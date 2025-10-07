@@ -2,7 +2,7 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top">
     <div class="container-fluid">
       <!-- Brand -->
-      <a class="navbar-brand fw-bold text-primary" href="#">
+      <a class="navbar-brand fw-bold text-primary p-3" href="#">
         🍎 FoodTracker
       </a>
 
