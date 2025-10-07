@@ -27,27 +27,20 @@
           <span>Leaderboard</span>
         </RouterLink>
         <div v-if="user" class="nav-link mt-4 position-relative">
-          <div
-            @click="toggleDropdown"
-            class="user-dropdown-toggle d-flex align-items-center gap-2"
-            tabindex="0"
-            @keydown.enter.prevent="toggleDropdown"
-            style="cursor:pointer;"
-            aria-haspopup="true"
-            :aria-expanded="dropdownOpen.toString()"
-          >
+          <div @click="toggleDropdown" class="user-dropdown-toggle d-flex align-items-center gap-2" tabindex="0"
+            @keydown.enter.prevent="toggleDropdown" style="cursor:pointer;" aria-haspopup="true"
+            :aria-expanded="dropdownOpen.toString()">
             <i class="bi bi-person-circle"></i>
             <span>{{ user.name }}</span>
             <i class="bi" :class="dropdownOpen ? 'bi-caret-up-fill' : 'bi-caret-down-fill'"></i>
           </div>
+
           <div v-if="dropdownOpen" class="user-dropdown-menu" role="menu" tabindex="-1">
-            <div
-              @click="logout"
-              class="logout-btn"
-              tabindex="0"
-              role="menuitem"
-              @keydown.enter.prevent="logout"
-            >
+            <!-- Link to Profile page -->
+            <RouterLink to="/profile" class="dropdown-item" role="menuitem" @click="closeDropdown" tabindex="0">My
+              Profile</RouterLink>
+            <!-- Logout button -->
+            <div @click="logout" class="logout-btn" tabindex="0" role="menuitem" @keydown.enter.prevent="logout">
               Logout
             </div>
           </div>
@@ -103,7 +96,7 @@ function logout() {
 .user-dropdown-menu {
   background: #f9f9f9;
   border-radius: 0.25rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   min-width: 110px;
   position: absolute;
   left: 0;
@@ -111,6 +104,7 @@ function logout() {
   z-index: 10;
   padding: 0.5rem 0.25rem;
 }
+
 .logout-btn {
   color: #059669;
   cursor: pointer;
@@ -121,20 +115,71 @@ function logout() {
   user-select: none;
   text-align: left;
 }
-.logout-btn:hover, .logout-btn:focus {
+
+.logout-btn:hover,
+.logout-btn:focus {
   background: #e6f4ef;
 }
+
 .user-dropdown-toggle {
   border-radius: 0.25rem;
   padding: 0.5rem 0;
   user-select: none;
 }
+
 .user-dropdown-toggle:hover,
 .user-dropdown-toggle:focus {
   background: #f3f4f6;
   outline: none;
 }
+
 .position-relative {
   position: relative;
 }
+.user-dropdown-menu {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+  min-width: 140px;
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 20;
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+.dropdown-item, .logout-btn {
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  transition: background 0.3s ease, color 0.3s ease;
+  text-align: left;
+}
+
+.dropdown-item {
+  color: #333;
+  font-weight: 600;
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+  background-color: #f0f0f0;
+  outline: none;
+}
+
+.logout-btn {
+  color: #059669; /* Green accent */
+  font-weight: 700;
+  margin-top: 0.25rem;
+}
+
+.logout-btn:hover, .logout-btn:focus {
+  background-color: #d1fae5;
+  color: #047857;
+  outline: none;
+}
+
 </style>
