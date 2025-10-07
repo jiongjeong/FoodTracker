@@ -49,7 +49,10 @@ export default {
           return;
         }
 
-        const userDoc = querySnapshot.docs[0].data();
+        const userDoc = {...
+          querySnapshot.docs[0].data(),
+          id: querySnapshot.docs[0].id
+        }
         console.log("User logged in:", userDoc);
 
         // Store user data in localStorage for session persistence
