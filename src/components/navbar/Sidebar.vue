@@ -26,6 +26,12 @@
           <i class="bi bi-trophy"></i>
           <span>Leaderboard</span>
         </RouterLink>
+
+        <RouterLink to="/signup" class="nav-link mt-auto" :class="{ active: $route.path === '/signup' }">
+          <i class="bi bi-person-plus"></i>
+          <span>Sign Up</span>
+        </RouterLink>
+        
       </nav>
     </div>
   </div>
