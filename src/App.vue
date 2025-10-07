@@ -1,7 +1,7 @@
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
 import HelloWorld from './components/HelloWorld.vue'
-import Sidebar from './components/navbar/Sidebar.vue'
+import Sidebar from './components/navbar/navbar.vue'
 </script>
 
 <template>
