@@ -66,6 +66,11 @@
             </a>
             <ul class="dropdown-menu dropdown-menu-end" :class="{ show: dropdownOpen }">
               <li>
+                <RouterLink to="/profile" class="dropdown-item" @click="closeNavbar">
+                  <i class="bi bi-person me-2"></i>My Profile
+                </RouterLink>
+              </li>
+              <li>
                 <a class="dropdown-item text-danger" href="#" @click="logout">
                   <i class="bi bi-box-arrow-right me-2"></i>Logout
                 </a>
