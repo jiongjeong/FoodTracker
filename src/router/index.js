@@ -11,7 +11,7 @@ import LeaderboardView from '../views/LeaderboardView.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/',component: HomeView },
+    // { path: '/',component: HomeView },
     { path: '/about', component: AboutView },
     { path: '/dashboard', component: DashboardView },
     { path: '/recipes', component: RecipesView },
@@ -19,7 +19,9 @@ const router = createRouter({
     { path: '/community', component: CommunityView },
     { path: '/analytics', component: AnalyticsView },
     { path: '/leaderboard', component: LeaderboardView },
-    { path: '/', redirect: '/dashboard' }
+    { path: '/', component: DashboardView },
+    // { path: '/signup', name: 'signup', component: () => import('../views/Signup.vue')},
+    // { path: '/login', name: 'login', component: () => import('../views/Login.vue')}
   ],
 })
 
