@@ -1,5 +1,38 @@
-<template>
+<script setup>
 
+import { ref, computed } from 'vue'
+const searchText = ref('')
+const selectedCategory = ref('All Categories')
+const sortBy = ref('expiration')
+const sortDirection = ref('asc')
+
+const categories = [
+  'All Categories',
+  'Fruits & Vegetables',
+  'Dairy & Eggs',
+  'Meat & Poultry',
+  'Bakery',
+  'Snacks',
+  'Beverages',
+  'Condiments & Sauces',
+  'Frozen Foods',
+  'Grains & Pasta',
+  'Other'
+]
+
+const toggleSortDirection = () => {
+  sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+}
+const getSortButtonIcon = computed(() => {
+  return sortDirection.value === 'asc' ? 'bi bi-sort-up' : 'bi bi-sort-down'
+})
+const getSortButtonTitle = computed(() => {
+  const direction = sortDirection.value === 'asc' ? 'Ascending' : 'Descending'
+  return `Sort ${direction}`
+})
+
+</script>
+<template>
   <div class="container-fluid p-4">
     <div class="dashboard-overview">
         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -58,6 +91,63 @@
           </div>
         </div>
       </div>
+      <div class="row g-4">
+          <div class="col-lg-8">
+            <div class="glass-card p-4">
+              <div class="d-flex align-items-center gap-2 mb-4">
+                <i class="bi bi-search"></i>
+                <h2 class="h4 mb-0">Food Inventory</h2>
+              </div>
+              <div class="row g-2 mb-3">
+                 <div class="col-12 col-md-4">
+                  <input
+                    v-model="searchText"
+                    type="text"
+                    class="form-control"
+                    placeholder="Search food items..."
+                 />
+                 </div>
+                 <div class="col-12 col-sm-6 col-md-3">
+                   <select v-model="selectedCategory" class="form-select">
+                    <option v-for="cat in categories" v-bind:key="cat" v-bind:value="cat">{{ cat }}</option>
+                  </select>
+                 </div>
+                 <div class="col-9 col-sm-4 col-md-3">
+                  <select v-model="sortBy" class="form-select">
+                    <option value="expiration">Expiration Date</option>
+                    <option value="name">Name (A-Z)</option>
+                    <option value="category">Category</option>
+                    <option value="quantity">Quantity (High-Low)</option>
+                    <option value="price">Price (High-Low)</option>
+                  </select>
+                 </div>
+                 <div class="col-3 col-sm-2 col-md-2">
+                  <button v-on:click="toggleSortDirection"
+                  class = "btn btn-outline-secondary sort-direction-btn w-100"
+                  :title="getSortButtonTitle"
+                  >
+                  <i :class="getSortButtonIcon"></i>
+                </button>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
   </div>
     
 </template>
+<style scoped>
+.sort-direction-btn {
+  min-width: 42px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.sort-direction-btn i {
+  font-size: 16px;
+  line-height: 1;
+}
+</style>
