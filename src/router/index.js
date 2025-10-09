@@ -20,9 +20,9 @@ const router = createRouter({
     { path: '/community', component: CommunityView },
     { path: '/analytics', component: AnalyticsView },
     { path: '/leaderboard', component: LeaderboardView },
-    { path: '/signup', name: 'signup', component: () => import('../views/Signup.vue')},
-    { path: '/login', name: 'login', component: () => import('../views/Login.vue')},
-    { path: '/profile', name: 'profile', component: () => import('../views/Profile.vue')},
+    { path: '/signup', name: 'signup', component: SignupView },
+    { path: '/login', name: 'login', component: LoginView },
+    { path: '/profile', name: 'profile', component: ProfileView },
   ],
 })
 
