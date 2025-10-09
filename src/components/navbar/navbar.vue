@@ -2,9 +2,14 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <!-- Brand -->
-      <a class="navbar-brand fw-bold text-primary p-2" href="#">
+      <RouterLink 
+        to="/dashboard" 
+        class="navbar-brand fw-bold text-primary p-2 text-decoration-none" 
+        :class="{ active: $route.path === '/dashboard' }" 
+        @click="closeNavbar"
+      >
         🍎 FoodTracker
-      </a>
+      </RouterLink>
 
       <!-- Mobile hamburger button (auto-hidden on lg+) -->
       <button 
@@ -138,6 +143,12 @@ function logout() {
 </script>
 
 <style scoped>
+/* Navbar layout reset */
+.navbar {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
 /* Custom active link styling */
 .nav-link.active {
   color: #0d6efd !important;
