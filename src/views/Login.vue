@@ -26,7 +26,7 @@
 
 <script>
 import { getFirestore, collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "@/firebase"; // Adjust based on your firebase config export
+import { db } from "@/firebase";  // Your firebase configuration export
 
 export default {
   data() {
@@ -40,7 +40,7 @@ export default {
     async submitForm() {
       this.errorMessage = "";
       try {
-        const usersRef = collection(db, "user");
+        const usersRef = collection(db, "user");  // Confirm your collection name here
         const q = query(usersRef, where("email", "==", this.email), where("password", "==", this.password));
         const querySnapshot = await getDocs(q);
 
@@ -49,8 +49,15 @@ export default {
           return;
         }
 
-        const userDoc = querySnapshot.docs[0].data();
+        const userDoc = {...
+          querySnapshot.docs[0].data(),
+          id: querySnapshot.docs[0].id
+        }
         console.log("User logged in:", userDoc);
+
+        // Store user data in localStorage for session persistence
+        localStorage.setItem("user", JSON.stringify(userDoc));
+        window.dispatchEvent(new Event('userChange'));  // Important: Notify other components immediately
 
         // Redirect on successful login
         this.$router.push('/dashboard');
@@ -63,6 +70,7 @@ export default {
     }
   }
 };
+
 </script>
 
 <style scoped>

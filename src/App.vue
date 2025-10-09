@@ -1,23 +1,22 @@
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-import Sidebar from './components/navbar/Sidebar.vue'
+// import HelloWorld from './components/HelloWorld.vue'
+import Navbar from './components/navbar/navbar.vue'
 </script>
 
 <template>
-  <header>
-    <!-- <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" /> -->
-
-    <!-- <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-    </div> -->
-  </header>
-  <Sidebar />
-
-  <RouterView />
+  <div class="app-container">
+    <Navbar />
+    <RouterView />
+  </div>
 </template>
 
 <style scoped>
+.app-container {
+  margin: 0;
+  padding: 0;
+}
+
 header {
   line-height: 1.5;
   max-height: 100vh;
