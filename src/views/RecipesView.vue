@@ -1,6 +1,14 @@
 <script setup>
 import { ref, computed } from 'vue'
+import axios from 'axios'
 
+// Configuration constants
+const API_BASE_URL = 'https://www.themealdb.com/api/json/v1/1'
+const MAX_INGREDIENTS = 20
+const REQUEST_TIMEOUT = 10000 // 10 seconds
+const POPULAR_CATEGORIES = ['Chicken', 'Beef', 'Pasta', 'Seafood', 'Dessert']
+
+// Reactive state
 const activeTab = ref('search')
 const searchQuery = ref('')
 const isLoading = ref(false)
@@ -9,21 +17,40 @@ const popularRecipes = ref([])
 const bookmarkedRecipes = ref([])
 const selectedRecipe = ref(null)
 const showRecipeModal = ref(false)
+const errorMessage = ref('')
+
+// Error handling helper
+const handleApiError = (error) => {
+  if (error.code === 'ECONNABORTED') {
+    return 'Request timed out. Please check your connection and try again.'
+  } else if (error.response) {
+    return `Server error: ${error.response.status}. Please try again later.`
+  } else if (error.request) {
+    return 'Network error. Please check your internet connection.'
+  } else {
+    return error.message || 'An unexpected error occurred. Please try again.'
+  }
+}
 
 // Search recipes from TheMealDB API
 const searchRecipes = async (query) => {
   if (!query.trim()) {
     searchResults.value = []
+    errorMessage.value = ''
     return
   }
 
   isLoading.value = true
+  errorMessage.value = ''
+  
   try {
-    const response = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(query)}`)
-    const data = await response.json()
+    const response = await axios.get(`${API_BASE_URL}/search.php`, {
+      params: { s: query },
+      timeout: REQUEST_TIMEOUT
+    })
     
-    if (data.meals) {
-      searchResults.value = data.meals.map(meal => ({
+    if (response.data.meals) {
+      searchResults.value = response.data.meals.map(meal => ({
         id: meal.idMeal,
         name: meal.strMeal,
         image: meal.strMealThumb,
@@ -40,27 +67,34 @@ const searchRecipes = async (query) => {
     }
   } catch (error) {
     console.error('Error searching recipes:', error)
+    errorMessage.value = handleApiError(error)
     searchResults.value = []
   } finally {
     isLoading.value = false
   }
 }
 
-// Get popular recipes
+// Get popular recipes using parallel requests
 const getPopularRecipes = async () => {
   isLoading.value = true
+  errorMessage.value = ''
+  
   try {
-    const categories = ['Chicken', 'Beef', 'Pasta', 'Seafood', 'Dessert']
-    const recipes = []
+    // Create parallel requests for all categories
+    const requests = POPULAR_CATEGORIES.map(category => 
+      axios.get(`${API_BASE_URL}/search.php`, {
+        params: { s: category },
+        timeout: REQUEST_TIMEOUT
+      })
+    )
     
-    for (const category of categories) {
-      const response = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${category}`)
-      const data = await response.json()
-      
-      if (data.meals) {
-        recipes.push(data.meals[0]) // Take first recipe from each category
-      }
-    }
+    // Execute all requests in parallel
+    const responses = await Promise.all(requests)
+    
+    // Process responses and extract first recipe from each category
+    const recipes = responses
+      .map(response => response.data.meals?.[0])
+      .filter(meal => meal !== null && meal !== undefined)
 
     popularRecipes.value = recipes.map(meal => ({
       id: meal.idMeal,
@@ -77,6 +111,8 @@ const getPopularRecipes = async () => {
     
   } catch (error) {
     console.error('Error getting popular recipes:', error)
+    errorMessage.value = handleApiError(error)
+    popularRecipes.value = []
   } finally {
     isLoading.value = false
   }
@@ -85,7 +121,7 @@ const getPopularRecipes = async () => {
 // Extract ingredients list from TheMealDB response
 const getIngredientsList = (meal) => {
   const ingredients = []
-  for (let i = 1; i <= 20; i++) {
+  for (let i = 1; i <= MAX_INGREDIENTS; i++) {
     const ingredient = meal[`strIngredient${i}`]
     const measure = meal[`strMeasure${i}`]
     if (ingredient && ingredient.trim()) {
@@ -180,6 +216,13 @@ initializeRecipes()
 
     <!-- Search Section -->
     <div class="glass-card p-4 mb-4">
+      <!-- Error Message -->
+      <div v-if="errorMessage" class="alert alert-danger d-flex align-items-center mb-3">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <span>{{ errorMessage }}</span>
+        <button type="button" class="btn-close ms-auto" @click="errorMessage = ''"></button>
+      </div>
+      
       <div class="row g-3 align-items-end">
         <div class="col-md-8">
           <label class="form-label">Search for recipes</label>
