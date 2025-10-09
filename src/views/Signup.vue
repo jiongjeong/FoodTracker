@@ -71,7 +71,7 @@ export default {
                     password: this.password // Plaintext, use hashing in real apps
                 });
                 alert('Registration successful!');
-                // clear form and redirect if needed
+                this.goToLogin();
             } catch (e) {
                 console.error('Error writing document: ', e);
                 alert('Error: ' + e.message);
