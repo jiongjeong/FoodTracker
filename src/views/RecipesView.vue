@@ -127,7 +127,11 @@ const toggleBookmark = (recipe) => {
   updateInList(popularRecipes.value)
   
   // Save to localStorage
-  localStorage.setItem('bookmarked_recipes', JSON.stringify(bookmarkedRecipes.value))
+  try {
+    localStorage.setItem('bookmarked_recipes', JSON.stringify(bookmarkedRecipes.value))
+  } catch (error) {
+    console.error('Error saving bookmarked recipes:', error)
+  }
 }
 
 // Load bookmarked recipes from localStorage
