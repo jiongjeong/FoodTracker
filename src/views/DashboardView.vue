@@ -13,6 +13,7 @@ const sortDirection = ref('asc')
 const food_inv = ref([])
 const auth = getAuth();
 const user = auth.currentUser;
+const uid = user ? user.id : null;
 
 const categories = [
   'All Categories',
@@ -28,7 +29,7 @@ const categories = [
   'Other'
 ]
 
-console.log( 'user id in dashboard:', uid);
+console.log('user id in dashboard:', user ? user.uid : 'No user');
 console.log('user in dashboard:', user);
 onMounted(async () => {
   if (user) {
