@@ -1,7 +1,7 @@
-<script>
+<script setup>
 import { db } from '../firebase.js'; // adjust path as needed
 import { collection, getDocs } from 'firebase/firestore';
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 
 const searchText = ref('')
