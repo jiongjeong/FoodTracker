@@ -118,17 +118,16 @@ export default {
       // Add a placeholder document with all activity fields initialized
       await addDoc(activitiesRef, {
         _placeholder: true,
-        type: "",
+        actionType: "",
+        foodName: "",
         description: "",
         points: 0,
-        relatedItemId: "",
         quantity: 0,
         unit: "",
-        moneySaved: 0,
+        price: 0,
         wasteAvoided: false,
         category: "",
-        achievement: "",
-      });
+    });
     },
 
     async initializeRecipesCollection(userId) {
