@@ -22,7 +22,8 @@ const router = createRouter({
     { path: '/leaderboard', component: LeaderboardView },
     { path: '/', component: DashboardView },
     { path: '/signup', name: 'signup', component: () => import('../views/Signup.vue')},
-    { path: '/login', name: 'login', component: () => import('../views/Login.vue')}
+    { path: '/login', name: 'login', component: () => import('../views/Login.vue')},
+    { path: '/profile', name: 'profile', component: () => import('../views/Profile.vue')},
   ],
 })
 
