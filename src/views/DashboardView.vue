@@ -58,9 +58,6 @@ const addForm = reactive({
   unit: ''
 })
 
-const foodItems = ref([])
-const recipes = ref([])
-const activities = ref([])
 
 onMounted(async () => {
   if (user && userId) {
