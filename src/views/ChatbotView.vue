@@ -80,19 +80,33 @@ const getPopularRecipes = async () => {
   errorMessage.value = ''
   
   try {
-    // Create parallel requests for all categories
-    const requests = POPULAR_CATEGORIES.map(category => 
-      axios.get(`${API_BASE_URL}/search.php`, {
-        params: { s: category },
+    // Step 1: Get first meal from each category using /filter.php?c=${category}
+    const filterRequests = POPULAR_CATEGORIES.map(category =>
+      axios.get(`${API_BASE_URL}/filter.php`, {
+        params: { c: category },
         timeout: REQUEST_TIMEOUT
       })
     )
     
-    // Execute all requests in parallel
-    const responses = await Promise.all(requests)
+    const filterResponses = await Promise.all(filterRequests)
     
-    // Process responses and extract first recipe from each category
-    const recipes = responses
+    // Step 2: For each category, get the first meal's id
+    const firstMealIds = filterResponses
+      .map(response => response.data.meals?.[0]?.idMeal)
+      .filter(id => id !== null && id !== undefined)
+
+    // Step 3: Fetch full details for each first meal using /lookup.php?i=${id}
+    const detailRequests = firstMealIds.map(id =>
+      axios.get(`${API_BASE_URL}/lookup.php`, {
+        params: { i: id },
+        timeout: REQUEST_TIMEOUT
+      })
+    )
+
+    const detailResponses = await Promise.all(detailRequests)
+
+    // Step 4: Map to full meal objects
+    const recipes = detailResponses
       .map(response => response.data.meals?.[0])
       .filter(meal => meal !== null && meal !== undefined)
 
