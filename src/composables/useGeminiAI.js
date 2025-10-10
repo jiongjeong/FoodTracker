@@ -16,13 +16,13 @@ export function useGeminiAI() {
     error.value = null
 
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+      const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" })
+      const response = await model.generateContent({
         contents: prompt,
-        config: {
-            thinkingConfig: {
-                thinkingBudget: 0, // Disables thinking
-            },
+        generationConfig: {
+          thinkingConfig: {
+            thinkingBudget: 0, // Disables thinking
+          },
         }
       })
 
