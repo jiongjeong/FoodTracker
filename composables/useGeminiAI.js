@@ -26,7 +26,7 @@ export function useGeminiAI() {
         }
       })
 
-      return response.text
+      return await response.response.text()
     } catch (err) {
       error.value = errorMessage
       console.error('Gemini AI Error:', err)
