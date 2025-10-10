@@ -28,13 +28,13 @@ const categories = [
   'Other'
 ]
 
-console.log( 'user id in dashboard:', uid);
+console.log( 'user id in dashboard:', id);
 console.log('user in dashboard:', user);
 onMounted(async () => {
   if (user) {
     const q = query (
       collection(db, 'food'),
-      where('userId', '==', user.uid)
+      where('userId', '==', user.id)
     );
     const querySnapshot = await getDocs(q);
     food_inv.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
