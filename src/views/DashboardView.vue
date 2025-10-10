@@ -65,17 +65,7 @@ console.log('user in dashboard:', user);
 console.log(foodItems);
 console.log(recipes);
 console.log(activities);
-// onMounted(async () => {
-//   if (user) {
-//     const q = query(
-//       collection(db, 'food'),
-//       where('userId', '==', userId)
-//     );
-//     const querySnapshot = await getDocs(q);
-//     foodItems.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-//     console.log('User is signed in:', user.email);
-//   }
-// })
+
 
 const filteredFoodItems = computed(() => {
   const uniqueItems = foodItems.value.filter(
