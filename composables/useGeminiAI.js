@@ -46,7 +46,7 @@ Context about the user:
 - Total money saved: $${context.totalSaved || 0}
 
 Guidelines for responses:
-1. Keep responses concise and helpful (4-5 sentences max)
+1. Keep responses concise and helpful (2-3 sentences max)
 2. Focus on food waste reduction, meal planning, and inventory management
 3. Be encouraging and positive about their food-saving efforts
 4. Provide actionable advice when possible
