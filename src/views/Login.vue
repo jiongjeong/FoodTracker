@@ -87,6 +87,7 @@ export default {
 h2 {
   margin-bottom: 1.5rem;
   color: #059669;
+  text-align: center;
 }
 
 .form-group {

@@ -2,20 +2,21 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <!-- Brand -->
-      <RouterLink 
-        to="/dashboard" 
-        class="navbar-brand fw-bold text-primary p-2 text-decoration-none" 
-        :class="{ active: $route.path === '/dashboard' }" 
+      <RouterLink
+        to="/dashboard"
+        class="navbar-brand fw-bold text-primary p-2 text-decoration-none"
+        :class="{ active: $route.path === '/dashboard' }"
         @click="closeNavbar"
       >
-        🍎 FoodTracker
+      <img src="/bigbackicon.jpg" alt="Logo" class="me-2" style="height: 40px; border-radius: 50%;" />
+         BigBack
       </RouterLink>
 
       <!-- Mobile hamburger button (auto-hidden on lg+) -->
-      <button 
-        class="navbar-toggler" 
-        type="button" 
-        data-bs-toggle="collapse" 
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-bs-toggle="collapse"
         data-bs-target="#navbarNav"
         @click="toggleNavbar"
       >
@@ -60,11 +61,11 @@
         <!-- User section -->
         <ul class="navbar-nav ms-auto">
           <li class="nav-item dropdown" v-if="user">
-            <a 
-              class="nav-link dropdown-toggle" 
-              href="#" 
-              role="button" 
-              @click="toggleDropdown"
+            <a
+              class="nav-link dropdown-toggle"
+              href="#"
+              role="button"
+              @click.prevent="toggleDropdown"
               :class="{ show: dropdownOpen }"
             >
               <i class="bi bi-person-circle me-1"></i>{{ user.name }}
@@ -76,14 +77,14 @@
                 </RouterLink>
               </li>
               <li>
-                <a class="dropdown-item text-danger" href="#" @click="logout">
+                <a class="dropdown-item text-danger" href="#" @click.prevent="logout">
                   <i class="bi bi-box-arrow-right me-2"></i>Logout
                 </a>
               </li>
             </ul>
           </li>
           <li class="nav-item" v-else>
-            <RouterLink to="/signup" class="nav-link" :class="{ active: $route.path === '/signup' }" @click="closeNavbar">
+            <RouterLink to="/login" class="nav-link" :class="{ active: $route.path === '/login' }" @click="closeNavbar">
               <i class="bi bi-person-plus me-1"></i>Login/Sign Up
             </RouterLink>
           </li>
@@ -133,6 +134,8 @@ function toggleDropdown() {
   dropdownOpen.value = !dropdownOpen.value
 }
 
+// Centralized logout logic in navbar
+
 function logout() {
   localStorage.removeItem('user')
   window.dispatchEvent(new Event("userChange"))
@@ -148,14 +151,12 @@ function logout() {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }
-
 /* Custom active link styling */
 .nav-link.active {
   color: #0d6efd !important;
   background-color: #e7f1ff;
   border-radius: 0.375rem;
 }
-
 /* Dropdown styling */
 .dropdown-menu {
   border: 1px solid #dee2e6;
@@ -165,21 +166,17 @@ function logout() {
   min-width: 200px;
   transform: translateX(0);
 }
-
 .dropdown-menu.dropdown-menu-end {
   right: 0 !important;
   left: auto !important;
 }
-
 /* Ensure navbar stays on top */
 .sticky-top {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-
 .navbar-brand {
   font-size: 1.35rem;
 }
-
 .nav-link {
   font-size: 1.12rem;
 }
