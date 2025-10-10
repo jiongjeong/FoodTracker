@@ -36,7 +36,7 @@
 </template>
 
 <script>
-import { getFirestore, collection, query, where, getDocs, addDoc } from "firebase/firestore";
+import { getFirestore, collection, query, where, getDocs, addDoc, doc, setDoc } from "firebase/firestore";
 import { db } from '@/firebase'; // your Firebase config export
 
 export default {
@@ -64,12 +64,18 @@ export default {
             }
 
             try {
-                await addDoc(usersRef, {
+                // Create user document
+                const userDocRef = await addDoc(usersRef, {
                     email: this.email,
                     foodScore: 0,
                     name: this.name,
-                    password: this.password // Plaintext, use hashing in real apps
+                    password: this.password,
+                    createdAt: new Date()
                 });
+
+                // Initialize empty collections for the new user
+                await this.initializeUserCollections(userDocRef.id);
+
                 alert('Registration successful!');
                 this.goToLogin();
             } catch (e) {
@@ -77,6 +83,65 @@ export default {
                 alert('Error: ' + e.message);
             }
         },
+
+        async initializeUserCollections(userId) {
+            try {
+                // Initialize collections with proper field structure
+                await this.initializeFoodItemsCollection(userId);
+                await this.initializeActivitiesCollection(userId);
+                await this.initializeRecipesCollection(userId);
+                
+                console.log('User collections initialized successfully');
+            } catch (error) {
+                console.error('Error initializing user collections:', error);
+                // Don't throw error to avoid breaking signup process
+            }
+        },
+
+        async initializeFoodItemsCollection(userId) {
+            const foodItemsRef = collection(db, `users/${userId}/foodItems`);
+            
+            // Add a placeholder document with all foodItem fields initialized
+            await addDoc(foodItemsRef, {
+                _placeholder: true,
+                name: "",
+                category: "",
+                quantity: 0,
+                unit: "",
+                expirationDate: "",
+                price: 0,
+            });
+        },
+
+        async initializeActivitiesCollection(userId) {
+            const activitiesRef = collection(db, `users/${userId}/activities`);
+            
+            // Add a placeholder document with all activity fields initialized
+            await addDoc(activitiesRef, {
+                _placeholder: true,
+                type: "",
+                description: "",
+                points: 0,
+                relatedItemId: "",
+                quantity: 0,
+                unit: "",
+                moneySaved: 0,
+                wasteAvoided: false,
+                category: "",
+                achievement: "",
+            });
+        },
+
+        async initializeRecipesCollection(userId) {
+            const recipesRef = collection(db, `users/${userId}/recipes`);
+            
+            // Add a placeholder document with minimal recipe fields for TheMealDB API
+            await addDoc(recipesRef, {
+                _placeholder: true,
+                idMeal: "",               // TheMealDB recipe ID (primary key)
+            });
+        },
+
         goToLogin() {
             this.$router.push('/login');
         }
@@ -147,7 +212,6 @@ button[type='submit'] {
 button[type='submit']:hover {
     background: #059669;
 }
-
 .login-redirect-btn {
     width: 100%;
     text-align: center;
