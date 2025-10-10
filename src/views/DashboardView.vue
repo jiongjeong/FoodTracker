@@ -5,29 +5,10 @@ import { collection, getDocs} from 'firebase/firestore';
 import { ref, computed, onMounted } from 'vue'
 
 
-const searchText = ref('');
-const selectedCategory = ref('All Categories');
-const sortBy = ref('expiration');
-const sortDirection = ref('asc');
-const food_inv = ref([]);
-const auth = getAuth();
-const user = auth.currentUser;
-const uid = user ? user.uid : null;
-
-onAuthStateChanged(auth, async(user) => {
-  if (user) {
-    const q = query(
-      collection(db, 'food'),
-      where('userId', '==', user.uid)
-    );
-    const querySnapshot = await getDocs(q);
-    food_inv.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    console.log('User is signed in:', user.email);
-  } else {
-    food_inv.value = [];
-    console.log('No user is signed in.');
-  } 
-})
+const searchText = ref('')
+const selectedCategory = ref('All Categories')
+const sortBy = ref('expiration')
+const sortDirection = ref('asc')
 
 const categories = [
   'All Categories',
@@ -228,41 +209,47 @@ const potentialLoss = computed(() =>
                 </button>
                  </div>
               </div>
+              <div v-if="food_inv.length === 0" class="text-center py-5">
+                <i class="bi bi-search fs-1 text-muted"></i>
+                <p class="text-muted mt-3">No food items found</p>
+              </div>
+              <div v-else class="food-scroll-container">
+                <div class="food-scroll-section">
+                  <div v-for="food in food_inv" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
+                  <div class="food-header">
+                    <div>
+                      <div class="food-title-group">
+                        <span class="food-name">{{ food.name }}</span>
+                        <span class="expired-badge" :class="getBadgeClass(food)">
+                          <span v-if="getDaysLeft(food) < 0">Expired</span>
+                          <span v-else-if="getDaysLeft(food) == 0">Today</span>
+                          <span v-else>{{ getDaysLeft(food) }} days</span>
+                        </span>
+                      </div>
+                      <div class="food-category">{{ food.category }}</div>
+                      <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
+                    </div>
+                    <div class="food-right">
+                      <div class="food-price">${{ food.price }}</div>
+                      <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
+                    </div>
+                  </div>
+                  <div class="food-actions">
+                    <button class="food-btn food-btn-edit"><i class="bi bi-pencil"></i> Edit</button>
+                    <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
+                    <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
+                  </div>
+
+                </div>
+              </div>
+              
+
             </div>
           </div>
-        </div>
-  <div class="food-scroll-container">
-    <div class="food-scroll-section">
-      <div v-for="food in food_inv" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
-        <div class="food-header">
-          <div>
-            <div class="food-title-group">
-              <span class="food-name">{{ food.name }}</span>
-              <span class="expired-badge" :class="getBadgeClass(food)">
-                <span v-if="getDaysLeft(food) < 0">Expired</span>
-                <span v-else-if="getDaysLeft(food) == 0">Today</span>
-                <span v-else>{{ getDaysLeft(food) }} days</span>
-              </span>
-            </div>
-            <div class="food-category">{{ food.category }}</div>
-            <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
-          </div>
-          <div class="food-right">
-            <div class="food-price">${{ food.price }}</div>
-            <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
-            
-          </div>
-        </div>
-        <div class="food-actions">
-          <button class="food-btn food-btn-edit"><i class="bi bi-pencil"></i> Edit</button>
-          <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
-          <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
         </div>
       </div>
-    </div>
-  </div>
-  </div>
-
+  
+</div>
   
 
 </template>
