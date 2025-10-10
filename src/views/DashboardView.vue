@@ -12,21 +12,28 @@ const food_inv = ref([])
 const user = JSON.parse(localStorage.getItem('user'))
 const userId = JSON.parse(localStorage.getItem('user'))?.id
 
+const foodItems = ref([])
+const recipes = ref([])
+const activities = ref([])
 
-// Fetch foodItems subcollection for the user
-const foodItemsRef = collection(db, 'user', userId, 'foodItems');
-const foodItemsSnapshot = await getDocs(foodItemsRef);
-const foodItems = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+onMounted(async () => {
+  if (user && userId) {
+    // Fetch food subcollection
+    const foodItemsRef = collection(db, 'user', userId, 'foodItems');
+    const foodItemsSnapshot = await getDocs(foodItemsRef);
+    foodItems.value = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-// Fetch recipes subcollection for the user
-const recipesRef = collection(db, 'user', userId, 'recipes');
-const recipesSnapshot = await getDocs(recipesRef);
-const recipes = recipesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Fetch recipes subcollection
+    const recipesRef = collection(db, 'user', userId, 'recipes');
+    const recipesSnapshot = await getDocs(recipesRef);
+    recipes.value = recipesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-// Repeat similarly for 'activity' if present as a subcollection
-const activityRef = collection(db, 'user', userId, 'activities');
-const activitySnapshot = await getDocs(activityRef);
-const activities = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Fetch activities subcollection
+    const activityRef = collection(db, 'user', userId, 'activities');
+    const activitySnapshot = await getDocs(activityRef);
+    activities.value = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  }
+});
 
 const categories = [
   'All Categories',
@@ -49,7 +56,7 @@ console.log(recipes);
 console.log(activities);
 onMounted(async () => {
   if (user) {
-    const q = query (
+    const q = query(
       collection(db, 'food'),
       where('userId', '==', userId)
     );
@@ -214,139 +221,132 @@ const potentialLoss = computed(() =>
 <template>
   <div class="container-fluid p-4">
     <div class="dashboard-overview">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <div>
-            <h1 class="h2 mb-2">Dashboard</h1>
-            <p class="text-muted mb-0">Track your food inventory and reduce waste</p>
-          </div>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h1 class="h2 mb-2">Dashboard</h1>
+          <p class="text-muted mb-0">Track your food inventory and reduce waste</p>
         </div>
+      </div>
 
-        <div class="row g-3">
-          <div class="col-6 col-lg-3">
-            <div class="glass-card stat-card p-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-graph-up-arrow text-success"></i>
-                <small class="text-muted">Food Score</small>
-              </div>
-              <!-- <h3 class="h4">{{ user.currentScore }}</h3> -->
-              <h3 class="h4">placeholder</h3>
-              <small class="text-muted">points</small>
-            </div>
-          </div>
+      <div class="row g-3">
         <div class="col-6 col-lg-3">
-            <div class="glass-card stat-card p-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-exclamation-triangle text-warning"></i>
-                <small class="text-muted">Expiring Soon</small>
-              </div>
-              <h3 class="h4">{{ expiringSoon }}</h3>
-              <small class="text-muted">items</small>
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-graph-up-arrow text-success"></i>
+              <small class="text-muted">Food Score</small>
             </div>
+            <!-- <h3 class="h4">{{ user.currentScore }}</h3> -->
+            <h3 class="h4">placeholder</h3>
+            <small class="text-muted">points</small>
           </div>
-
-          <div class="col-6 col-lg-3">
-            <div class="glass-card stat-card p-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-currency-dollar text-success"></i>
-                <small class="text-muted">Potential Loss</small>
-              </div>
-              <h3 class="h4">${{ potentialLoss.toFixed(2) }}</h3>
-              <small class="text-muted">if expired</small>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-exclamation-triangle text-warning"></i>
+              <small class="text-muted">Expiring Soon</small>
             </div>
+            <h3 class="h4">{{ expiringSoon }}</h3>
+            <small class="text-muted">items</small>
           </div>
+        </div>
 
-          <div class="col-6 col-lg-3">
-            <div class="glass-card stat-card p-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-calendar-x text-danger"></i>
-                <small class="text-muted">Expired</small>
-              </div>
-              <h3 class="h4 text-danger">{{ expired }}</h3>
-              <small class="text-muted">items</small>
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-currency-dollar text-success"></i>
+              <small class="text-muted">Potential Loss</small>
             </div>
+            <h3 class="h4">${{ potentialLoss.toFixed(2) }}</h3>
+            <small class="text-muted">if expired</small>
+          </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-calendar-x text-danger"></i>
+              <small class="text-muted">Expired</small>
+            </div>
+            <h3 class="h4 text-danger">{{ expired }}</h3>
+            <small class="text-muted">items</small>
           </div>
         </div>
       </div>
+    </div>
     <div class="row g-4">
-          <div class="col-lg-8">
-            <div class="glass-card p-4">
-              <div class="d-flex align-items-center gap-2 mb-4">
-                <i class="bi bi-search"></i>
-                <h2 class="h4 mb-0">Food Inventory</h2>
-              </div>
-              <div class="row g-2 mb-3">
-                 <div class="col-12 col-md-4">
-                  <input
-                    v-model="searchText"
-                    type="text"
-                    class="form-control"
-                    placeholder="Search food items..."
-                 />
-                 </div>
-                 <div class="col-12 col-sm-6 col-md-3">
-                   <select v-model="selectedCategory" class="form-select">
-                    <option v-for="cat in categories" v-bind:key="cat" v-bind:value="cat">{{ cat }}</option>
-                  </select>
-                 </div>
-                 <div class="col-9 col-sm-4 col-md-3">
-                  <select v-model="sortBy" class="form-select">
-                    <option value="expiration">Expiration Date</option>
-                    <option value="name">Name (A-Z)</option>
-                    <option value="category">Category</option>
-                    <option value="quantity">Quantity (High-Low)</option>
-                    <option value="price">Price (High-Low)</option>
-                  </select>
-                 </div>
-                 <div class="col-3 col-sm-2 col-md-2">
-                  <button v-on:click="toggleSortDirection"
-                  class = "btn btn-outline-secondary sort-direction-btn w-100"
-                  :title="getSortButtonTitle"
-                  >
-                  <i :class="getSortButtonIcon"></i>
-                </button>
-                 </div>
-              </div>
-              <div v-if="filteredFoodItems.length === 0" class="text-center py-5">
-                <i class="bi bi-search fs-1 text-muted"></i>
-                <p class="text-muted mt-3">No food items found</p>
-              </div>
-              <div v-else class="food-scroll-container">
-                <div class="food-scroll-section">
-                  <div v-for="food in filteredFoodItems" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
-                  <div class="food-header">
-                    <div>
-                      <div class="food-title-group">
-                        <span class="food-name">{{ food.name }}</span>
-                        <span class="expired-badge" :class="getBadgeClass(food)">
-                          <span v-if="getDaysLeft(food) < 0">Expired</span>
-                          <span v-else-if="getDaysLeft(food) == 0">Today</span>
-                          <span v-else>{{ getDaysLeft(food) }} days</span>
-                        </span>
-                      </div>
-                      <div class="food-category">{{ food.category }}</div>
-                      <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
-                    </div>
-                    <div class="food-right">
-                      <div class="food-price">${{ food.price }}</div>
-                      <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
-                    </div>
-                  </div>
-                  <div class="food-actions">
-                    <button class="food-btn food-btn-edit"><i class="bi bi-pencil"></i> Edit</button>
-                    <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
-                    <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
-                  </div>
-
-                </div>
-              </div>
-
-
+      <div class="col-lg-8">
+        <div class="glass-card p-4">
+          <div class="d-flex align-items-center gap-2 mb-4">
+            <i class="bi bi-search"></i>
+            <h2 class="h4 mb-0">Food Inventory</h2>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-12 col-md-4">
+              <input v-model="searchText" type="text" class="form-control" placeholder="Search food items..." />
             </div>
+            <div class="col-12 col-sm-6 col-md-3">
+              <select v-model="selectedCategory" class="form-select">
+                <option v-for="cat in categories" v-bind:key="cat" v-bind:value="cat">{{ cat }}</option>
+              </select>
+            </div>
+            <div class="col-9 col-sm-4 col-md-3">
+              <select v-model="sortBy" class="form-select">
+                <option value="expiration">Expiration Date</option>
+                <option value="name">Name (A-Z)</option>
+                <option value="category">Category</option>
+                <option value="quantity">Quantity (High-Low)</option>
+                <option value="price">Price (High-Low)</option>
+              </select>
+            </div>
+            <div class="col-3 col-sm-2 col-md-2">
+              <button v-on:click="toggleSortDirection" class="btn btn-outline-secondary sort-direction-btn w-100"
+                :title="getSortButtonTitle">
+                <i :class="getSortButtonIcon"></i>
+              </button>
+            </div>
+          </div>
+          <div v-if="filteredFoodItems.length === 0" class="text-center py-5">
+            <i class="bi bi-search fs-1 text-muted"></i>
+            <p class="text-muted mt-3">No food items found</p>
+          </div>
+          <div v-else class="food-scroll-container">
+            <div class="food-scroll-section">
+              <div v-for="food in filteredFoodItems" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
+                <div class="food-header">
+                  <div>
+                    <div class="food-title-group">
+                      <span class="food-name">{{ food.name }}</span>
+                      <span class="expired-badge" :class="getBadgeClass(food)">
+                        <span v-if="getDaysLeft(food) < 0">Expired</span>
+                        <span v-else-if="getDaysLeft(food) == 0">Today</span>
+                        <span v-else>{{ getDaysLeft(food) }} days</span>
+                      </span>
+                    </div>
+                    <div class="food-category">{{ food.category }}</div>
+                    <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
+                  </div>
+                  <div class="food-right">
+                    <div class="food-price">${{ food.price }}</div>
+                    <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
+                  </div>
+                </div>
+                <div class="food-actions">
+                  <button class="food-btn food-btn-edit"><i class="bi bi-pencil"></i> Edit</button>
+                  <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
+                  <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
+                </div>
+
+              </div>
+            </div>
+
+
           </div>
         </div>
       </div>
+    </div>
 
-</div>
+  </div>
 
 
 </template>
@@ -480,17 +480,21 @@ const potentialLoss = computed(() =>
   gap: 6px;
   transition: background 0.2s, color 0.2s;
 }
+
 .food-btn-edit {
   background: #e0e0e0;
 }
+
 .food-btn-use {
   background: #e8f5e9;
   color: #388e3c;
 }
+
 .food-btn-delete {
   background: #ffebee;
   color: #e53935;
 }
+
 .food-btn:hover {
   filter: brightness(0.95);
 }
@@ -500,6 +504,7 @@ const potentialLoss = computed(() =>
   font-weight: bold;
   margin-left: 16px;
 }
+
 .sort-direction-btn {
   min-width: 42px;
   height: 38px;
