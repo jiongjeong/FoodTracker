@@ -12,6 +12,22 @@ const food_inv = ref([])
 const user = JSON.parse(localStorage.getItem('user'))
 const userId = JSON.parse(localStorage.getItem('user'))?.id
 
+
+// Fetch foodItems subcollection for the user
+const foodItemsRef = collection(db, 'user', userId, 'foodItems');
+const foodItemsSnapshot = await getDocs(foodItemsRef);
+const foodItems = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+// Fetch recipes subcollection for the user
+const recipesRef = collection(db, 'user', userId, 'recipes');
+const recipesSnapshot = await getDocs(recipesRef);
+const recipes = recipesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+// Repeat similarly for 'activity' if present as a subcollection
+const activityRef = collection(db, 'user', userId, 'activities');
+const activitySnapshot = await getDocs(activityRef);
+const activities = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
 const categories = [
   'All Categories',
   'Fruits & Vegetables',
@@ -28,6 +44,9 @@ const categories = [
 
 console.log('user id in dashboard:', userId);
 console.log('user in dashboard:', user);
+console.log(foodItems);
+console.log(recipes);
+console.log(activities);
 onMounted(async () => {
   if (user) {
     const q = query (
