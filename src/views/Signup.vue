@@ -127,7 +127,7 @@ export default {
         price: 0,
         wasteAvoided: false,
         category: "",
-    });
+      });
     },
 
     async initializeRecipesCollection(userId) {
