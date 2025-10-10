@@ -16,18 +16,12 @@ export function useGeminiAI() {
     error.value = null
 
     try {
-      const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" })
-      const response = await model.generateContent({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: prompt }]
-          }
-        ],
-        // generationConfig can be included if you have valid options, but thinkingConfig is not supported
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
       })
-      return response.response.text()
-      return await response.response.text()
+      
+      return response.text
     } catch (err) {
       error.value = errorMessage
       console.error('Gemini AI Error:', err)
@@ -47,7 +41,7 @@ Context about the user:
 - Total money saved: $${context.totalSaved || 0}
 
 Guidelines for responses:
-1. Keep responses concise and helpful (2-3 sentences max)
+1. Keep responses concise and helpful (3-4 sentences max)
 2. Focus on food waste reduction, meal planning, and inventory management
 3. Be encouraging and positive about their food-saving efforts
 4. Provide actionable advice when possible
