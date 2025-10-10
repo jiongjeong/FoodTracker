@@ -13,6 +13,46 @@ export default {
     this.food_inv = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     // console.log(this.food_inv)
   },
+  methods: {
+    formatDate(dateObj) {
+      const date = dateObj instanceof Date ? dateObj : dateObj.toDate();
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = date.toLocaleString('en-US', { month: 'short' });
+      const year = date.getFullYear();
+      return `${day} ${month} ${year}`;
+    },
+    getFoodCardClass(food) {
+      const now = new Date();
+      const expDate = food.expirationDate.toDate();
+      const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+      if (expDate < now) {
+        return 'expired-card';
+      } else if (daysLeft >= 1 && daysLeft <= 7) {
+        return 'warning-card';
+      } else {
+        return 'normal-card';
+      }
+    },
+    getDaysLeft(food) {
+      const now = new Date();
+      const expDate = food.expirationDate.toDate();
+      const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate());
+      return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24));
+    },
+    getBadgeClass(food) {
+      const daysLeft = this.getDaysLeft(food);
+
+      if (daysLeft < 0 || daysLeft === 0 || daysLeft === 1) {
+        return 'badge-expired';
+      } else if (daysLeft >= 2 && daysLeft <= 7) {
+        return 'badge-warning';
+      } else {
+        return 'badge-transparent';
+      }
+    }
+  }
+
 };
 
 
@@ -24,42 +64,124 @@ export default {
   margin: 0 auto;
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   padding: 16px;
 }
+
 .food-scroll-section {
   max-height: 500px;
   overflow-y: auto;
   padding: 8px;
 }
+
 .food-card {
   margin-bottom: 16px;
-  background: #f5dcdc;
   border-radius: 8px;
   padding: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
+
+.expired-card {
+  background: #f5dcdc;
+}
+
+.warning-card {
+  background: #fff9c4;
+}
+
+.normal-card {
+  background: #fff;
+}
+
+.expired-badge {
+  border-radius: 6px;
+  padding: 2px 10px;
+  font-weight: bold;
+  transition: background 0.2s, color 0.2s;
+}
+
+.badge-expired {
+  background: #e53935;
+  color: #fff;
+}
+
+.badge-warning {
+  background-color: #ff9800;
+  color: #fff;
+}
+
+.badge-transparent {
+  background: #ede9e8;
+  color: #333;
+}
+
 .food-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
+
 .food-title-group {
   display: flex;
   align-items: center;
   gap: 8px;
 }
+
+.sub-details {
+  margin-top: 8px;
+  display: flex;
+  gap: 16px;
+  font-size: 0.9rem;
+  color: #555;
+}
+
 .food-name {
   font-size: 1.5rem;
   font-weight: bold;
 }
-.expired-badge {
-  background: #e53935;
-  color: #fff;
-  border-radius: 6px;
-  padding: 2px 10px;
-  font-weight: bold;
+
+.food-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
+
+.food-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 16px;
+}
+
+.food-btn {
+  border: none;
+  background: #f5f5f5;
+  color: #333;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s, color 0.2s;
+}
+.food-btn-edit {
+  background: #e0e0e0;
+}
+.food-btn-use {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+.food-btn-delete {
+  background: #ffebee;
+  color: #e53935;
+}
+.food-btn:hover {
+  filter: brightness(0.95);
+}
+
 .food-price {
   font-size: 1.3rem;
   font-weight: bold;
@@ -128,38 +250,37 @@ export default {
     </div>
   </div>
 
-<div class="food-scroll-container">
-  <div class="food-scroll-section">
-    <div v-for="food in food_inv" :key="food.id" class="food-card">
-      <div class="food-header">
-        <div class="food-title-group">
-          <span class="food-name">{{ food.name }}</span>
-          <span v-if="food.expired" class="expired-badge">Expired</span>
+  <div class="food-scroll-container">
+    <div class="food-scroll-section">
+      <div v-for="food in food_inv" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
+        <div class="food-header">
+          <div>
+            <div class="food-title-group">
+              <span class="food-name">{{ food.name }}</span>
+              <span class="expired-badge" :class="getBadgeClass(food)">
+                <span v-if="getDaysLeft(food) < 0">Expired</span>
+                <span v-else-if="getDaysLeft(food) == 0">Today</span>
+                <span v-else>{{ getDaysLeft(food) }} days</span>
+              </span>
+            </div>
+            <div class="food-category">{{ food.category }}</div>
+            <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
+          </div>
+          <div class="food-right">
+            <div class="food-price">${{ food.price }}</div>
+            <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
+            
+          </div>
         </div>
-        <span class="food-price">${{ food.price }}</span>
+        <div class="food-actions">
+          <button class="food-btn food-btn-edit"><i class="bi bi-pencil"></i> Edit</button>
+          <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
+          <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
+        </div>
       </div>
-      <div class="food-category">{{ food.category }}</div>
-      <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
-      <div class="food-expiry">Expires: {{ food.expiry }}</div>
-      <!-- Add your Edit, Use, Delete buttons here -->
     </div>
   </div>
-</div>
 
-<!-- hard coded  -->
-  <!-- <div class="food-scroll-section">
-    <div class="food-card">
-      <div class="food-header">
-        <div class="food-title-group">
-          <span class="food-name">Bagels</span>
-          <span class="expired-badge">Expired</span>
-        </div>
-        <span class="food-price">$3.99</span>
-      </div>
-      <div class="food-category">Bakery</div>
-      <div class="food-quantity">6 pieces</div>
-      <div class="food-expiry">Expires: 4 Oct 2025</div>
-    </div>
-  </div> -->
+  
 
 </template>
