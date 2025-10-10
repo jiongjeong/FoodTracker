@@ -18,12 +18,13 @@ export function useGeminiAI() {
     try {
       const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" })
       const response = await model.generateContent({
-        contents: prompt,
-        generationConfig: {
-          thinkingConfig: {
-            thinkingBudget: 0, // Disables thinking
-          },
-        }
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }]
+          }
+        ],
+        // generationConfig can be included if you have valid options, but thinkingConfig is not supported
       })
 
       return await response.response.text()
