@@ -1,6 +1,6 @@
 <script setup>
 import { db } from '../firebase.js';
-import { collection, getDocs, query, where, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc, addDoc, Timestamp } from 'firebase/firestore';
 import { ref, computed, onMounted, reactive } from 'vue'
 
 
@@ -23,6 +23,41 @@ const editForm = reactive({
   unit: ''
 })
 const editFormOriginal = ref(null)
+
+// Add modal state
+const showAddModal = ref(false)
+const addForm = reactive({
+  name: '',
+  category: '',
+  expirationDate: '',
+  createdAt: '',
+  price: '',
+  quantity: '',
+  unit: ''
+})
+
+const foodItems = ref([])
+const recipes = ref([])
+const activities = ref([])
+
+onMounted(async () => {
+  if (user && userId) {
+    // Fetch food subcollection
+    const foodItemsRef = collection(db, 'user', userId, 'foodItems');
+    const foodItemsSnapshot = await getDocs(foodItemsRef);
+    foodItems.value = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Fetch recipes subcollection
+    const recipesRef = collection(db, 'user', userId, 'recipes');
+    const recipesSnapshot = await getDocs(recipesRef);
+    recipes.value = recipesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Fetch activities subcollection
+    const activityRef = collection(db, 'user', userId, 'activities');
+    const activitySnapshot = await getDocs(activityRef);
+    activities.value = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  }
+});
 
 const categories = [
   'All Categories',
@@ -233,6 +268,57 @@ const openEdit = (food) => {
   editForm.quantity = food.quantity != null ? food.quantity : ''
   editForm.unit = food.unit ?? ''
   showEditModal.value = true
+}
+
+const openAdd = () => {
+  addForm.name = ''
+  addForm.category = ''
+  addForm.expirationDate = ''
+  addForm.createdAt = ''
+  addForm.price = ''
+  addForm.quantity = ''
+  addForm.unit = ''
+  showAddModal.value = true
+}
+
+const closeAdd = () => {
+  showAddModal.value = false
+  addForm.name = ''
+  addForm.category = ''
+  addForm.expirationDate = ''
+  addForm.createdAt = ''
+  addForm.price = ''
+  addForm.quantity = ''
+  addForm.unit = ''
+}
+
+const saveAdd = async () => {
+  if (!userId) {
+    console.warn('No userId available; cannot add food item')
+    return
+  }
+  const colRef = collection(db, 'user', userId, 'foodItems')
+  const payload = {
+    name: addForm.name || '',
+    category: addForm.category || '',
+    price: Number(addForm.price) || 0,
+    quantity: Number(addForm.quantity) || 0,
+    unit: addForm.unit || ''
+  }
+  if (addForm.expirationDate) {
+    payload.expirationDate = Timestamp.fromDate(new Date(addForm.expirationDate))
+  }
+  // If createdAt provided use it, otherwise set now
+  if (addForm.createdAt) {
+    payload.createdAt = Timestamp.fromDate(new Date(addForm.createdAt))
+  } else {
+    payload.createdAt = Timestamp.fromDate(new Date())
+  }
+
+  const newDocRef = await addDoc(colRef, payload)
+  // push into local list (at front)
+  foodItems.value.unshift({ id: newDocRef.id, ...payload })
+  closeAdd()
 }
 
 const closeEdit = () => {
@@ -450,6 +536,54 @@ const saveEdit = async () => {
     </div>
   </div>
 
+  <!-- Floating Add Button -->
+  <button class="fab-add" @click="openAdd" title="Add Food">
+    <i class="bi bi-plus-lg"></i>
+  </button>
+
+  <!-- Add Modal -->
+  <div v-if="showAddModal" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="h5 mb-3">Add Food Item</h3>
+      <div class="mb-2">
+        <label class="form-label">Name</label>
+        <input v-model="addForm.name" class="form-control" />
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Category</label>
+        <input v-model="addForm.category" class="form-control" />
+      </div>
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label">Expiration Date</label>
+          <input v-model="addForm.expirationDate" type="date" class="form-control" />
+        </div>
+        <div class="col-6">
+          <label class="form-label">Created At</label>
+          <input v-model="addForm.createdAt" type="date" class="form-control" />
+        </div>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-4">
+          <label class="form-label">Price</label>
+          <input v-model="addForm.price" type="number" step="0.01" class="form-control" />
+        </div>
+        <div class="col-4">
+          <label class="form-label">Quantity</label>
+          <input v-model="addForm.quantity" type="number" class="form-control" />
+        </div>
+        <div class="col-4">
+          <label class="form-label">Unit</label>
+          <input v-model="addForm.unit" class="form-control" />
+        </div>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-secondary" @click="closeAdd">Cancel</button>
+        <button class="btn btn-primary" @click="saveAdd">Add</button>
+      </div>
+    </div>
+  </div>
+
 </template>
 <style scoped>
 .dashboard-overview {
@@ -638,5 +772,28 @@ const saveEdit = async () => {
   width: 600px;
   max-width: calc(100% - 32px);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Floating Add button */
+.fab-add {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #10b981, #059669);
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 6px 18px rgba(5, 150, 105, 0.25);
+  cursor: pointer;
+  z-index: 2500;
+}
+.fab-add:hover {
+  transform: translateY(-2px);
 }
 </style>
