@@ -8,7 +8,6 @@ const searchText = ref('')
 const selectedCategory = ref('All Categories')
 const sortBy = ref('expiration')
 const sortDirection = ref('asc')
-const food_inv = ref([])
 const user = JSON.parse(localStorage.getItem('user'))
 const userId = JSON.parse(localStorage.getItem('user'))?.id
 const showEditModal = ref(false)
@@ -23,6 +22,29 @@ const editForm = reactive({
   unit: ''
 })
 const editFormOriginal = ref(null)
+
+const foodItems = ref([])
+const recipes = ref([])
+const activities = ref([])
+
+onMounted(async () => {
+  if (user && userId) {
+    // Fetch food subcollection
+    const foodItemsRef = collection(db, 'user', userId, 'foodItems');
+    const foodItemsSnapshot = await getDocs(foodItemsRef);
+    foodItems.value = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Fetch recipes subcollection
+    const recipesRef = collection(db, 'user', userId, 'recipes');
+    const recipesSnapshot = await getDocs(recipesRef);
+    recipes.value = recipesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Fetch activities subcollection
+    const activityRef = collection(db, 'user', userId, 'activities');
+    const activitySnapshot = await getDocs(activityRef);
+    activities.value = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  }
+});
 
 // Add modal state
 const showAddModal = ref(false)
@@ -75,20 +97,13 @@ const categories = [
 
 console.log('user id in dashboard:', userId);
 console.log('user in dashboard:', user);
-onMounted(async () => {
-  if (user) {
-    const q = query (
-      collection(db, 'food'),
-      where('userId', '==', userId)
-    );
-    const querySnapshot = await getDocs(q);
-    food_inv.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    console.log('User is signed in:', user.email);
-  }
-})
+console.log(foodItems);
+console.log(recipes);
+console.log(activities);
+
 
 const filteredFoodItems = computed(() => {
-  const uniqueItems = food_inv.value.filter(
+  const uniqueItems = foodItems.value.filter(
     (item, index, self) =>
       index === self.findIndex(i => i.id === item.id)
   )
@@ -181,6 +196,16 @@ const formatDate = (dateObj) => {
   const year = date.getFullYear()
   return `${day} ${month} ${year}`
 }
+const getRelativeTime = (dateString) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (diffInSeconds < 60) return 'Just now'
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+    return `${Math.floor(diffInSeconds / 86400)}d ago`
+  }
 
 const getDaysLeft = (food) => {
   const now = new Date()
@@ -215,21 +240,21 @@ const getBadgeClass = (food) => {
 }
 
 const expiringSoon = computed(() => {
-  return food_inv.value.filter(food => {
+  return foodItems.value.filter(food => {
     const daysLeft = getDaysLeft(food)
     return daysLeft >= 0 && daysLeft <= 5
   }).length
 })
 
 const expired = computed(() => {
-  return food_inv.value.filter(food => {
+  return foodItems.value.filter(food => {
     const daysLeft = getDaysLeft(food)
     return daysLeft < 0
   }).length
 })
 
 const potentialLoss = computed(() =>
-  food_inv.value
+  foodItems.value
     .filter(item => {
       const days = getDaysLeft(item)
       return days >= 0 && days <= 7
@@ -336,7 +361,7 @@ const closeEdit = () => {
 
 const saveEdit = async () => {
   if (!editForm.id) return
-  const refDoc = doc(db, 'food', editForm.id)
+  const refDoc = doc(db, 'user', userId, 'foodItems', editForm.id)
   const payload = {
     name: editForm.name,
     category: editForm.category,
@@ -352,9 +377,9 @@ const saveEdit = async () => {
   }
   await updateDoc(refDoc, payload)
   // update local list
-  const idx = food_inv.value.findIndex(f => f.id === editForm.id)
+  const idx = foodItems.value.findIndex(f => f.id === editForm.id)
   if (idx !== -1) {
-    food_inv.value[idx] = { ...food_inv.value[idx], ...payload }
+    foodItems.value[idx] = { ...foodItems.value[idx], ...payload }
   }
   closeEdit()
 }
@@ -384,39 +409,39 @@ const saveEdit = async () => {
           </div>
         </div>
         <div class="col-6 col-lg-3">
-            <div class="glass-card stat-card p-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-exclamation-triangle text-warning"></i>
-                <small class="text-muted">Expiring Soon</small>
-              </div>
-              <h3 class="h4">{{ expiringSoon }}</h3>
-              <small class="text-muted">items</small>
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-exclamation-triangle text-warning"></i>
+              <small class="text-muted">Expiring Soon</small>
             </div>
+            <h3 class="h4">{{ expiringSoon }}</h3>
+            <small class="text-muted">items</small>
           </div>
+        </div>
 
-          <div class="col-6 col-lg-3">
-            <div class="glass-card stat-card p-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-currency-dollar text-success"></i>
-                <small class="text-muted">Potential Loss</small>
-              </div>
-              <h3 class="h4">${{ potentialLoss.toFixed(2) }}</h3>
-              <small class="text-muted">if expired</small>
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-currency-dollar text-success"></i>
+              <small class="text-muted">Potential Loss</small>
             </div>
+            <h3 class="h4">${{ potentialLoss.toFixed(2) }}</h3>
+            <small class="text-muted">if expired</small>
           </div>
+        </div>
 
-          <div class="col-6 col-lg-3">
-            <div class="glass-card stat-card p-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-calendar-x text-danger"></i>
-                <small class="text-muted">Expired</small>
-              </div>
-              <h3 class="h4 text-danger">{{ expired }}</h3>
-              <small class="text-muted">items</small>
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-calendar-x text-danger"></i>
+              <small class="text-muted">Expired</small>
             </div>
+            <h3 class="h4 text-danger">{{ expired }}</h3>
+            <small class="text-muted">items</small>
           </div>
         </div>
       </div>
+    </div>
     <div class="row g-4">
       <div class="col-lg-8">
         <div class="glass-card p-4">
@@ -481,17 +506,78 @@ const saveEdit = async () => {
                   <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
                 </div>
 
-                </div>
               </div>
+            </div>
               
 
             </div>
           </div>
         </div>
+        <div class="col-lg-4 d-none d-lg-block">
+        <div class="glass-card p-4">
+          <h3 class="h5 mb-3">Recent Activity</h3>
+          <div v-if="activities.length === 0" class="text-center py-4">
+            <p class="text-muted">No recent activity</p>
+          </div>
+          <div v-else class="d-flex flex-column gap-3">
+            <div
+              v-for="activity in activities"
+              :key="activity.id"
+              class="pb-3 border-bottom"
+            >
+              <p class="mb-1 small">{{ activity.description }}</p>
+              <small class="text-muted">{{ getRelativeTime(activity.createdAt) }}</small>
+            </div>
+          </div>
+        </div>
       </div>
-  
+      </div>
+
 </div>
-  
+
+
+  <!-- Edit Modal -->
+  <div v-if="showEditModal" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="h5 mb-3">Edit Food Item</h3>
+      <div class="mb-2">
+        <label class="form-label">Name</label>
+        <input v-model="editForm.name" class="form-control" />
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Category</label>
+        <input v-model="editForm.category" class="form-control" />
+      </div>
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label">Expiration Date</label>
+          <input v-model="editForm.expirationDate" type="date" class="form-control" />
+        </div>
+        <div class="col-6">
+          <label class="form-label">Created At</label>
+          <input v-model="editForm.createdAt" type="date" class="form-control" />
+        </div>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-4">
+          <label class="form-label">Price</label>
+          <input v-model="editForm.price" type="number" step="0.01" class="form-control" />
+        </div>
+        <div class="col-4">
+          <label class="form-label">Quantity</label>
+          <input v-model="editForm.quantity" type="number" class="form-control" />
+        </div>
+        <div class="col-4">
+          <label class="form-label">Unit</label>
+          <input v-model="editForm.unit" class="form-control" />
+        </div>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-secondary" @click="closeEdit">Cancel</button>
+        <button class="btn btn-primary" @click="saveEdit">Save</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Edit Modal -->
   <div v-if="showEditModal" class="modal-backdrop">
