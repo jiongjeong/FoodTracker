@@ -5,10 +5,14 @@ import { collection, getDocs} from 'firebase/firestore';
 import { ref, computed, onMounted } from 'vue'
 
 
+
 const searchText = ref('')
 const selectedCategory = ref('All Categories')
 const sortBy = ref('expiration')
 const sortDirection = ref('asc')
+const food_inv = ref([])
+const auth = getAuth();
+const user = auth.currentUser;
 
 const categories = [
   'All Categories',
