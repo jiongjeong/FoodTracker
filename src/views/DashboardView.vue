@@ -1,7 +1,7 @@
 <script setup>
 import { db } from '../firebase.js'; // adjust path as needed
-import { collection, getDocs } from 'firebase/firestore';
-import { ref, computed, onMounted } from 'vue'
+import { collection, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { ref, computed, onMounted, reactive } from 'vue'
 
 
 const searchText = ref('')
@@ -9,6 +9,18 @@ const selectedCategory = ref('All Categories')
 const sortBy = ref('expiration')
 const sortDirection = ref('asc')
 const food_inv = ref([])
+const showEditModal = ref(false)
+const editForm = reactive({
+  id: null,
+  name: '',
+  category: '',
+  expirationDate: '',
+  createdAt: '',
+  price: '',
+  quantity: '',
+  unit: ''
+})
+const editFormOriginal = ref(null)
 
 const categories = [
   'All Categories',
@@ -80,148 +92,256 @@ const getBadgeClass = (food) => {
   }
 }
 
+const toInputDateString = (d) => {
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+const openEdit = (food) => {
+  editFormOriginal.value = JSON.parse(JSON.stringify(food))
+  editForm.id = food.id || null
+  editForm.name = food.name ?? ''
+  editForm.category = food.category ?? ''
+  
+  let exp = null;
+  if (food.expirationDate) {
+    if (typeof food.expirationDate.toDate === 'function') {
+      // Firestore Timestamp
+      exp = food.expirationDate.toDate();
+    } else {
+      // already a Date or a string that Date can parse
+      exp = new Date(food.expirationDate);
+      if (isNaN(exp)) exp = null; // optional: guard against invalid parse
+    }
+  }
+  editForm.expirationDate = exp ? toInputDateString(exp) : ''
+  const created = food.createdAt && food.createdAt.toDate ? food.createdAt.toDate() : (food.createdAt ? new Date(food.createdAt) : null)
+  editForm.createdAt = created ? toInputDateString(created) : ''
+  editForm.price = food.price != null ? food.price : ''
+  editForm.quantity = food.quantity != null ? food.quantity : ''
+  editForm.unit = food.unit ?? ''
+  showEditModal.value = true
+}
+
+const closeEdit = () => {
+  showEditModal.value = false
+  editForm.id = null
+  editForm.name = ''
+  editForm.category = ''
+  editForm.expirationDate = ''
+  editForm.createdAt = ''
+  editForm.price = ''
+  editForm.quantity = ''
+  editForm.unit = ''
+  editFormOriginal.value = null
+}
+
+const saveEdit = async () => {
+  if (!editForm.id) return
+  const refDoc = doc(db, 'food', editForm.id)
+  const payload = {
+    name: editForm.name,
+    category: editForm.category,
+    price: Number(editForm.price) || 0,
+    quantity: Number(editForm.quantity) || 0,
+    unit: editForm.unit || ''
+  }
+  if (editForm.expirationDate) {
+    payload.expirationDate = Timestamp.fromDate(new Date(editForm.expirationDate))
+  }
+  if (editForm.createdAt) {
+    payload.createdAt = Timestamp.fromDate(new Date(editForm.createdAt))
+  }
+  await updateDoc(refDoc, payload)
+  // update local list
+  const idx = food_inv.value.findIndex(f => f.id === editForm.id)
+  if (idx !== -1) {
+    food_inv.value[idx] = { ...food_inv.value[idx], ...payload }
+  }
+  closeEdit()
+}
+
 
 </script>
 <template>
   <div class="container-fluid p-4">
     <div class="dashboard-overview">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <div>
-            <h1 class="h2 mb-2">Dashboard</h1>
-            <p class="text-muted mb-0">Track your food inventory and reduce waste</p>
-          </div>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h1 class="h2 mb-2">Dashboard</h1>
+          <p class="text-muted mb-0">Track your food inventory and reduce waste</p>
         </div>
+      </div>
 
-        <div class="row g-3">
-          <div class="col-6 col-lg-3">
-            <div class="glass-card stat-card p-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-graph-up-arrow text-success"></i>
-                <small class="text-muted">Food Score</small>
-              </div>
-              <!-- <h3 class="h4">{{ user.currentScore }}</h3> -->
-              <h3 class="h4">placeholder</h3>
-              <small class="text-muted">points</small>
-            </div>
-          </div>
+      <div class="row g-3">
         <div class="col-6 col-lg-3">
-            <div class="glass-card stat-card p-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-exclamation-triangle text-warning"></i>
-                <small class="text-muted">Expiring Soon</small>
-              </div>
-              <!-- <h3 class="h4">{{ expiringSoon }}</h3> -->
-              <h3 class="h4">placeholder</h3>
-              <small class="text-muted">items</small>
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-graph-up-arrow text-success"></i>
+              <small class="text-muted">Food Score</small>
             </div>
+            <!-- <h3 class="h4">{{ user.currentScore }}</h3> -->
+            <h3 class="h4">placeholder</h3>
+            <small class="text-muted">points</small>
           </div>
-
-          <div class="col-6 col-lg-3">
-            <div class="glass-card stat-card p-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-currency-dollar text-success"></i>
-                <small class="text-muted">Potential Loss</small>
-              </div>
-              <!-- <h3 class="h4">${{ potentialLoss.toFixed(2) }}</h3> -->
-              <h3 class="h4">placeholder</h3>
-              <small class="text-muted">if expired</small>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-exclamation-triangle text-warning"></i>
+              <small class="text-muted">Expiring Soon</small>
             </div>
+            <!-- <h3 class="h4">{{ expiringSoon }}</h3> -->
+            <h3 class="h4">placeholder</h3>
+            <small class="text-muted">items</small>
           </div>
+        </div>
 
-          <div class="col-6 col-lg-3">
-            <div class="glass-card stat-card p-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-calendar-x text-danger"></i>
-                <small class="text-muted">Expired</small>
-              </div>
-              <!-- <h3 class="h4 text-danger">{{ expired }}</h3> -->
-              <h3 class="h4 text-danger">placeholder</h3>
-              <small class="text-muted">items</small>
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-currency-dollar text-success"></i>
+              <small class="text-muted">Potential Loss</small>
             </div>
+            <!-- <h3 class="h4">${{ potentialLoss.toFixed(2) }}</h3> -->
+            <h3 class="h4">placeholder</h3>
+            <small class="text-muted">if expired</small>
+          </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-calendar-x text-danger"></i>
+              <small class="text-muted">Expired</small>
+            </div>
+            <!-- <h3 class="h4 text-danger">{{ expired }}</h3> -->
+            <h3 class="h4 text-danger">placeholder</h3>
+            <small class="text-muted">items</small>
           </div>
         </div>
       </div>
+    </div>
     <div class="row g-4">
-          <div class="col-lg-8">
-            <div class="glass-card p-4">
-              <div class="d-flex align-items-center gap-2 mb-4">
-                <i class="bi bi-search"></i>
-                <h2 class="h4 mb-0">Food Inventory</h2>
-              </div>
-              <div class="row g-2 mb-3">
-                 <div class="col-12 col-md-4">
-                  <input
-                    v-model="searchText"
-                    type="text"
-                    class="form-control"
-                    placeholder="Search food items..."
-                 />
-                 </div>
-                 <div class="col-12 col-sm-6 col-md-3">
-                   <select v-model="selectedCategory" class="form-select">
-                    <option v-for="cat in categories" v-bind:key="cat" v-bind:value="cat">{{ cat }}</option>
-                  </select>
-                 </div>
-                 <div class="col-9 col-sm-4 col-md-3">
-                  <select v-model="sortBy" class="form-select">
-                    <option value="expiration">Expiration Date</option>
-                    <option value="name">Name (A-Z)</option>
-                    <option value="category">Category</option>
-                    <option value="quantity">Quantity (High-Low)</option>
-                    <option value="price">Price (High-Low)</option>
-                  </select>
-                 </div>
-                 <div class="col-3 col-sm-2 col-md-2">
-                  <button v-on:click="toggleSortDirection"
-                  class = "btn btn-outline-secondary sort-direction-btn w-100"
-                  :title="getSortButtonTitle"
-                  >
-                  <i :class="getSortButtonIcon"></i>
-                </button>
-                 </div>
-              </div>
-              <div v-if="food_inv.length === 0" class="text-center py-5">
-                <i class="bi bi-search fs-1 text-muted"></i>
-                <p class="text-muted mt-3">No food items found</p>
-              </div>
-              <div v-else class="food-scroll-container">
-                <div class="food-scroll-section">
-                  <div v-for="food in food_inv" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
-                  <div class="food-header">
-                    <div>
-                      <div class="food-title-group">
-                        <span class="food-name">{{ food.name }}</span>
-                        <span class="expired-badge" :class="getBadgeClass(food)">
-                          <span v-if="getDaysLeft(food) < 0">Expired</span>
-                          <span v-else-if="getDaysLeft(food) == 0">Today</span>
-                          <span v-else>{{ getDaysLeft(food) }} days</span>
-                        </span>
-                      </div>
-                      <div class="food-category">{{ food.category }}</div>
-                      <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
-                    </div>
-                    <div class="food-right">
-                      <div class="food-price">${{ food.price }}</div>
-                      <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
-                    </div>
-                  </div>
-                  <div class="food-actions">
-                    <button class="food-btn food-btn-edit"><i class="bi bi-pencil"></i> Edit</button>
-                    <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
-                    <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
-                  </div>
-
-                </div>
-              </div>
-              
-
+      <div class="col-lg-8">
+        <div class="glass-card p-4">
+          <div class="d-flex align-items-center gap-2 mb-4">
+            <i class="bi bi-search"></i>
+            <h2 class="h4 mb-0">Food Inventory</h2>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-12 col-md-4">
+              <input v-model="searchText" type="text" class="form-control" placeholder="Search food items..." />
             </div>
+            <div class="col-12 col-sm-6 col-md-3">
+              <select v-model="selectedCategory" class="form-select">
+                <option v-for="cat in categories" v-bind:key="cat" v-bind:value="cat">{{ cat }}</option>
+              </select>
+            </div>
+            <div class="col-9 col-sm-4 col-md-3">
+              <select v-model="sortBy" class="form-select">
+                <option value="expiration">Expiration Date</option>
+                <option value="name">Name (A-Z)</option>
+                <option value="category">Category</option>
+                <option value="quantity">Quantity (High-Low)</option>
+                <option value="price">Price (High-Low)</option>
+              </select>
+            </div>
+            <div class="col-3 col-sm-2 col-md-2">
+              <button v-on:click="toggleSortDirection" class="btn btn-outline-secondary sort-direction-btn w-100"
+                :title="getSortButtonTitle">
+                <i :class="getSortButtonIcon"></i>
+              </button>
+            </div>
+          </div>
+          <div v-if="food_inv.length === 0" class="text-center py-5">
+            <i class="bi bi-search fs-1 text-muted"></i>
+            <p class="text-muted mt-3">No food items found</p>
+          </div>
+          <div v-else class="food-scroll-container">
+            <div class="food-scroll-section">
+              <div v-for="food in food_inv" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
+                <div class="food-header">
+                  <div>
+                    <div class="food-title-group">
+                      <span class="food-name">{{ food.name }}</span>
+                      <span class="expired-badge" :class="getBadgeClass(food)">
+                        <span v-if="getDaysLeft(food) < 0">Expired</span>
+                        <span v-else-if="getDaysLeft(food) == 0">Today</span>
+                        <span v-else>{{ getDaysLeft(food) }} days</span>
+                      </span>
+                    </div>
+                    <div class="food-category">{{ food.category }}</div>
+                    <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
+                  </div>
+                  <div class="food-right">
+                    <div class="food-price">${{ food.price }}</div>
+                    <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
+                  </div>
+                </div>
+                <div class="food-actions">
+                  <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
+                    Edit</button>
+                  <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
+                  <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
+                </div>
+
+              </div>
+            </div>
+
+
           </div>
         </div>
       </div>
-  
-</div>
-  
+    </div>
+
+  </div>
+
+
+  <!-- Edit Modal -->
+  <div v-if="showEditModal" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="h5 mb-3">Edit Food Item</h3>
+      <div class="mb-2">
+        <label class="form-label">Name</label>
+        <input v-model="editForm.name" class="form-control" />
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Category</label>
+        <input v-model="editForm.category" class="form-control" />
+      </div>
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label">Expiration Date</label>
+          <input v-model="editForm.expirationDate" type="date" class="form-control" />
+        </div>
+        <div class="col-6">
+          <label class="form-label">Created At</label>
+          <input v-model="editForm.createdAt" type="date" class="form-control" />
+        </div>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-4">
+          <label class="form-label">Price</label>
+          <input v-model="editForm.price" type="number" step="0.01" class="form-control" />
+        </div>
+        <div class="col-4">
+          <label class="form-label">Quantity</label>
+          <input v-model="editForm.quantity" type="number" class="form-control" />
+        </div>
+        <div class="col-4">
+          <label class="form-label">Unit</label>
+          <input v-model="editForm.unit" class="form-control" />
+        </div>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-secondary" @click="closeEdit">Cancel</button>
+        <button class="btn btn-primary" @click="saveEdit">Save</button>
+      </div>
+    </div>
+  </div>
 
 </template>
 <style scoped>
@@ -354,17 +474,21 @@ const getBadgeClass = (food) => {
   gap: 6px;
   transition: background 0.2s, color 0.2s;
 }
+
 .food-btn-edit {
   background: #e0e0e0;
 }
+
 .food-btn-use {
   background: #e8f5e9;
   color: #388e3c;
 }
+
 .food-btn-delete {
   background: #ffebee;
   color: #e53935;
 }
+
 .food-btn:hover {
   filter: brightness(0.95);
 }
@@ -374,6 +498,7 @@ const getBadgeClass = (food) => {
   font-weight: bold;
   margin-left: 16px;
 }
+
 .sort-direction-btn {
   min-width: 42px;
   height: 38px;
@@ -386,5 +511,25 @@ const getBadgeClass = (food) => {
 .sort-direction-btn i {
   font-size: 16px;
   line-height: 1;
+}
+
+/* Modal styles */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal-card {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  width: 600px;
+  max-width: calc(100% - 32px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
 }
 </style>
