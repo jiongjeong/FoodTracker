@@ -7,16 +7,6 @@ import { useGeminiAI } from '../composables/useGeminiAI'
 // TODO: Import food items store when implemented
 // import { useFoodItemsStore } from '../stores/foodItems'
 
-// Mock AI service for now - replace with actual implementation
-const useGeminiAI = () => ({
-  generateResponse: async (message, context) => {
-    // TODO: Implement actual AI service
-    await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate delay
-    return `This is a mock response to: "${message}". In the future, this will be powered by AI.`
-  },
-  isLoading: ref(false),
-  error: ref(null)
-})
 
 // Mock stores for now - replace with actual implementations
 const useUser = () => ({
