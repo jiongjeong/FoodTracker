@@ -352,9 +352,9 @@ initializeRecipes()
     </div>
 
     <!-- Recipe Detail Modal -->
-    <div v-if="showRecipeModal && selectedRecipe" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
-      <div class="modal-backdrop fade show" @click="showRecipeModal = false" style="z-index: 1050;"></div>
-      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style="z-index: 1060;">
+    <div v-if="showRecipeModal && selectedRecipe" class="modal fade show d-block" tabindex="-1" style="z-index: var(--modal-z-index);">
+      <div class="modal-backdrop fade show" @click="showRecipeModal = false" style="z-index: var(--modal-backdrop-z-index);"></div>
+      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style="z-index: var(--modal-dialog-z-index);">
         <div class="modal-content">
           <div class="modal-body p-0">
             <button type="button" class="modal-close-btn" @click="showRecipeModal = false">
