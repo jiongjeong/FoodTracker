@@ -1,7 +1,26 @@
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
-// import HelloWorld from './components/HelloWorld.vue'
 import Navbar from './components/navbar/navbar.vue'
+
+let timer;
+const timeout = 15 * 60 * 1000; // 15 minutes
+
+function resetTimeout() {
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    localStorage.clear();
+    window.location.reload();
+  }, timeout);
+}
+
+['mousemove', 'keydown', 'scroll', 'touchstart'].forEach(event =>
+  window.addEventListener(event, resetTimeout)
+);
+
+
+
+resetTimeout();
+
 </script>
 
 <template>

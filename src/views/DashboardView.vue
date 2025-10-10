@@ -1,6 +1,6 @@
 <script setup>
-import { db } from '../firebase.js'; // adjust path as needed
-import { collection, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase.js';
+import { collection, getDocs, query, where, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { ref, computed, onMounted, reactive } from 'vue'
 
 
@@ -9,6 +9,8 @@ const selectedCategory = ref('All Categories')
 const sortBy = ref('expiration')
 const sortDirection = ref('asc')
 const food_inv = ref([])
+const user = JSON.parse(localStorage.getItem('user'))
+const userId = JSON.parse(localStorage.getItem('user'))?.id
 const showEditModal = ref(false)
 const editForm = reactive({
   id: null,
@@ -36,9 +38,94 @@ const categories = [
   'Other'
 ]
 
+console.log('user id in dashboard:', userId);
+console.log('user in dashboard:', user);
 onMounted(async () => {
-  const querySnapshot = await getDocs(collection(db, 'food'))
-  food_inv.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+  if (user) {
+    const q = query (
+      collection(db, 'food'),
+      where('userId', '==', userId)
+    );
+    const querySnapshot = await getDocs(q);
+    food_inv.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    console.log('User is signed in:', user.email);
+  }
+})
+
+const filteredFoodItems = computed(() => {
+  const uniqueItems = food_inv.value.filter(
+    (item, index, self) =>
+      index === self.findIndex(i => i.id === item.id)
+  )
+
+  let items = [...uniqueItems]
+
+  // Search
+  if (searchText.value && searchText.value.trim()) {
+    const searchTerm = searchText.value.toLowerCase().trim()
+    items = items.filter(item =>
+      item.name && item.name.toLowerCase().includes(searchTerm)
+    )
+  }
+
+  // Category filter
+  if (selectedCategory.value && selectedCategory.value !== 'All Categories') {
+    items = items.filter(item => item.category === selectedCategory.value)
+  }
+
+  // Sorting
+  const direction = sortDirection.value === 'desc' ? -1 : 1
+
+  switch (sortBy.value) {
+    case 'expiration':
+      items.sort((a, b) => {
+        const dateA = new Date(a.expirationDate?.toDate?.() || a.expirationDate)
+        const dateB = new Date(b.expirationDate?.toDate?.() || b.expirationDate)
+        if (isNaN(dateA) && isNaN(dateB)) return 0
+        if (isNaN(dateA)) return 1
+        if (isNaN(dateB)) return -1
+        return (dateA - dateB) * direction
+      })
+      break
+
+    case 'name':
+      items.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase()
+        const nameB = (b.name || '').toLowerCase()
+        return nameA.localeCompare(nameB) * direction
+      })
+      break
+
+    case 'category':
+      items.sort((a, b) => {
+        const catA = a.category || ''
+        const catB = b.category || ''
+        const categoryCompare = catA.localeCompare(catB) * direction
+        if (categoryCompare !== 0) return categoryCompare
+        const nameA = (a.name || '').toLowerCase()
+        const nameB = (b.name || '').toLowerCase()
+        return nameA.localeCompare(nameB)
+      })
+      break
+
+    case 'quantity':
+      items.sort((a, b) => {
+        const qtyA = parseFloat(a.quantity) || 0
+        const qtyB = parseFloat(b.quantity) || 0
+        return (qtyB - qtyA) * direction
+      })
+      break
+
+    case 'price':
+      items.sort((a, b) => {
+        const priceA = parseFloat(a.price) || 0
+        const priceB = parseFloat(b.price) || 0
+        return (priceB - priceA) * direction
+      })
+      break
+  }
+
+  return items
 })
 
 const toggleSortDirection = () => {
@@ -91,6 +178,29 @@ const getBadgeClass = (food) => {
     return 'badge-transparent'
   }
 }
+
+const expiringSoon = computed(() => {
+  return food_inv.value.filter(food => {
+    const daysLeft = getDaysLeft(food)
+    return daysLeft >= 0 && daysLeft <= 5
+  }).length
+})
+
+const expired = computed(() => {
+  return food_inv.value.filter(food => {
+    const daysLeft = getDaysLeft(food)
+    return daysLeft < 0
+  }).length
+})
+
+const potentialLoss = computed(() =>
+  food_inv.value
+    .filter(item => {
+      const days = getDaysLeft(item)
+      return days >= 0 && days <= 7
+    })
+    .reduce((sum, item) => sum + (item.price || 0), 0)
+)
 
 const toInputDateString = (d) => {
   const yyyy = d.getFullYear()
@@ -188,42 +298,39 @@ const saveEdit = async () => {
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-exclamation-triangle text-warning"></i>
-              <small class="text-muted">Expiring Soon</small>
+            <div class="glass-card stat-card p-3">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-exclamation-triangle text-warning"></i>
+                <small class="text-muted">Expiring Soon</small>
+              </div>
+              <h3 class="h4">{{ expiringSoon }}</h3>
+              <small class="text-muted">items</small>
             </div>
-            <!-- <h3 class="h4">{{ expiringSoon }}</h3> -->
-            <h3 class="h4">placeholder</h3>
-            <small class="text-muted">items</small>
           </div>
-        </div>
 
-        <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-currency-dollar text-success"></i>
-              <small class="text-muted">Potential Loss</small>
+          <div class="col-6 col-lg-3">
+            <div class="glass-card stat-card p-3">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-currency-dollar text-success"></i>
+                <small class="text-muted">Potential Loss</small>
+              </div>
+              <h3 class="h4">${{ potentialLoss.toFixed(2) }}</h3>
+              <small class="text-muted">if expired</small>
             </div>
-            <!-- <h3 class="h4">${{ potentialLoss.toFixed(2) }}</h3> -->
-            <h3 class="h4">placeholder</h3>
-            <small class="text-muted">if expired</small>
           </div>
-        </div>
 
-        <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-calendar-x text-danger"></i>
-              <small class="text-muted">Expired</small>
+          <div class="col-6 col-lg-3">
+            <div class="glass-card stat-card p-3">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-calendar-x text-danger"></i>
+                <small class="text-muted">Expired</small>
+              </div>
+              <h3 class="h4 text-danger">{{ expired }}</h3>
+              <small class="text-muted">items</small>
             </div>
-            <!-- <h3 class="h4 text-danger">{{ expired }}</h3> -->
-            <h3 class="h4 text-danger">placeholder</h3>
-            <small class="text-muted">items</small>
           </div>
         </div>
       </div>
-    </div>
     <div class="row g-4">
       <div class="col-lg-8">
         <div class="glass-card p-4">
@@ -256,13 +363,13 @@ const saveEdit = async () => {
               </button>
             </div>
           </div>
-          <div v-if="food_inv.length === 0" class="text-center py-5">
+          <div v-if="filteredFoodItems.length === 0" class="text-center py-5">
             <i class="bi bi-search fs-1 text-muted"></i>
             <p class="text-muted mt-3">No food items found</p>
           </div>
           <div v-else class="food-scroll-container">
             <div class="food-scroll-section">
-              <div v-for="food in food_inv" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
+              <div v-for="food in filteredFoodItems" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
                 <div class="food-header">
                   <div>
                     <div class="food-title-group">
@@ -288,17 +395,17 @@ const saveEdit = async () => {
                   <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
                 </div>
 
+                </div>
               </div>
+              
+
             </div>
-
-
           </div>
         </div>
       </div>
-    </div>
-
-  </div>
-
+  
+</div>
+  
 
   <!-- Edit Modal -->
   <div v-if="showEditModal" class="modal-backdrop">
@@ -367,7 +474,7 @@ const saveEdit = async () => {
 }
 
 .food-scroll-container {
-  max-width: 700px;
+  max-width: 100%;
   margin: 0 auto;
   background: #fff;
   border-radius: 12px;
