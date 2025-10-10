@@ -8,7 +8,6 @@ const searchText = ref('')
 const selectedCategory = ref('All Categories')
 const sortBy = ref('expiration')
 const sortDirection = ref('asc')
-const food_inv = ref([])
 const user = JSON.parse(localStorage.getItem('user'))
 const userId = JSON.parse(localStorage.getItem('user'))?.id
 const showEditModal = ref(false)
@@ -66,20 +65,20 @@ console.log('user in dashboard:', user);
 console.log(foodItems);
 console.log(recipes);
 console.log(activities);
-onMounted(async () => {
-  if (user) {
-    const q = query(
-      collection(db, 'food'),
-      where('userId', '==', userId)
-    );
-    const querySnapshot = await getDocs(q);
-    food_inv.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    console.log('User is signed in:', user.email);
-  }
-})
+// onMounted(async () => {
+//   if (user) {
+//     const q = query(
+//       collection(db, 'food'),
+//       where('userId', '==', userId)
+//     );
+//     const querySnapshot = await getDocs(q);
+//     foodItems.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+//     console.log('User is signed in:', user.email);
+//   }
+// })
 
 const filteredFoodItems = computed(() => {
-  const uniqueItems = food_inv.value.filter(
+  const uniqueItems = foodItems.value.filter(
     (item, index, self) =>
       index === self.findIndex(i => i.id === item.id)
   )
@@ -276,7 +275,7 @@ const closeEdit = () => {
 
 const saveEdit = async () => {
   if (!editForm.id) return
-  const refDoc = doc(db, 'food', editForm.id)
+  const refDoc = doc(db, 'user', userId, 'foodItems', editForm.id)
   const payload = {
     name: editForm.name,
     category: editForm.category,
@@ -292,9 +291,9 @@ const saveEdit = async () => {
   }
   await updateDoc(refDoc, payload)
   // update local list
-  const idx = food_inv.value.findIndex(f => f.id === editForm.id)
+  const idx = foodItems.value.findIndex(f => f.id === editForm.id)
   if (idx !== -1) {
-    food_inv.value[idx] = { ...food_inv.value[idx], ...payload }
+    foodItems.value[idx] = { ...foodItems.value[idx], ...payload }
   }
   closeEdit()
 }
