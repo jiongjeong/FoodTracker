@@ -1,10 +1,15 @@
 <template>
   <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top">
-    <div class="container-fluid">
+    <div class="container-fluid d-flex justify-content-between align-items-center">
       <!-- Brand -->
-      <a class="navbar-brand fw-bold text-primary p-3" href="#">
+      <RouterLink 
+        to="/dashboard" 
+        class="navbar-brand fw-bold text-primary p-2 text-decoration-none" 
+        :class="{ active: $route.path === '/dashboard' }" 
+        @click="closeNavbar"
+      >
         🍎 FoodTracker
-      </a>
+      </RouterLink>
 
       <!-- Mobile hamburger button (auto-hidden on lg+) -->
       <button 
@@ -18,8 +23,8 @@
       </button>
 
       <!-- Collapsible navbar content -->
-      <div class="collapse navbar-collapse" id="navbarNav" :class="{ show: navbarOpen }">
-        <ul class="navbar-nav me-auto">
+      <div class="collapse navbar-collapse flex-grow-1" id="navbarNav" :class="{ show: navbarOpen }">
+        <ul class="navbar-nav mx-auto">
           <li class="nav-item">
             <RouterLink to="/dashboard" class="nav-link" :class="{ active: $route.path === '/dashboard' }" @click="closeNavbar">
               <i class="bi bi-house-door me-1"></i>Dashboard
@@ -53,7 +58,7 @@
         </ul>
 
         <!-- User section -->
-        <ul class="navbar-nav">
+        <ul class="navbar-nav ms-auto">
           <li class="nav-item dropdown" v-if="user">
             <a 
               class="nav-link dropdown-toggle" 
@@ -138,6 +143,12 @@ function logout() {
 </script>
 
 <style scoped>
+/* Navbar layout reset */
+.navbar {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
 /* Custom active link styling */
 .nav-link.active {
   color: #0d6efd !important;
@@ -149,10 +160,27 @@ function logout() {
 .dropdown-menu {
   border: 1px solid #dee2e6;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  right: 0;
+  left: auto;
+  min-width: 200px;
+  transform: translateX(0);
+}
+
+.dropdown-menu.dropdown-menu-end {
+  right: 0 !important;
+  left: auto !important;
 }
 
 /* Ensure navbar stays on top */
 .sticky-top {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.navbar-brand {
+  font-size: 1.35rem;
+}
+
+.nav-link {
+  font-size: 1.12rem;
 }
 </style>

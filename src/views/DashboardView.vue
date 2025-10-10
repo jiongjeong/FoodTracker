@@ -224,6 +224,27 @@ export default {
 
 </template>
 <style scoped>
+.dashboard-overview {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.08) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.1);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.08);
+  border-radius: 1rem;
+  position: relative;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-overview::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #059669 0%, #10b981 50%, #34d399 100%);
+  border-radius: 1rem 1rem 0 0;
+}
+
 .food-scroll-container {
   max-width: 700px;
   margin: 0 auto;
