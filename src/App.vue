@@ -17,9 +17,6 @@ function resetTimeout() {
   window.addEventListener(event, resetTimeout)
 );
 
-window.addEventListener('beforeunload', () => {
-  localStorage.clear();
-});
 
 
 resetTimeout();

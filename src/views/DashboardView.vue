@@ -1,9 +1,7 @@
 <script setup>
-import { db } from '../firebase.js'; 
-import {getAuth, onAuthStateChanged} from 'firebase/auth';
-import { collection, getDocs} from 'firebase/firestore';
+import { db } from '../firebase.js';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { ref, computed, onMounted } from 'vue'
-
 
 
 const searchText = ref('')
@@ -11,9 +9,8 @@ const selectedCategory = ref('All Categories')
 const sortBy = ref('expiration')
 const sortDirection = ref('asc')
 const food_inv = ref([])
-const auth = getAuth();
-const user = auth.currentUser;
-const uid = user ? user.id : null;
+const user = JSON.parse(localStorage.getItem('user'))
+const userId = JSON.parse(localStorage.getItem('user'))?.id
 
 const categories = [
   'All Categories',
@@ -29,18 +26,18 @@ const categories = [
   'Other'
 ]
 
-console.log('user id in dashboard:', user ? user.uid : 'No user');
+console.log('user id in dashboard:', userId);
 console.log('user in dashboard:', user);
 onMounted(async () => {
   if (user) {
     const q = query (
       collection(db, 'food'),
-      where('userId', '==', user.id)
+      where('userId', '==', userId)
     );
     const querySnapshot = await getDocs(q);
     food_inv.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     console.log('User is signed in:', user.email);
-  } 
+  }
 })
 
 const filteredFoodItems = computed(() => {
@@ -182,7 +179,7 @@ const expired = computed(() => {
     const daysLeft = getDaysLeft(food)
     return daysLeft < 0
   }).length
-})  
+})
 
 const potentialLoss = computed(() =>
   food_inv.value
@@ -323,15 +320,15 @@ const potentialLoss = computed(() =>
 
                 </div>
               </div>
-              
+
 
             </div>
           </div>
         </div>
       </div>
-  
+
 </div>
-  
+
 
 </template>
 <style scoped>
