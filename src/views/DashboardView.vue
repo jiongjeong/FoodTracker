@@ -206,21 +206,21 @@ const getBadgeClass = (food) => {
 }
 
 const expiringSoon = computed(() => {
-  return food_inv.value.filter(food => {
+  return foodItems.value.filter(food => {
     const daysLeft = getDaysLeft(food)
     return daysLeft >= 0 && daysLeft <= 5
   }).length
 })
 
 const expired = computed(() => {
-  return food_inv.value.filter(food => {
+  return foodItems.value.filter(food => {
     const daysLeft = getDaysLeft(food)
     return daysLeft < 0
   }).length
 })
 
 const potentialLoss = computed(() =>
-  food_inv.value
+  foodItems.value
     .filter(item => {
       const days = getDaysLeft(item)
       return days >= 0 && days <= 7
