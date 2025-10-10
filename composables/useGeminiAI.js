@@ -26,7 +26,7 @@ export function useGeminiAI() {
         ],
         // generationConfig can be included if you have valid options, but thinkingConfig is not supported
       })
-
+      return response.response.text()
       return await response.response.text()
     } catch (err) {
       error.value = errorMessage
