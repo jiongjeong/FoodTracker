@@ -2,6 +2,8 @@
 import { db } from '../firebase.js'; // adjust path as needed
 import { collection, getDocs } from 'firebase/firestore';
 import { ref, computed } from 'vue'
+
+
 const searchText = ref('')
 const selectedCategory = ref('All Categories')
 const sortBy = ref('expiration')
@@ -21,6 +23,11 @@ const categories = [
   'Other'
 ]
 
+onMounted(async () => {
+  const querySnapshot = await getDocs(collection(db, 'food'))
+  food_inv.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+})
+
 const toggleSortDirection = () => {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
 }
@@ -32,58 +39,45 @@ const getSortButtonTitle = computed(() => {
   return `Sort ${direction}`
 })
 
-export default {
-  data() {
-    return {
-      food_inv: [],
-    };
-  },
-  async mounted() {
-    const querySnapshot = await getDocs(collection(db, 'food'));
-    this.food_inv = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    // console.log(this.food_inv)
-  },
-  methods: {
-    formatDate(dateObj) {
-      const date = dateObj instanceof Date ? dateObj : dateObj.toDate();
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = date.toLocaleString('en-US', { month: 'short' });
-      const year = date.getFullYear();
-      return `${day} ${month} ${year}`;
-    },
-    getFoodCardClass(food) {
-      const now = new Date();
-      const expDate = food.expirationDate.toDate();
-      const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
-      if (expDate < now) {
-        return 'expired-card';
-      } else if (daysLeft >= 1 && daysLeft <= 7) {
-        return 'warning-card';
-      } else {
-        return 'normal-card';
-      }
-    },
-    getDaysLeft(food) {
-      const now = new Date();
-      const expDate = food.expirationDate.toDate();
-      const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate());
-      return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24));
-    },
-    getBadgeClass(food) {
-      const daysLeft = this.getDaysLeft(food);
+const formatDate = (dateObj) => {
+  const date = dateObj instanceof Date ? dateObj : dateObj.toDate()
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = date.toLocaleString('en-US', { month: 'short' })
+  const year = date.getFullYear()
+  return `${day} ${month} ${year}`
+}
 
-      if (daysLeft < 0 || daysLeft === 0 || daysLeft === 1) {
-        return 'badge-expired';
-      } else if (daysLeft >= 2 && daysLeft <= 7) {
-        return 'badge-warning';
-      } else {
-        return 'badge-transparent';
-      }
-    }
+const getDaysLeft = (food) => {
+  const now = new Date()
+  const expDate = food.expirationDate.toDate()
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate())
+  return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
+}
+
+const getFoodCardClass = (food) => {
+  const now = new Date()
+  const expDate = food.expirationDate.toDate()
+  const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24))
+  if (expDate < now) {
+    return 'expired-card'
+  } else if (daysLeft >= 1 && daysLeft <= 7) {
+    return 'warning-card'
+  } else {
+    return 'normal-card'
   }
+}
 
-};
+const getBadgeClass = (food) => {
+  const daysLeft = getDaysLeft(food)
+  if (daysLeft <= 1) {
+    return 'badge-expired'
+  } else if (daysLeft <= 7) {
+    return 'badge-warning'
+  } else {
+    return 'badge-transparent'
+  }
+}
 
 
 </script>
@@ -146,7 +140,6 @@ export default {
           </div>
         </div>
       </div>
-    </div>
     <div class="row g-4">
           <div class="col-lg-8">
             <div class="glass-card p-4">
@@ -218,6 +211,7 @@ export default {
         </div>
       </div>
     </div>
+  </div>
   </div>
 
   
