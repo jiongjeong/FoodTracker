@@ -1,7 +1,9 @@
 <script setup>
-import { db } from '../firebase.js'; // adjust path as needed
-import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase.js'; 
+import {getAuth, onAuthStateChanged} from 'firebase/auth';
+import { collection, getDocs} from 'firebase/firestore';
 import { ref, computed, onMounted } from 'vue'
+
 
 
 const searchText = ref('')
@@ -9,6 +11,9 @@ const selectedCategory = ref('All Categories')
 const sortBy = ref('expiration')
 const sortDirection = ref('asc')
 const food_inv = ref([])
+const auth = getAuth();
+const user = auth.currentUser;
+const uid = user ? user.id : null;
 
 const categories = [
   'All Categories',
@@ -24,9 +29,18 @@ const categories = [
   'Other'
 ]
 
+console.log('user id in dashboard:', user ? user.uid : 'No user');
+console.log('user in dashboard:', user);
 onMounted(async () => {
-  const querySnapshot = await getDocs(collection(db, 'food'))
-  food_inv.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+  if (user) {
+    const q = query (
+      collection(db, 'food'),
+      where('userId', '==', user.uid)
+    );
+    const querySnapshot = await getDocs(q);
+    food_inv.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    console.log('User is signed in:', user.email);
+  } 
 })
 
 const filteredFoodItems = computed(() => {
@@ -156,6 +170,29 @@ const getBadgeClass = (food) => {
   }
 }
 
+const expiringSoon = computed(() => {
+  return food_inv.value.filter(food => {
+    const daysLeft = getDaysLeft(food)
+    return daysLeft >= 0 && daysLeft <= 5
+  }).length
+})
+
+const expired = computed(() => {
+  return food_inv.value.filter(food => {
+    const daysLeft = getDaysLeft(food)
+    return daysLeft < 0
+  }).length
+})  
+
+const potentialLoss = computed(() =>
+  food_inv.value
+    .filter(item => {
+      const days = getDaysLeft(item)
+      return days >= 0 && days <= 7
+    })
+    .reduce((sum, item) => sum + (item.price || 0), 0)
+)
+
 
 </script>
 <template>
@@ -186,8 +223,7 @@ const getBadgeClass = (food) => {
                 <i class="bi bi-exclamation-triangle text-warning"></i>
                 <small class="text-muted">Expiring Soon</small>
               </div>
-              <!-- <h3 class="h4">{{ expiringSoon }}</h3> -->
-              <h3 class="h4">placeholder</h3>
+              <h3 class="h4">{{ expiringSoon }}</h3>
               <small class="text-muted">items</small>
             </div>
           </div>
@@ -198,8 +234,7 @@ const getBadgeClass = (food) => {
                 <i class="bi bi-currency-dollar text-success"></i>
                 <small class="text-muted">Potential Loss</small>
               </div>
-              <!-- <h3 class="h4">${{ potentialLoss.toFixed(2) }}</h3> -->
-              <h3 class="h4">placeholder</h3>
+              <h3 class="h4">${{ potentialLoss.toFixed(2) }}</h3>
               <small class="text-muted">if expired</small>
             </div>
           </div>
@@ -210,8 +245,7 @@ const getBadgeClass = (food) => {
                 <i class="bi bi-calendar-x text-danger"></i>
                 <small class="text-muted">Expired</small>
               </div>
-              <!-- <h3 class="h4 text-danger">{{ expired }}</h3> -->
-              <h3 class="h4 text-danger">placeholder</h3>
+              <h3 class="h4 text-danger">{{ expired }}</h3>
               <small class="text-muted">items</small>
             </div>
           </div>
