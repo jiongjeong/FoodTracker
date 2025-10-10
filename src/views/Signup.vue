@@ -36,7 +36,7 @@
 </template>
 
 <script>
-import { getFirestore, collection, query, where, getDocs, addDoc } from "firebase/firestore";
+import { getFirestore, collection, query, where, getDocs, addDoc, doc, setDoc } from "firebase/firestore";
 import { db } from '@/firebase'; // your Firebase config export
 
 export default {
@@ -118,13 +118,13 @@ export default {
       // Add a placeholder document with all activity fields initialized
       await addDoc(activitiesRef, {
         _placeholder: true,
-        actionType: "",
-        foodName: "",
+        type: "",
         description: "",
         points: 0,
+        relatedItemId: "",
         quantity: 0,
         unit: "",
-        price: 0,
+        moneySaved: 0,
         wasteAvoided: false,
         category: "",
       });
@@ -212,7 +212,6 @@ button[type='submit'] {
 button[type='submit']:hover {
   background: #059669;
 }
-
 .login-redirect-btn {
   width: 100%;
   text-align: center;
