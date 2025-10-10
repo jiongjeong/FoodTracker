@@ -118,13 +118,13 @@ export default {
       // Add a placeholder document with all activity fields initialized
       await addDoc(activitiesRef, {
         _placeholder: true,
-        actionType: "",
-        foodName: "",
+        type: "",
         description: "",
         points: 0,
+        relatedItemId: "",
         quantity: 0,
         unit: "",
-        price: 0,
+        moneySaved: 0,
         wasteAvoided: false,
         category: "",
       });
