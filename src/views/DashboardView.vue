@@ -1,7 +1,7 @@
 <script setup>
 import { db } from '../firebase.js';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { ref, computed, onMounted } from 'vue'
+import { collection, getDocs, query, where, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { ref, computed, onMounted, reactive } from 'vue'
 
 
 const searchText = ref('')
@@ -11,6 +11,18 @@ const sortDirection = ref('asc')
 const food_inv = ref([])
 const user = JSON.parse(localStorage.getItem('user'))
 const userId = JSON.parse(localStorage.getItem('user'))?.id
+const showEditModal = ref(false)
+const editForm = reactive({
+  id: null,
+  name: '',
+  category: '',
+  expirationDate: '',
+  createdAt: '',
+  price: '',
+  quantity: '',
+  unit: ''
+})
+const editFormOriginal = ref(null)
 
 const foodItems = ref([])
 const recipes = ref([])
@@ -216,6 +228,77 @@ const potentialLoss = computed(() =>
     .reduce((sum, item) => sum + (item.price || 0), 0)
 )
 
+const toInputDateString = (d) => {
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+const openEdit = (food) => {
+  editFormOriginal.value = JSON.parse(JSON.stringify(food))
+  editForm.id = food.id || null
+  editForm.name = food.name ?? ''
+  editForm.category = food.category ?? ''
+  
+  let exp = null;
+  if (food.expirationDate) {
+    if (typeof food.expirationDate.toDate === 'function') {
+      // Firestore Timestamp
+      exp = food.expirationDate.toDate();
+    } else {
+      // already a Date or a string that Date can parse
+      exp = new Date(food.expirationDate);
+      if (isNaN(exp)) exp = null; // optional: guard against invalid parse
+    }
+  }
+  editForm.expirationDate = exp ? toInputDateString(exp) : ''
+  const created = food.createdAt && food.createdAt.toDate ? food.createdAt.toDate() : (food.createdAt ? new Date(food.createdAt) : null)
+  editForm.createdAt = created ? toInputDateString(created) : ''
+  editForm.price = food.price != null ? food.price : ''
+  editForm.quantity = food.quantity != null ? food.quantity : ''
+  editForm.unit = food.unit ?? ''
+  showEditModal.value = true
+}
+
+const closeEdit = () => {
+  showEditModal.value = false
+  editForm.id = null
+  editForm.name = ''
+  editForm.category = ''
+  editForm.expirationDate = ''
+  editForm.createdAt = ''
+  editForm.price = ''
+  editForm.quantity = ''
+  editForm.unit = ''
+  editFormOriginal.value = null
+}
+
+const saveEdit = async () => {
+  if (!editForm.id) return
+  const refDoc = doc(db, 'food', editForm.id)
+  const payload = {
+    name: editForm.name,
+    category: editForm.category,
+    price: Number(editForm.price) || 0,
+    quantity: Number(editForm.quantity) || 0,
+    unit: editForm.unit || ''
+  }
+  if (editForm.expirationDate) {
+    payload.expirationDate = Timestamp.fromDate(new Date(editForm.expirationDate))
+  }
+  if (editForm.createdAt) {
+    payload.createdAt = Timestamp.fromDate(new Date(editForm.createdAt))
+  }
+  await updateDoc(refDoc, payload)
+  // update local list
+  const idx = food_inv.value.findIndex(f => f.id === editForm.id)
+  if (idx !== -1) {
+    food_inv.value[idx] = { ...food_inv.value[idx], ...payload }
+  }
+  closeEdit()
+}
+
 
 </script>
 <template>
@@ -332,22 +415,109 @@ const potentialLoss = computed(() =>
                   </div>
                 </div>
                 <div class="food-actions">
-                  <button class="food-btn food-btn-edit"><i class="bi bi-pencil"></i> Edit</button>
+                  <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
+                    Edit</button>
                   <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
                   <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
                 </div>
 
               </div>
             </div>
+              
 
-
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
+</div>
+
+
+  <!-- Edit Modal -->
+  <div v-if="showEditModal" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="h5 mb-3">Edit Food Item</h3>
+      <div class="mb-2">
+        <label class="form-label">Name</label>
+        <input v-model="editForm.name" class="form-control" />
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Category</label>
+        <input v-model="editForm.category" class="form-control" />
+      </div>
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label">Expiration Date</label>
+          <input v-model="editForm.expirationDate" type="date" class="form-control" />
+        </div>
+        <div class="col-6">
+          <label class="form-label">Created At</label>
+          <input v-model="editForm.createdAt" type="date" class="form-control" />
+        </div>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-4">
+          <label class="form-label">Price</label>
+          <input v-model="editForm.price" type="number" step="0.01" class="form-control" />
+        </div>
+        <div class="col-4">
+          <label class="form-label">Quantity</label>
+          <input v-model="editForm.quantity" type="number" class="form-control" />
+        </div>
+        <div class="col-4">
+          <label class="form-label">Unit</label>
+          <input v-model="editForm.unit" class="form-control" />
+        </div>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-secondary" @click="closeEdit">Cancel</button>
+        <button class="btn btn-primary" @click="saveEdit">Save</button>
+      </div>
+    </div>
   </div>
 
+  <!-- Edit Modal -->
+  <div v-if="showEditModal" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="h5 mb-3">Edit Food Item</h3>
+      <div class="mb-2">
+        <label class="form-label">Name</label>
+        <input v-model="editForm.name" class="form-control" />
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Category</label>
+        <input v-model="editForm.category" class="form-control" />
+      </div>
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label">Expiration Date</label>
+          <input v-model="editForm.expirationDate" type="date" class="form-control" />
+        </div>
+        <div class="col-6">
+          <label class="form-label">Created At</label>
+          <input v-model="editForm.createdAt" type="date" class="form-control" />
+        </div>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-4">
+          <label class="form-label">Price</label>
+          <input v-model="editForm.price" type="number" step="0.01" class="form-control" />
+        </div>
+        <div class="col-4">
+          <label class="form-label">Quantity</label>
+          <input v-model="editForm.quantity" type="number" class="form-control" />
+        </div>
+        <div class="col-4">
+          <label class="form-label">Unit</label>
+          <input v-model="editForm.unit" class="form-control" />
+        </div>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-secondary" @click="closeEdit">Cancel</button>
+        <button class="btn btn-primary" @click="saveEdit">Save</button>
+      </div>
+    </div>
+  </div>
 
 </template>
 <style scoped>
@@ -517,5 +687,25 @@ const potentialLoss = computed(() =>
 .sort-direction-btn i {
   font-size: 16px;
   line-height: 1;
+}
+
+/* Modal styles */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal-card {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  width: 600px;
+  max-width: calc(100% - 32px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
 }
 </style>
