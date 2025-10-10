@@ -29,6 +29,82 @@ onMounted(async () => {
   food_inv.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
 })
 
+const filteredFoodItems = computed(() => {
+  const uniqueItems = food_inv.value.filter(
+    (item, index, self) =>
+      index === self.findIndex(i => i.id === item.id)
+  )
+
+  let items = [...uniqueItems]
+
+  // Search
+  if (searchText.value && searchText.value.trim()) {
+    const searchTerm = searchText.value.toLowerCase().trim()
+    items = items.filter(item =>
+      item.name && item.name.toLowerCase().includes(searchTerm)
+    )
+  }
+
+  // Category filter
+  if (selectedCategory.value && selectedCategory.value !== 'All Categories') {
+    items = items.filter(item => item.category === selectedCategory.value)
+  }
+
+  // Sorting
+  const direction = sortDirection.value === 'desc' ? -1 : 1
+
+  switch (sortBy.value) {
+    case 'expiration':
+      items.sort((a, b) => {
+        const dateA = new Date(a.expirationDate?.toDate?.() || a.expirationDate)
+        const dateB = new Date(b.expirationDate?.toDate?.() || b.expirationDate)
+        if (isNaN(dateA) && isNaN(dateB)) return 0
+        if (isNaN(dateA)) return 1
+        if (isNaN(dateB)) return -1
+        return (dateA - dateB) * direction
+      })
+      break
+
+    case 'name':
+      items.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase()
+        const nameB = (b.name || '').toLowerCase()
+        return nameA.localeCompare(nameB) * direction
+      })
+      break
+
+    case 'category':
+      items.sort((a, b) => {
+        const catA = a.category || ''
+        const catB = b.category || ''
+        const categoryCompare = catA.localeCompare(catB) * direction
+        if (categoryCompare !== 0) return categoryCompare
+        const nameA = (a.name || '').toLowerCase()
+        const nameB = (b.name || '').toLowerCase()
+        return nameA.localeCompare(nameB)
+      })
+      break
+
+    case 'quantity':
+      items.sort((a, b) => {
+        const qtyA = parseFloat(a.quantity) || 0
+        const qtyB = parseFloat(b.quantity) || 0
+        return (qtyB - qtyA) * direction
+      })
+      break
+
+    case 'price':
+      items.sort((a, b) => {
+        const priceA = parseFloat(a.price) || 0
+        const priceB = parseFloat(b.price) || 0
+        return (priceB - priceA) * direction
+      })
+      break
+  }
+
+  return items
+})
+
 const toggleSortDirection = () => {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
 }
@@ -180,13 +256,13 @@ const getBadgeClass = (food) => {
                 </button>
                  </div>
               </div>
-              <div v-if="food_inv.length === 0" class="text-center py-5">
+              <div v-if="filteredFoodItems.length === 0" class="text-center py-5">
                 <i class="bi bi-search fs-1 text-muted"></i>
                 <p class="text-muted mt-3">No food items found</p>
               </div>
               <div v-else class="food-scroll-container">
                 <div class="food-scroll-section">
-                  <div v-for="food in food_inv" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
+                  <div v-for="food in filteredFoodItems" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
                   <div class="food-header">
                     <div>
                       <div class="food-title-group">
@@ -247,7 +323,7 @@ const getBadgeClass = (food) => {
 }
 
 .food-scroll-container {
-  max-width: 700px;
+  max-width: 100%;
   margin: 0 auto;
   background: #fff;
   border-radius: 12px;
