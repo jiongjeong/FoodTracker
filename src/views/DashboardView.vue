@@ -161,6 +161,16 @@ const formatDate = (dateObj) => {
   const year = date.getFullYear()
   return `${day} ${month} ${year}`
 }
+const getRelativeTime = (dateString) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (diffInSeconds < 60) return 'Just now'
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+    return `${Math.floor(diffInSeconds / 86400)}d ago`
+  }
 
 const getDaysLeft = (food) => {
   const now = new Date()
@@ -417,6 +427,24 @@ const saveEdit = async () => {
             </div>
           </div>
         </div>
+        <div class="col-lg-4 d-none d-lg-block">
+        <div class="glass-card p-4">
+          <h3 class="h5 mb-3">Recent Activity</h3>
+          <div v-if="activities.length === 0" class="text-center py-4">
+            <p class="text-muted">No recent activity</p>
+          </div>
+          <div v-else class="d-flex flex-column gap-3">
+            <div
+              v-for="activity in activities"
+              :key="activity.id"
+              class="pb-3 border-bottom"
+            >
+              <p class="mb-1 small">{{ activity.description }}</p>
+              <small class="text-muted">{{ getRelativeTime(activity.createdAt) }}</small>
+            </div>
+          </div>
+        </div>
+      </div>
       </div>
 
 </div>
