@@ -59,25 +59,6 @@ const addForm = reactive({
 })
 
 
-onMounted(async () => {
-  if (user && userId) {
-    // Fetch food subcollection
-    const foodItemsRef = collection(db, 'user', userId, 'foodItems');
-    const foodItemsSnapshot = await getDocs(foodItemsRef);
-    foodItems.value = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    // Fetch recipes subcollection
-    const recipesRef = collection(db, 'user', userId, 'recipes');
-    const recipesSnapshot = await getDocs(recipesRef);
-    recipes.value = recipesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    // Fetch activities subcollection
-    const activityRef = collection(db, 'user', userId, 'activities');
-    const activitySnapshot = await getDocs(activityRef);
-    activities.value = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  }
-});
-
 const categories = [
   'All Categories',
   'Fruits & Vegetables',
@@ -271,7 +252,7 @@ const openEdit = (food) => {
   editForm.id = food.id || null
   editForm.name = food.name ?? ''
   editForm.category = food.category ?? ''
-  
+
   let exp = null;
   if (food.expirationDate) {
     if (typeof food.expirationDate.toDate === 'function') {
@@ -505,7 +486,7 @@ const saveEdit = async () => {
 
               </div>
             </div>
-              
+
 
             </div>
           </div>
