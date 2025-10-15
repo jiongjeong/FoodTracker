@@ -2,24 +2,15 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <!-- Brand -->
-      <RouterLink
-        to="/dashboard"
-        class="navbar-brand fw-bold text-primary p-2 text-decoration-none"
-        :class="{ active: $route.path === '/dashboard' }"
-        @click="closeNavbar"
-      >
-      <img src="/bigbackicon.jpg" alt="Logo" class="me-2" style="height: 40px; border-radius: 50%;" />
-         BigBack
+      <RouterLink to="/dashboard" class="navbar-brand fw-bold text-primary p-2 text-decoration-none"
+        :class="{ active: $route.path === '/dashboard' }" @click="closeNavbar">
+        <img src="/bigbackicon.jpg" alt="Logo" class="me-2" style="height: 40px; border-radius: 50%;" />
+        BigBack
       </RouterLink>
 
       <!-- Mobile hamburger button (auto-hidden on lg+) -->
-      <button
-        class="navbar-toggler"
-        type="button"
-        data-bs-toggle="collapse"
-        data-bs-target="#navbarNav"
-        @click="toggleNavbar"
-      >
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+        @click="toggleNavbar">
         <span class="navbar-toggler-icon"></span>
       </button>
 
@@ -27,12 +18,14 @@
       <div class="collapse navbar-collapse flex-grow-1" id="navbarNav" :class="{ show: navbarOpen }">
         <ul class="navbar-nav mx-auto">
           <li class="nav-item">
-            <RouterLink to="/dashboard" class="nav-link" :class="{ active: $route.path === '/dashboard' }" @click="closeNavbar">
+            <RouterLink to="/dashboard" class="nav-link" :class="{ active: $route.path === '/dashboard' }"
+              @click="closeNavbar">
               <i class="bi bi-house-door me-1"></i>Dashboard
             </RouterLink>
           </li>
           <li class="nav-item">
-            <RouterLink to="/recipes" class="nav-link" :class="{ active: $route.path === '/recipes' }" @click="closeNavbar">
+            <RouterLink to="/recipes" class="nav-link" :class="{ active: $route.path === '/recipes' }"
+              @click="closeNavbar">
               <i class="bi bi-egg-fried me-1"></i>Recipes
             </RouterLink>
           </li>
@@ -42,17 +35,20 @@
             </RouterLink>
           </li>
           <li class="nav-item">
-            <RouterLink to="/community" class="nav-link" :class="{ active: $route.path === '/community' }" @click="closeNavbar">
+            <RouterLink to="/community" class="nav-link" :class="{ active: $route.path === '/community' }"
+              @click="closeNavbar">
               <i class="bi bi-people me-1"></i>Community
             </RouterLink>
           </li>
           <li class="nav-item">
-            <RouterLink to="/analytics" class="nav-link" :class="{ active: $route.path === '/analytics' }" @click="closeNavbar">
+            <RouterLink to="/analytics" class="nav-link" :class="{ active: $route.path === '/analytics' }"
+              @click="closeNavbar">
               <i class="bi bi-bar-chart me-1"></i>Analytics
             </RouterLink>
           </li>
           <li class="nav-item">
-            <RouterLink to="/leaderboard" class="nav-link" :class="{ active: $route.path === '/leaderboard' }" @click="closeNavbar">
+            <RouterLink to="/leaderboard" class="nav-link" :class="{ active: $route.path === '/leaderboard' }"
+              @click="closeNavbar">
               <i class="bi bi-trophy me-1"></i>Leaderboard
             </RouterLink>
           </li>
@@ -60,15 +56,10 @@
 
         <!-- User section -->
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item dropdown" v-if="user">
-            <a
-              class="nav-link dropdown-toggle"
-              href="#"
-              role="button"
-              @click.prevent="toggleDropdown"
-              :class="{ show: dropdownOpen }"
-            >
-              <i class="bi bi-person-circle me-1"></i>{{ user.name }}
+          <li class="nav-item dropdown" v-if="userName">
+            <a class="nav-link dropdown-toggle" href="#" role="button" @click.prevent="toggleDropdown"
+              :class="{ show: dropdownOpen }">
+              <i class="bi bi-person-circle me-1"></i>{{ userName }}
             </a>
             <ul class="dropdown-menu dropdown-menu-end" :class="{ show: dropdownOpen }">
               <li>
@@ -95,53 +86,61 @@
 </template>
 
 <script setup>
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { getAuth, signOut } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '@/firebase'
 
 const $route = useRoute()
 const router = useRouter()
 
-const user = ref(null)
 const dropdownOpen = ref(false)
 const navbarOpen = ref(false)
 
-// Sync user from localStorage reactively on mount and custom event
-function syncUser() {
-  const userJSON = localStorage.getItem('user')
-  user.value = userJSON ? JSON.parse(userJSON) : null
-  if (!user.value) dropdownOpen.value = false
-}
+// Auth and user state
+const auth = getAuth()
+const user = ref(auth.currentUser)
+const userName = ref('')
 
+// Listen for Auth changes and update userName from Firestore
 onMounted(() => {
-  syncUser()
-  window.addEventListener("userChange", syncUser)
-})
-
-onUnmounted(() => {
-  window.removeEventListener("userChange", syncUser)
+  auth.onAuthStateChanged(async (u) => {
+    user.value = u
+    userName.value = ''
+    if (u) {
+      try {
+        const userDocRef = doc(db, "user", u.uid)
+        const userDocSnap = await getDoc(userDocRef)
+        if (userDocSnap.exists()) {
+          userName.value = userDocSnap.data().name
+        }
+      } catch (error) {
+        console.error("Failed to fetch user profile:", error)
+      }
+    }
+  })
 })
 
 function toggleNavbar() {
   navbarOpen.value = !navbarOpen.value
 }
-
 function closeNavbar() {
   navbarOpen.value = false
   dropdownOpen.value = false
 }
-
 function toggleDropdown() {
   dropdownOpen.value = !dropdownOpen.value
 }
-
-// Centralized logout logic in navbar
-
-function logout() {
-  localStorage.removeItem('user')
-  window.dispatchEvent(new Event("userChange"))
-  dropdownOpen.value = false
-  navbarOpen.value = false
-  router.push('/login')
+async function logout() {
+  try {
+    await signOut(auth)
+    dropdownOpen.value = false
+    navbarOpen.value = false
+    router.push('/login')
+  } catch (error) {
+    console.error('Logout failed:', error)
+  }
 }
 </script>
 
@@ -151,32 +150,38 @@ function logout() {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }
+
 /* Custom active link styling */
 .nav-link.active {
   color: #0d6efd !important;
   background-color: #e7f1ff;
   border-radius: 0.375rem;
 }
+
 /* Dropdown styling */
 .dropdown-menu {
   border: 1px solid #dee2e6;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   right: 0;
   left: auto;
   min-width: 200px;
   transform: translateX(0);
 }
+
 .dropdown-menu.dropdown-menu-end {
   right: 0 !important;
   left: auto !important;
 }
+
 /* Ensure navbar stays on top */
 .sticky-top {
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
+
 .navbar-brand {
   font-size: 1.35rem;
 }
+
 .nav-link {
   font-size: 1.12rem;
 }

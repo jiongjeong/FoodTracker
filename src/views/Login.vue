@@ -6,18 +6,13 @@
         <label for="email">Email</label>
         <input type="email" id="email" v-model="email" placeholder="Enter your email" required />
       </div>
-
       <div class="form-group">
         <label for="password">Password</label>
         <input type="password" id="password" v-model="password" placeholder="Enter your password" required />
       </div>
-
       <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
-
       <button type="submit">Log In</button>
     </form>
-
-    <!-- Button to redirect to signup -->
     <button @click="goToSignup" class="signup-redirect-btn">
       Don't have an account? Sign Up
     </button>
@@ -25,55 +20,53 @@
 </template>
 
 <script>
-import { getFirestore, collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "@/firebase";  // Your firebase configuration export
+import { auth } from "@/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 export default {
   data() {
     return {
       email: "",
       password: "",
-      errorMessage: ""
+      errorMessage: "",
     };
   },
   methods: {
     async submitForm() {
       this.errorMessage = "";
       try {
-        const usersRef = collection(db, "user");  // Confirm your collection name here
-        const q = query(usersRef, where("email", "==", this.email), where("password", "==", this.password));
-        const querySnapshot = await getDocs(q);
+        const result = await signInWithEmailAndPassword(auth, this.email, this.password);
+        const user = result.user;
 
-        if (querySnapshot.empty) {
-          this.errorMessage = "Invalid email or password.";
-          return;
-        }
+        // No localStorage usage here
+        window.dispatchEvent(new Event('userChange')); // Keep notifying app components if required
 
-        const userDoc = {...
-          querySnapshot.docs[0].data(),
-          id: querySnapshot.docs[0].id
-        }
-        console.log("User logged in:", userDoc);
-
-        // Store user data in localStorage for session persistence
-        localStorage.setItem("user", JSON.stringify(userDoc));
-        window.dispatchEvent(new Event('userChange'));  // Important: Notify other components immediately
-
-        // Redirect on successful login
         this.$router.push('/dashboard');
       } catch (error) {
-        this.errorMessage = "Login failed: " + error.message;
+        switch (error.code) {
+          case 'auth/invalid-email':
+            this.errorMessage = 'Invalid email.';
+            break;
+          case 'auth/user-not-found':
+            this.errorMessage = 'No account with that email was found.';
+            break;
+          case 'auth/wrong-password':
+            this.errorMessage = 'Incorrect password.';
+            break;
+          default:
+            this.errorMessage = 'Email or password was incorrect.';
+        }
       }
     },
     goToSignup() {
       this.$router.push('/signup');
-    }
-  }
+    },
+  },
 };
-
 </script>
 
 <style scoped>
+/* Your existing styles remain unchanged */
 .login-container {
   max-width: 400px;
   margin: 2rem auto;

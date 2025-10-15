@@ -1,16 +1,17 @@
 <script setup>
 import { db } from '../firebase.js';
-import { collection, getDocs, query, where, doc, updateDoc, addDoc, Timestamp } from 'firebase/firestore';
-import { ref, computed, onMounted, reactive } from 'vue'
+import { collection, getDocs, doc, updateDoc, addDoc, Timestamp } from 'firebase/firestore';
+import { ref, computed, onMounted, reactive, watch } from 'vue';
+import { getAuth } from 'firebase/auth';
 
+const searchText = ref('');
+const selectedCategory = ref('All Categories');
+const sortBy = ref('expiration');
+const sortDirection = ref('asc');
 
-const searchText = ref('')
-const selectedCategory = ref('All Categories')
-const sortBy = ref('expiration')
-const sortDirection = ref('asc')
-const user = JSON.parse(localStorage.getItem('user'))
-const userId = JSON.parse(localStorage.getItem('user'))?.id
-const showEditModal = ref(false)
+const showEditModal = ref(false);
+const showAddModal = ref(false);
+
 const editForm = reactive({
   id: null,
   name: '',
@@ -20,34 +21,10 @@ const editForm = reactive({
   price: '',
   quantity: '',
   unit: ''
-})
-const editFormOriginal = ref(null)
-
-const foodItems = ref([])
-const recipes = ref([])
-const activities = ref([])
-
-onMounted(async () => {
-  if (user && userId) {
-    // Fetch food subcollection
-    const foodItemsRef = collection(db, 'user', userId, 'foodItems');
-    const foodItemsSnapshot = await getDocs(foodItemsRef);
-    foodItems.value = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    // Fetch recipes subcollection
-    const recipesRef = collection(db, 'user', userId, 'recipes');
-    const recipesSnapshot = await getDocs(recipesRef);
-    recipes.value = recipesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    // Fetch activities subcollection
-    const activityRef = collection(db, 'user', userId, 'activities');
-    const activitySnapshot = await getDocs(activityRef);
-    activities.value = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  }
 });
 
-// Add modal state
-const showAddModal = ref(false)
+const editFormOriginal = ref(null);
+
 const addForm = reactive({
   name: '',
   category: '',
@@ -56,28 +33,63 @@ const addForm = reactive({
   price: '',
   quantity: '',
   unit: ''
-})
+});
 
+const foodItems = ref([]);
+const recipes = ref([]);
+const activities = ref([]);
 
-onMounted(async () => {
-  if (user && userId) {
-    // Fetch food subcollection
-    const foodItemsRef = collection(db, 'user', userId, 'foodItems');
+const auth = getAuth();
+const user = ref(auth.currentUser);
+const userId = computed(() => user.value?.uid || null);
+
+auth.onAuthStateChanged(u => {
+  user.value = u;
+});
+
+watch(userId, async (val) => {
+  if (val) {
+    // Load all user collections live after userId is available
+    const foodItemsRef = collection(db, 'user', val, 'foodItems');
     const foodItemsSnapshot = await getDocs(foodItemsRef);
     foodItems.value = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    // Fetch recipes subcollection
-    const recipesRef = collection(db, 'user', userId, 'recipes');
+    const recipesRef = collection(db, 'user', val, 'recipes');
     const recipesSnapshot = await getDocs(recipesRef);
     recipes.value = recipesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    // Fetch activities subcollection
-    const activityRef = collection(db, 'user', userId, 'activities');
+    const activityRef = collection(db, 'user', val, 'activities');
     const activitySnapshot = await getDocs(activityRef);
     activities.value = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } else {
+    // Clear data if user logs out
+    foodItems.value = [];
+    recipes.value = [];
+    activities.value = [];
   }
 });
 
+// Fetch food items function
+async function loadFoodItems() {
+  if (userId.value) {
+    const foodItemsRef = collection(db, 'user', userId.value, 'foodItems');
+    const foodItemsSnapshot = await getDocs(foodItemsRef);
+    foodItems.value = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  }
+}
+
+// Call loadFoodItems on load
+onMounted(() => {
+  loadFoodItems();
+});
+
+// Also, watch for userId changes (like login)
+watch(userId, () => {
+  loadFoodItems();
+});
+
+// Categories for select input
 const categories = [
   'All Categories',
   'Fruits & Vegetables',
@@ -90,299 +102,290 @@ const categories = [
   'Frozen Foods',
   'Grains & Pasta',
   'Other'
-]
+];
 
-console.log('user id in dashboard:', userId);
-console.log('user in dashboard:', user);
-console.log(foodItems);
-console.log(recipes);
-console.log(activities);
-
-
+// Filtered food items (remove duplicates, search, filter, sort)
 const filteredFoodItems = computed(() => {
   const uniqueItems = foodItems.value.filter(
     (item, index, self) =>
       index === self.findIndex(i => i.id === item.id)
-  )
+  );
 
-  let items = [...uniqueItems]
+  let items = [...uniqueItems];
+
+  // Exclude items with empty or whitespace-only names
+  items = items.filter(item => item.name && item.name.trim().length > 0);
 
   // Search
   if (searchText.value && searchText.value.trim()) {
-    const searchTerm = searchText.value.toLowerCase().trim()
+    const searchTerm = searchText.value.toLowerCase().trim();
     items = items.filter(item =>
-      item.name && item.name.toLowerCase().includes(searchTerm)
-    )
+      item.name.toLowerCase().includes(searchTerm)
+    );
   }
 
   // Category filter
   if (selectedCategory.value && selectedCategory.value !== 'All Categories') {
-    items = items.filter(item => item.category === selectedCategory.value)
+    items = items.filter(item => item.category === selectedCategory.value);
   }
 
-  // Sorting
-  const direction = sortDirection.value === 'desc' ? -1 : 1
+  // ... rest of your sorting logic
 
-  switch (sortBy.value) {
-    case 'expiration':
-      items.sort((a, b) => {
-        const dateA = new Date(a.expirationDate?.toDate?.() || a.expirationDate)
-        const dateB = new Date(b.expirationDate?.toDate?.() || b.expirationDate)
-        if (isNaN(dateA) && isNaN(dateB)) return 0
-        if (isNaN(dateA)) return 1
-        if (isNaN(dateB)) return -1
-        return (dateA - dateB) * direction
-      })
-      break
-
-    case 'name':
-      items.sort((a, b) => {
-        const nameA = (a.name || '').toLowerCase()
-        const nameB = (b.name || '').toLowerCase()
-        return nameA.localeCompare(nameB) * direction
-      })
-      break
-
-    case 'category':
-      items.sort((a, b) => {
-        const catA = a.category || ''
-        const catB = b.category || ''
-        const categoryCompare = catA.localeCompare(catB) * direction
-        if (categoryCompare !== 0) return categoryCompare
-        const nameA = (a.name || '').toLowerCase()
-        const nameB = (b.name || '').toLowerCase()
-        return nameA.localeCompare(nameB)
-      })
-      break
-
-    case 'quantity':
-      items.sort((a, b) => {
-        const qtyA = parseFloat(a.quantity) || 0
-        const qtyB = parseFloat(b.quantity) || 0
-        return (qtyB - qtyA) * direction
-      })
-      break
-
-    case 'price':
-      items.sort((a, b) => {
-        const priceA = parseFloat(a.price) || 0
-        const priceB = parseFloat(b.price) || 0
-        return (priceB - priceA) * direction
-      })
-      break
-  }
-
-  return items
-})
+  return items;
+});
 
 const toggleSortDirection = () => {
-  sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
-}
+  sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+};
+
 const getSortButtonIcon = computed(() => {
-  return sortDirection.value === 'asc' ? 'bi bi-sort-up' : 'bi bi-sort-down'
-})
+  return sortDirection.value === 'asc' ? 'bi bi-sort-up' : 'bi bi-sort-down';
+});
+
 const getSortButtonTitle = computed(() => {
-  const direction = sortDirection.value === 'asc' ? 'Ascending' : 'Descending'
-  return `Sort ${direction}`
-})
+  const direction = sortDirection.value === 'asc' ? 'Ascending' : 'Descending';
+  return `Sort ${direction}`;
+});
 
 const formatDate = (dateObj) => {
-  const date = dateObj instanceof Date ? dateObj : dateObj.toDate()
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = date.toLocaleString('en-US', { month: 'short' })
-  const year = date.getFullYear()
-  return `${day} ${month} ${year}`
-}
-const getRelativeTime = (dateString) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
-    if (diffInSeconds < 60) return 'Just now'
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
-    return `${Math.floor(diffInSeconds / 86400)}d ago`
+  let date;
+  if (dateObj) {
+    if (typeof dateObj.toDate === "function") {
+      date = dateObj.toDate(); // Firestore Timestamp
+    } else if (dateObj instanceof Date) {
+      date = dateObj; // JS Date
+    } else {
+      date = new Date(dateObj); // try parsing string or other formats
+    }
+  } else {
+    return ''; // or some default string for missing date
   }
+
+  if (isNaN(date)) {
+    return ''; // Handle invalid date
+  }
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = date.toLocaleString('en-US', { month: 'short' });
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
+};
+
+const getRelativeTime = (dateString) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  return `${Math.floor(diffInSeconds / 86400)}d ago`;
+};
 
 const getDaysLeft = (food) => {
-  const now = new Date()
-  const expDate = food.expirationDate.toDate()
-  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate())
-  return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
-}
+  const now = new Date();
+  let expDate;
+
+  if (food.expirationDate) {
+    if (typeof food.expirationDate.toDate === 'function') {
+      // Firestore Timestamp
+      expDate = food.expirationDate.toDate();
+    } else if (food.expirationDate instanceof Date) {
+      // Plain JS Date
+      expDate = food.expirationDate;
+    } else {
+      // Try to parse a string
+      expDate = new Date(food.expirationDate);
+    }
+  } else {
+    // No expiration date, assume far future or zero days left
+    return 0;
+  }
+
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate());
+  return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24));
+};
 
 const getFoodCardClass = (food) => {
-  const now = new Date()
-  const expDate = food.expirationDate.toDate()
-  const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24))
-  if (expDate < now) {
-    return 'expired-card'
-  } else if (daysLeft >= 1 && daysLeft <= 7) {
-    return 'warning-card'
+  const now = new Date();
+  let expDate;
+
+  if (food.expirationDate) {
+    if (typeof food.expirationDate.toDate === 'function') {
+      expDate = food.expirationDate.toDate();
+    } else if (food.expirationDate instanceof Date) {
+      expDate = food.expirationDate;
+    } else {
+      expDate = new Date(food.expirationDate);
+    }
   } else {
-    return 'normal-card'
+    return 'normal-card'; // fallback class if no expirationDate
   }
-}
+
+  if (isNaN(expDate)) return 'normal-card'; // protect against invalid date
+
+  const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+
+  if (expDate < now) {
+    return 'expired-card';
+  } else if (daysLeft >= 1 && daysLeft <= 7) {
+    return 'warning-card';
+  } else {
+    return 'normal-card';
+  }
+};
+
 
 const getBadgeClass = (food) => {
-  const daysLeft = getDaysLeft(food)
+  const daysLeft = getDaysLeft(food);
   if (daysLeft <= 1) {
-    return 'badge-expired'
+    return 'badge-expired';
   } else if (daysLeft <= 7) {
-    return 'badge-warning'
+    return 'badge-warning';
   } else {
-    return 'badge-transparent'
+    return 'badge-transparent';
   }
-}
+};
 
-const expiringSoon = computed(() => {
-  return foodItems.value.filter(food => {
-    const daysLeft = getDaysLeft(food)
-    return daysLeft >= 0 && daysLeft <= 5
+const expiringSoon = computed(() =>
+  foodItems.value.filter(food => {
+    const daysLeft = getDaysLeft(food);
+    return daysLeft >= 0 && daysLeft <= 5;
   }).length
-})
+);
 
-const expired = computed(() => {
-  return foodItems.value.filter(food => {
-    const daysLeft = getDaysLeft(food)
-    return daysLeft < 0
+const expired = computed(() =>
+  foodItems.value.filter(food => {
+    const daysLeft = getDaysLeft(food);
+    return daysLeft < 0;
   }).length
-})
+);
 
 const potentialLoss = computed(() =>
   foodItems.value
     .filter(item => {
-      const days = getDaysLeft(item)
-      return days >= 0 && days <= 7
+      const days = getDaysLeft(item);
+      return days >= 0 && days <= 7;
     })
     .reduce((sum, item) => sum + (item.price || 0), 0)
-)
+);
 
 const toInputDateString = (d) => {
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
-}
-
-const openEdit = (food) => {
-  editFormOriginal.value = JSON.parse(JSON.stringify(food))
-  editForm.id = food.id || null
-  editForm.name = food.name ?? ''
-  editForm.category = food.category ?? ''
-  
-  let exp = null;
-  if (food.expirationDate) {
-    if (typeof food.expirationDate.toDate === 'function') {
-      // Firestore Timestamp
-      exp = food.expirationDate.toDate();
-    } else {
-      // already a Date or a string that Date can parse
-      exp = new Date(food.expirationDate);
-      if (isNaN(exp)) exp = null; // optional: guard against invalid parse
-    }
-  }
-  editForm.expirationDate = exp ? toInputDateString(exp) : ''
-  const created = food.createdAt && food.createdAt.toDate ? food.createdAt.toDate() : (food.createdAt ? new Date(food.createdAt) : null)
-  editForm.createdAt = created ? toInputDateString(created) : ''
-  editForm.price = food.price != null ? food.price : ''
-  editForm.quantity = food.quantity != null ? food.quantity : ''
-  editForm.unit = food.unit ?? ''
-  showEditModal.value = true
-}
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
 
 const openAdd = () => {
-  addForm.name = ''
-  addForm.category = ''
-  addForm.expirationDate = ''
-  addForm.createdAt = ''
-  addForm.price = ''
-  addForm.quantity = ''
-  addForm.unit = ''
-  showAddModal.value = true
-}
+  addForm.name = '';
+  addForm.category = '';
+  addForm.expirationDate = '';
+  addForm.createdAt = '';
+  addForm.price = '';
+  addForm.quantity = '';
+  addForm.unit = '';
+  showAddModal.value = true;
+};
 
 const closeAdd = () => {
-  showAddModal.value = false
-  addForm.name = ''
-  addForm.category = ''
-  addForm.expirationDate = ''
-  addForm.createdAt = ''
-  addForm.price = ''
-  addForm.quantity = ''
-  addForm.unit = ''
-}
+  showAddModal.value = false;
+  addForm.name = '';
+  addForm.category = '';
+  addForm.expirationDate = '';
+  addForm.createdAt = '';
+  addForm.price = '';
+  addForm.quantity = '';
+  addForm.unit = '';
+};
 
 const saveAdd = async () => {
-  if (!userId) {
-    console.warn('No userId available; cannot add food item')
-    return
+  if (!userId.value) {
+    console.warn('No userId available; cannot add food item');
+    return;
   }
-  const colRef = collection(db, 'user', userId, 'foodItems')
+  const colRef = collection(db, 'user', userId.value, 'foodItems');
   const payload = {
     name: addForm.name || '',
     category: addForm.category || '',
     price: Number(addForm.price) || 0,
     quantity: Number(addForm.quantity) || 0,
     unit: addForm.unit || ''
-  }
+  };
   if (addForm.expirationDate) {
-    payload.expirationDate = Timestamp.fromDate(new Date(addForm.expirationDate))
+    payload.expirationDate = Timestamp.fromDate(new Date(addForm.expirationDate));
   }
-  // If createdAt provided use it, otherwise set now
   if (addForm.createdAt) {
-    payload.createdAt = Timestamp.fromDate(new Date(addForm.createdAt))
+    payload.createdAt = Timestamp.fromDate(new Date(addForm.createdAt));
   } else {
-    payload.createdAt = Timestamp.fromDate(new Date())
+    payload.createdAt = Timestamp.fromDate(new Date());
   }
+  const newDocRef = await addDoc(colRef, payload);
+  foodItems.value.unshift({ id: newDocRef.id, ...payload });
+  closeAdd();
+};
 
-  const newDocRef = await addDoc(colRef, payload)
-  // push into local list (at front)
-  foodItems.value.unshift({ id: newDocRef.id, ...payload })
-  closeAdd()
-}
+const openEdit = (food) => {
+  editFormOriginal.value = JSON.parse(JSON.stringify(food));
+  editForm.id = food.id || null;
+  editForm.name = food.name ?? '';
+  editForm.category = food.category ?? '';
+  let exp = null;
+  if (food.expirationDate) {
+    if (typeof food.expirationDate.toDate === 'function') {
+      exp = food.expirationDate.toDate();
+    } else {
+      exp = new Date(food.expirationDate);
+      if (isNaN(exp)) exp = null;
+    }
+  }
+  editForm.expirationDate = exp ? toInputDateString(exp) : '';
+  const created = food.createdAt && food.createdAt.toDate ? food.createdAt.toDate() : (food.createdAt ? new Date(food.createdAt) : null);
+  editForm.createdAt = created ? toInputDateString(created) : '';
+  editForm.price = food.price != null ? food.price : '';
+  editForm.quantity = food.quantity != null ? food.quantity : '';
+  editForm.unit = food.unit ?? '';
+  showEditModal.value = true;
+};
 
 const closeEdit = () => {
-  showEditModal.value = false
-  editForm.id = null
-  editForm.name = ''
-  editForm.category = ''
-  editForm.expirationDate = ''
-  editForm.createdAt = ''
-  editForm.price = ''
-  editForm.quantity = ''
-  editForm.unit = ''
-  editFormOriginal.value = null
-}
+  showEditModal.value = false;
+  editForm.id = null;
+  editForm.name = '';
+  editForm.category = '';
+  editForm.expirationDate = '';
+  editForm.createdAt = '';
+  editForm.price = '';
+  editForm.quantity = '';
+  editForm.unit = '';
+  editFormOriginal.value = null;
+};
 
 const saveEdit = async () => {
-  if (!editForm.id) return
-  const refDoc = doc(db, 'user', userId, 'foodItems', editForm.id)
+  if (!editForm.id) return;
+  const refDoc = doc(db, 'user', userId.value, 'foodItems', editForm.id);
   const payload = {
     name: editForm.name,
     category: editForm.category,
     price: Number(editForm.price) || 0,
     quantity: Number(editForm.quantity) || 0,
     unit: editForm.unit || ''
-  }
+  };
   if (editForm.expirationDate) {
-    payload.expirationDate = Timestamp.fromDate(new Date(editForm.expirationDate))
+    payload.expirationDate = Timestamp.fromDate(new Date(editForm.expirationDate));
   }
   if (editForm.createdAt) {
-    payload.createdAt = Timestamp.fromDate(new Date(editForm.createdAt))
+    payload.createdAt = Timestamp.fromDate(new Date(editForm.createdAt));
   }
-  await updateDoc(refDoc, payload)
-  // update local list
-  const idx = foodItems.value.findIndex(f => f.id === editForm.id)
+  await updateDoc(refDoc, payload);
+  const idx = foodItems.value.findIndex(f => f.id === editForm.id);
   if (idx !== -1) {
-    foodItems.value[idx] = { ...foodItems.value[idx], ...payload }
+    foodItems.value[idx] = { ...foodItems.value[idx], ...payload };
   }
-  closeEdit()
-}
-
-
+  closeEdit();
+};
 </script>
+
 <template>
   <div class="container-fluid p-4">
     <div class="dashboard-overview">
@@ -400,7 +403,6 @@ const saveEdit = async () => {
               <i class="bi bi-graph-up-arrow text-success"></i>
               <small class="text-muted">Food Score</small>
             </div>
-            <!-- <h3 class="h4">{{ user.currentScore }}</h3> -->
             <h3 class="h4">placeholder</h3>
             <small class="text-muted">points</small>
           </div>
@@ -415,7 +417,6 @@ const saveEdit = async () => {
             <small class="text-muted">items</small>
           </div>
         </div>
-
         <div class="col-6 col-lg-3">
           <div class="glass-card stat-card p-3">
             <div class="d-flex align-items-center gap-2 mb-2">
@@ -426,7 +427,6 @@ const saveEdit = async () => {
             <small class="text-muted">if expired</small>
           </div>
         </div>
-
         <div class="col-6 col-lg-3">
           <div class="glass-card stat-card p-3">
             <div class="d-flex align-items-center gap-2 mb-2">
@@ -439,6 +439,7 @@ const saveEdit = async () => {
         </div>
       </div>
     </div>
+
     <div class="row g-4">
       <div class="col-lg-8">
         <div class="glass-card p-4">
@@ -452,7 +453,7 @@ const saveEdit = async () => {
             </div>
             <div class="col-12 col-sm-6 col-md-3">
               <select v-model="selectedCategory" class="form-select">
-                <option v-for="cat in categories" v-bind:key="cat" v-bind:value="cat">{{ cat }}</option>
+                <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
               </select>
             </div>
             <div class="col-9 col-sm-4 col-md-3">
@@ -465,19 +466,20 @@ const saveEdit = async () => {
               </select>
             </div>
             <div class="col-3 col-sm-2 col-md-2">
-              <button v-on:click="toggleSortDirection" class="btn btn-outline-secondary sort-direction-btn w-100"
+              <button @click="toggleSortDirection" class="btn btn-outline-secondary sort-direction-btn w-100"
                 :title="getSortButtonTitle">
                 <i :class="getSortButtonIcon"></i>
               </button>
             </div>
           </div>
+
           <div v-if="filteredFoodItems.length === 0" class="text-center py-5">
             <i class="bi bi-search fs-1 text-muted"></i>
             <p class="text-muted mt-3">No food items found</p>
           </div>
           <div v-else class="food-scroll-container">
             <div class="food-scroll-section">
-              <div v-for="food in filteredFoodItems" :key="food.id" class="food-card" :class="getFoodCardClass(food)">
+              <div v-for="food in filteredFoodItems" :key="food.id" :class="['food-card', getFoodCardClass(food)]">
                 <div class="food-header">
                   <div>
                     <div class="food-title-group">
@@ -502,172 +504,121 @@ const saveEdit = async () => {
                   <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
                   <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
                 </div>
-
               </div>
-            </div>
-              
-
             </div>
           </div>
         </div>
-        <div class="col-lg-4 d-none d-lg-block">
+      </div>
+
+      <div class="col-lg-4 d-none d-lg-block">
         <div class="glass-card p-4">
           <h3 class="h5 mb-3">Recent Activity</h3>
           <div v-if="activities.length === 0" class="text-center py-4">
             <p class="text-muted">No recent activity</p>
           </div>
           <div v-else class="d-flex flex-column gap-3">
-            <div
-              v-for="activity in activities"
-              :key="activity.id"
-              class="pb-3 border-bottom"
-            >
+            <div v-for="activity in activities" :key="activity.id" class="pb-3 border-bottom">
               <p class="mb-1 small">{{ activity.description }}</p>
               <small class="text-muted">{{ getRelativeTime(activity.createdAt) }}</small>
             </div>
           </div>
         </div>
       </div>
-      </div>
+    </div>
 
-</div>
+    <!-- Edit Modal -->
+    <div v-if="showEditModal" class="modal-backdrop">
+      <div class="modal-card">
+        <h3 class="h5 mb-3">Edit Food Item</h3>
+        <div class="mb-2">
+          <label class="form-label">Name</label>
+          <input v-model="editForm.name" class="form-control" />
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Category</label>
+          <input v-model="editForm.category" class="form-control" />
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Expiration Date</label>
+            <input v-model="editForm.expirationDate" type="date" class="form-control" />
+          </div>
+          <div class="col-6">
+            <label class="form-label">Created At</label>
+            <input v-model="editForm.createdAt" type="date" class="form-control" />
+          </div>
+        </div>
+        <div class="row g-2 mt-2">
+          <div class="col-4">
+            <label class="form-label">Price</label>
+            <input v-model="editForm.price" type="number" step="0.01" class="form-control" />
+          </div>
+          <div class="col-4">
+            <label class="form-label">Quantity</label>
+            <input v-model="editForm.quantity" type="number" class="form-control" />
+          </div>
+          <div class="col-4">
+            <label class="form-label">Unit</label>
+            <input v-model="editForm.unit" class="form-control" />
+          </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+          <button class="btn btn-secondary" @click="closeEdit">Cancel</button>
+          <button class="btn btn-primary" @click="saveEdit">Save</button>
+        </div>
+      </div>
+    </div>
 
+    <!-- Floating Add Button -->
+    <button class="fab-add" @click="openAdd" title="Add Food">
+      <i class="bi bi-plus-lg"></i>
+    </button>
 
-  <!-- Edit Modal -->
-  <div v-if="showEditModal" class="modal-backdrop">
-    <div class="modal-card">
-      <h3 class="h5 mb-3">Edit Food Item</h3>
-      <div class="mb-2">
-        <label class="form-label">Name</label>
-        <input v-model="editForm.name" class="form-control" />
-      </div>
-      <div class="mb-2">
-        <label class="form-label">Category</label>
-        <input v-model="editForm.category" class="form-control" />
-      </div>
-      <div class="row g-2">
-        <div class="col-6">
-          <label class="form-label">Expiration Date</label>
-          <input v-model="editForm.expirationDate" type="date" class="form-control" />
+    <!-- Add Modal -->
+    <div v-if="showAddModal" class="modal-backdrop">
+      <div class="modal-card">
+        <h3 class="h5 mb-3">Add Food Item</h3>
+        <div class="mb-2">
+          <label class="form-label">Name</label>
+          <input v-model="addForm.name" class="form-control" />
         </div>
-        <div class="col-6">
-          <label class="form-label">Created At</label>
-          <input v-model="editForm.createdAt" type="date" class="form-control" />
+        <div class="mb-2">
+          <label class="form-label">Category</label>
+          <input v-model="addForm.category" class="form-control" />
         </div>
-      </div>
-      <div class="row g-2 mt-2">
-        <div class="col-4">
-          <label class="form-label">Price</label>
-          <input v-model="editForm.price" type="number" step="0.01" class="form-control" />
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Expiration Date</label>
+            <input v-model="addForm.expirationDate" type="date" class="form-control" />
+          </div>
+          <div class="col-6">
+            <label class="form-label">Created At</label>
+            <input v-model="addForm.createdAt" type="date" class="form-control" />
+          </div>
         </div>
-        <div class="col-4">
-          <label class="form-label">Quantity</label>
-          <input v-model="editForm.quantity" type="number" class="form-control" />
+        <div class="row g-2 mt-2">
+          <div class="col-4">
+            <label class="form-label">Price</label>
+            <input v-model="addForm.price" type="number" step="0.01" class="form-control" />
+          </div>
+          <div class="col-4">
+            <label class="form-label">Quantity</label>
+            <input v-model="addForm.quantity" type="number" class="form-control" />
+          </div>
+          <div class="col-4">
+            <label class="form-label">Unit</label>
+            <input v-model="addForm.unit" class="form-control" />
+          </div>
         </div>
-        <div class="col-4">
-          <label class="form-label">Unit</label>
-          <input v-model="editForm.unit" class="form-control" />
+        <div class="d-flex justify-content-end gap-2 mt-3">
+          <button class="btn btn-secondary" @click="closeAdd">Cancel</button>
+          <button class="btn btn-primary" @click="saveAdd">Add</button>
         </div>
-      </div>
-      <div class="d-flex justify-content-end gap-2 mt-3">
-        <button class="btn btn-secondary" @click="closeEdit">Cancel</button>
-        <button class="btn btn-primary" @click="saveEdit">Save</button>
       </div>
     </div>
   </div>
-
-  <!-- Edit Modal -->
-  <div v-if="showEditModal" class="modal-backdrop">
-    <div class="modal-card">
-      <h3 class="h5 mb-3">Edit Food Item</h3>
-      <div class="mb-2">
-        <label class="form-label">Name</label>
-        <input v-model="editForm.name" class="form-control" />
-      </div>
-      <div class="mb-2">
-        <label class="form-label">Category</label>
-        <input v-model="editForm.category" class="form-control" />
-      </div>
-      <div class="row g-2">
-        <div class="col-6">
-          <label class="form-label">Expiration Date</label>
-          <input v-model="editForm.expirationDate" type="date" class="form-control" />
-        </div>
-        <div class="col-6">
-          <label class="form-label">Created At</label>
-          <input v-model="editForm.createdAt" type="date" class="form-control" />
-        </div>
-      </div>
-      <div class="row g-2 mt-2">
-        <div class="col-4">
-          <label class="form-label">Price</label>
-          <input v-model="editForm.price" type="number" step="0.01" class="form-control" />
-        </div>
-        <div class="col-4">
-          <label class="form-label">Quantity</label>
-          <input v-model="editForm.quantity" type="number" class="form-control" />
-        </div>
-        <div class="col-4">
-          <label class="form-label">Unit</label>
-          <input v-model="editForm.unit" class="form-control" />
-        </div>
-      </div>
-      <div class="d-flex justify-content-end gap-2 mt-3">
-        <button class="btn btn-secondary" @click="closeEdit">Cancel</button>
-        <button class="btn btn-primary" @click="saveEdit">Save</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Floating Add Button -->
-  <button class="fab-add" @click="openAdd" title="Add Food">
-    <i class="bi bi-plus-lg"></i>
-  </button>
-
-  <!-- Add Modal -->
-  <div v-if="showAddModal" class="modal-backdrop">
-    <div class="modal-card">
-      <h3 class="h5 mb-3">Add Food Item</h3>
-      <div class="mb-2">
-        <label class="form-label">Name</label>
-        <input v-model="addForm.name" class="form-control" />
-      </div>
-      <div class="mb-2">
-        <label class="form-label">Category</label>
-        <input v-model="addForm.category" class="form-control" />
-      </div>
-      <div class="row g-2">
-        <div class="col-6">
-          <label class="form-label">Expiration Date</label>
-          <input v-model="addForm.expirationDate" type="date" class="form-control" />
-        </div>
-        <div class="col-6">
-          <label class="form-label">Created At</label>
-          <input v-model="addForm.createdAt" type="date" class="form-control" />
-        </div>
-      </div>
-      <div class="row g-2 mt-2">
-        <div class="col-4">
-          <label class="form-label">Price</label>
-          <input v-model="addForm.price" type="number" step="0.01" class="form-control" />
-        </div>
-        <div class="col-4">
-          <label class="form-label">Quantity</label>
-          <input v-model="addForm.quantity" type="number" class="form-control" />
-        </div>
-        <div class="col-4">
-          <label class="form-label">Unit</label>
-          <input v-model="addForm.unit" class="form-control" />
-        </div>
-      </div>
-      <div class="d-flex justify-content-end gap-2 mt-3">
-        <button class="btn btn-secondary" @click="closeAdd">Cancel</button>
-        <button class="btn btn-primary" @click="saveAdd">Add</button>
-      </div>
-    </div>
-  </div>
-
 </template>
+
 <style scoped>
 .dashboard-overview {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.08) 100%);
@@ -876,6 +827,7 @@ const saveEdit = async () => {
   cursor: pointer;
   z-index: 2500;
 }
+
 .fab-add:hover {
   transform: translateY(-2px);
 }
