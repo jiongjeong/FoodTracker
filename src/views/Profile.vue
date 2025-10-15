@@ -1,7 +1,105 @@
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { getAuth, updateProfile, updateEmail, updatePassword, deleteUser } from "firebase/auth";
+import { db } from "@/firebase";
+
+const router = useRouter()
+const auth = getAuth()
+const user = ref(auth.currentUser)
+const editableUser = ref({
+  name: '',
+  email: ''
+})
+const passwords = ref({
+  current: '',
+  new: '',
+  confirm: ''
+})
+const loading = ref(true)
+
+// Load user profile from Firestore via Auth UID
+async function loadUser() {
+  loading.value = true
+  auth.onAuthStateChanged(async (u) => {
+    user.value = u
+    if (u) {
+      const userDoc = await getDoc(doc(db, "user", u.uid))
+      if (userDoc.exists()) {
+        const profile = userDoc.data()
+        editableUser.value = { name: profile.name || '', email: profile.email || '' }
+      } else {
+        editableUser.value = { name: '', email: u.email || '' }
+      }
+    }
+    loading.value = false
+  })
+}
+
+// Save profile to Firestore and update Firebase Auth profile
+async function saveChanges() {
+  if (!user.value) {
+    alert('User not found.')
+    return
+  }
+  if (passwords.value.new && passwords.value.new !== passwords.value.confirm) {
+    alert('New password and confirmation do not match.')
+    return
+  }
+  try {
+    // Update Firestore
+    await updateDoc(doc(db, "user", user.value.uid), {
+      name: editableUser.value.name,
+      email: editableUser.value.email,
+    })
+    // Update Auth profile
+    await updateProfile(user.value, { displayName: editableUser.value.name })
+    if (user.value.email !== editableUser.value.email) {
+      await updateEmail(user.value, editableUser.value.email)
+    }
+    if (passwords.value.new) {
+      await updatePassword(user.value, passwords.value.new)
+    }
+    // Clear password fields
+    passwords.value.current = ''
+    passwords.value.new = ''
+    passwords.value.confirm = ''
+    alert('Profile updated.')
+  } catch (error) {
+    alert('Error updating profile: ' + error.message)
+  }
+}
+
+// Delete user account from both Auth and Firestore
+async function deleteAccount() {
+  if (!user.value) {
+    alert('User not found.')
+    return
+  }
+  if (confirm('Are you sure you want to delete your account? This is irreversible.')) {
+    try {
+      // Delete Firestore user doc
+      await deleteDoc(doc(db, "user", user.value.uid))
+      // Delete Auth account
+      await deleteUser(user.value)
+      alert('Account deleted.')
+      router.push('/signup')
+    } catch (error) {
+      alert('Error deleting account: ' + error.message)
+    }
+  }
+}
+
+onMounted(() => {
+  loadUser()
+})
+</script>
+
 <template>
   <div class="profile-page">
     <h2>User Profile</h2>
-    <div v-if="user">
+    <div v-if="!loading">
       <form @submit.prevent="saveChanges">
         <div class="form-group">
           <label>Name:</label>
@@ -10,10 +108,6 @@
         <div class="form-group">
           <label>Email:</label>
           <input v-model="editableUser.email" type="email" required />
-        </div>
-        <div class="form-group">
-          <label>Current Password:</label>
-          <input v-model="passwords.current" type="password" placeholder="Enter current password" />
         </div>
         <div class="form-group">
           <label>New Password:</label>
@@ -33,115 +127,6 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { doc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db } from "@/firebase";
-
-const router = useRouter()
-
-// States
-const user = ref(null)
-const editableUser = ref({})
-const passwords = ref({
-  current: '',
-  new: '',
-  confirm: ''
-})
-const dropdownOpen = ref(false)
-const navbarOpen = ref(false)
-
-// Load user data from localStorage
-function loadUser() {
-  const userData = localStorage.getItem('user')
-  if (userData) {
-    user.value = JSON.parse(userData)
-    editableUser.value = { ...user.value }
-  }
-}
-
-// Save profile changes
-async function saveChanges() {
-  try {
-    if (!user.value || !user.value.id) {
-      alert('User ID missing.');
-      return;
-    }
-
-    if (passwords.value.new && passwords.value.new !== passwords.value.confirm) {
-      alert('New password and confirmation do not match.');
-      return;
-    }
-
-    const userRef = doc(db, 'user', user.value.id);
-    const updateData = {
-      name: editableUser.value.name,
-      email: editableUser.value.email,
-    };
-
-    if (passwords.value.new) {
-      updateData.password = passwords.value.new;
-    }
-
-    await updateDoc(userRef, updateData);
-
-    const updatedUser = { ...editableUser.value };
-    if (passwords.value.new) {
-      updatedUser.password = passwords.value.new;
-    }
-
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-    user.value = { ...updatedUser };
-
-    // Clear password fields
-    passwords.value.current = '';
-    passwords.value.new = '';
-    passwords.value.confirm = '';
-
-    alert('Profile updated.');
-  } catch (error) {
-    alert('Error updating profile: ' + error.message);
-  }
-}
-
-
-// Delete user account
-async function deleteAccount() {
-  if (!user.value || !user.value.id) {
-    alert('User ID missing.')
-    return
-  }
-  if (confirm('Are you sure you want to delete your account? This is irreversible.')) {
-    try {
-      const userRef = doc(db, 'user', user.value.id)
-      await deleteDoc(userRef)
-      localStorage.removeItem('user')
-      alert('Account deleted.')
-      localStorage.clear()
-      window.dispatchEvent(new Event("userChange"))
-      router.push('/signup')
-    } catch (error) {
-      alert('Error deleting account: ' + error.message)
-    }
-  }
-}
-
-// Logout function, exposed to parent
-function logout() {
-  localStorage.removeItem('user')
-  window.dispatchEvent(new Event("userChange"))
-  dropdownOpen.value = false
-  navbarOpen.value = false
-  router.push('/login')
-}
-defineExpose({ logout })
-
-onMounted(() => {
-  loadUser()
-})
-</script>
-
 <style scoped>
 .profile-page {
   max-width: 500px;
@@ -150,7 +135,7 @@ onMounted(() => {
   background: #fff;
   border-radius: 0.5rem;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
-  text-align: center; /* Add this to center all text inside */
+  text-align: center;
 }
 
 .profile-page h2 {
@@ -159,9 +144,8 @@ onMounted(() => {
 
 .form-group {
   margin-bottom: 1rem;
-  text-align: left; /* Override parent center if you want inputs left-aligned */
+  text-align: left;
 }
-
 
 label {
   display: block;

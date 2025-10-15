@@ -19,8 +19,7 @@
 
       <div class="form-group">
         <label for="confirmPassword">Confirm Password</label>
-        <input type="password" id="confirmPassword" v-model="confirmPassword" placeholder="Confirm your password"
-          required />
+        <input type="password" id="confirmPassword" v-model="confirmPassword" placeholder="Confirm your password" required />
       </div>
 
       <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
@@ -28,7 +27,6 @@
       <button type="submit">Sign Up</button>
     </form>
 
-    <!-- Button to redirect to login -->
     <button @click="goToLogin" class="login-redirect-btn">
       Already have an account? Log In
     </button>
@@ -36,8 +34,9 @@
 </template>
 
 <script>
-import { getFirestore, collection, query, where, getDocs, addDoc, doc, setDoc } from "firebase/firestore";
-import { db } from '@/firebase'; // your Firebase config export
+import { auth, db } from '@/firebase';
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { doc, setDoc, collection, addDoc } from "firebase/firestore";
 
 export default {
   name: 'Signup',
@@ -52,56 +51,62 @@ export default {
   },
   methods: {
     async submitForm() {
-      const usersRef = collection(db, "user"); // Use "users" if that is your correct collection name
-
-      // Query if email exists
-      const q = query(usersRef, where("email", "==", this.email));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        this.errorMessage = "Email already registered.";
+      this.errorMessage = "";
+      if (this.password !== this.confirmPassword) {
+        this.errorMessage = "Passwords do not match.";
         return;
       }
-
       try {
-        // Create user document
-        const userDocRef = await addDoc(usersRef, {
+        // Create Auth user
+        const userCredential = await createUserWithEmailAndPassword(auth, this.email, this.password);
+        const user = userCredential.user;
+
+        // Update Firebase Auth display name
+        await updateProfile(user, { displayName: this.name });
+
+        // Create Firestore user document with UID as ID
+        await setDoc(doc(db, "user", user.uid), {
+          name: this.name,
           email: this.email,
           foodScore: 0,
-          name: this.name,
-          password: this.password,
           createdAt: new Date()
         });
 
-        // Initialize empty collections for the new user
-        await this.initializeUserCollections(userDocRef.id);
+        // Initialize user subcollections
+        await this.initializeUserCollections(user.uid);
 
-        alert('Registration successful!');
-        this.goToLogin();
-      } catch (e) {
-        console.error('Error writing document: ', e);
-        alert('Error: ' + e.message);
+        // Redirect to login or dashboard
+        this.$router.push('/login');
+      } catch (error) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            this.errorMessage = "Email is already registered.";
+            break;
+          case 'auth/invalid-email':
+            this.errorMessage = "Invalid email.";
+            break;
+          case 'auth/weak-password':
+            this.errorMessage = "Password is too weak.";
+            break;
+          default:
+            this.errorMessage = "Signup failed: " + error.message;
+        }
       }
     },
 
     async initializeUserCollections(userId) {
       try {
-        // Initialize collections with proper field structure
         await this.initializeFoodItemsCollection(userId);
         await this.initializeActivitiesCollection(userId);
         await this.initializeRecipesCollection(userId);
-
         console.log('User collections initialized successfully');
       } catch (error) {
         console.error('Error initializing user collections:', error);
-        // Don't throw error to avoid breaking signup process
       }
     },
 
     async initializeFoodItemsCollection(userId) {
-      const foodItemsRef = collection(db, `user/${userId}/foodItems`);
-
-      // Add a placeholder document with all foodItem fields initialized
+      const foodItemsRef = collection(doc(db, "user", userId), "foodItems");
       await addDoc(foodItemsRef, {
         _placeholder: true,
         name: "",
@@ -112,10 +117,9 @@ export default {
         price: 0,
       });
     },
-    async initializeActivitiesCollection(userId) {
-      const activitiesRef = collection(db, `user/${userId}/activities`);
 
-      // Add a placeholder document with all activity fields initialized
+    async initializeActivitiesCollection(userId) {
+      const activitiesRef = collection(doc(db, "user", userId), "activities");
       await addDoc(activitiesRef, {
         _placeholder: true,
         type: "",
@@ -131,12 +135,10 @@ export default {
     },
 
     async initializeRecipesCollection(userId) {
-      const recipesRef = collection(db, `user/${userId}/recipes`);
-
-      // Add a placeholder document with minimal recipe fields for TheMealDB API
+      const recipesRef = collection(doc(db, "user", userId), "recipes");
       await addDoc(recipesRef, {
         _placeholder: true,
-        idMeal: "",               // TheMealDB recipe ID (primary key)
+        idMeal: "",
       });
     },
 
@@ -147,9 +149,8 @@ export default {
 }
 </script>
 
+
 <style scoped>
-/* Keep your existing styles here */
-/* Keep your existing styles */
 
 .signup-container {
   background: white;
@@ -160,7 +161,6 @@ export default {
   color: black;
   font-family: Arial, sans-serif;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
-
 }
 
 h2 {
@@ -212,6 +212,7 @@ button[type='submit'] {
 button[type='submit']:hover {
   background: #059669;
 }
+
 .login-redirect-btn {
   width: 100%;
   text-align: center;
