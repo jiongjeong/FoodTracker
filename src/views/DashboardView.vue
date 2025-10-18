@@ -130,6 +130,62 @@ const filteredFoodItems = computed(() => {
   }
 
   // ... rest of your sorting logic
+  // Apply sorting
+  const direction = sortDirection.value === 'desc' ? -1 : 1
+  
+  switch (sortBy.value) {
+    case 'expiration':
+      items.sort((a, b) => {
+        const dateA = new Date(a.expirationDate)
+        const dateB = new Date(b.expirationDate)
+        
+        if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0
+        if (isNaN(dateA.getTime())) return 1
+        if (isNaN(dateB.getTime())) return -1
+        
+        return (dateA.getTime() - dateB.getTime()) * direction
+      })
+      break
+      
+    case 'name':
+      items.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase()
+        const nameB = (b.name || '').toLowerCase()
+        return nameA.localeCompare(nameB) * direction
+      })
+      break
+      
+    case 'category':
+      items.sort((a, b) => {
+        const catA = a.category || ''
+        const catB = b.category || ''
+        const categoryCompare = catA.localeCompare(catB) * direction
+        if (categoryCompare !== 0) return categoryCompare
+        
+        // Secondary sort by name
+        const nameA = (a.name || '').toLowerCase()
+        const nameB = (b.name || '').toLowerCase()
+        return nameA.localeCompare(nameB)
+      })
+      break
+      
+    case 'quantity':
+      items.sort((a, b) => {
+        const qtyA = parseFloat(a.quantity) || 0
+        const qtyB = parseFloat(b.quantity) || 0
+        return (qtyB - qtyA) * direction
+      })
+      break
+      
+    case 'price':
+      items.sort((a, b) => {
+        const priceA = parseFloat(a.price) || 0
+        const priceB = parseFloat(b.price) || 0
+        return (priceB - priceA) * direction
+      })
+      break
+  }
+
 
   return items;
 });
