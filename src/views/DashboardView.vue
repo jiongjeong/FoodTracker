@@ -1,6 +1,6 @@
 <script setup>
 import { db } from '../firebase.js';
-import { collection, getDocs, doc, updateDoc, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { ref, computed, onMounted, reactive, watch } from 'vue';
 import { getAuth } from 'firebase/auth';
 
@@ -11,6 +11,7 @@ const sortDirection = ref('asc');
 
 const showEditModal = ref(false);
 const showAddModal = ref(false);
+const showDeleteModal = ref(false);
 
 const editForm = reactive({
   id: null,
@@ -34,6 +35,16 @@ const addForm = reactive({
   quantity: '',
   unit: ''
 });
+
+const deleteTarget = ref(null);
+const showToast = ref(false);
+const toastMessage = ref('');
+
+function showToastFor(msg, ms = 2200) {
+  toastMessage.value = msg;
+  showToast.value = true;
+  setTimeout(() => (showToast.value = false), ms);
+}
 
 const foodItems = ref([]);
 const recipes = ref([]);
@@ -440,6 +451,45 @@ const saveEdit = async () => {
   }
   closeEdit();
 };
+
+// Delete food item (performs deletion; UI confirmation handled separately)
+const deleteFood = async (food) => {
+  if (!food || food.id == null) return;
+  try {
+    const uid = userId.value;
+    if (!uid) {
+      console.warn('Not logged in');
+      return false;
+    }
+    const refDoc = doc(db, 'user', uid, 'foodItems', food.id);
+    await deleteDoc(refDoc);
+    // remove locally
+    const idx = foodItems.value.findIndex(f => f.id === food.id);
+    if (idx !== -1) foodItems.value.splice(idx, 1);
+    return true;
+  } catch (err) {
+    console.error('Failed to delete', err);
+    return false;
+  }
+};
+
+const openDelete = (food) => {
+  deleteTarget.value = food || null;
+  showDeleteModal.value = true;
+};
+
+const closeDelete = () => {
+  showDeleteModal.value = false;
+  deleteTarget.value = null;
+};
+
+const confirmDelete = async () => {
+  if (!deleteTarget.value) return;
+  const ok = await deleteFood(deleteTarget.value);
+  closeDelete();
+  if (ok) showToastFor('Item deleted');
+  else showToastFor('Failed to delete');
+};
 </script>
 
 <template>
@@ -558,7 +608,7 @@ const saveEdit = async () => {
                   <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
                     Edit</button>
                   <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
-                  <button class="food-btn food-btn-delete"><i class="bi bi-trash"></i></button>
+                  <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i class="bi bi-trash"></i></button>
                 </div>
               </div>
             </div>
@@ -673,6 +723,21 @@ const saveEdit = async () => {
       </div>
     </div>
   </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div v-if="showDeleteModal" class="modal-backdrop">
+    <div class="modal-card delete-modal">
+      <h5>Delete Item</h5>
+      <p>Are you sure you want to delete <strong>{{ deleteTarget?.name }}</strong>? This action cannot be undone.</p>
+      <div class="d-flex justify-content-end gap-2">
+        <button class="btn btn-secondary" @click="closeDelete">Cancel</button>
+        <button class="btn btn-danger" @click="confirmDelete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div v-if="showToast" class="custom-toast">{{ toastMessage }}</div>
 </template>
 
 <style scoped>
@@ -685,6 +750,7 @@ const saveEdit = async () => {
   padding: 1.5rem;
   margin-bottom: 1.5rem;
 }
+
 
 .dashboard-overview::before {
   content: '';
@@ -886,5 +952,49 @@ const saveEdit = async () => {
 
 .fab-add:hover {
   transform: translateY(-2px);
+}
+
+.custom-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 100px;
+  background: rgba(17,24,39,0.95);
+  color: white;
+  padding: 10px 14px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  z-index: 6000;
+  font-weight: 600;
+}
+
+.modal-card h5 { margin-bottom: 8px }
+.modal-card p { margin-bottom: 12px }
+
+/* Delete modal — white interior with pulsing red glow */
+.delete-modal {
+  background: #ffffff; /* keep interior white for better readability */
+  color: #111;
+  border: 1px solid rgba(229,57,53,0.08);
+  position: relative;
+}
+.delete-modal .btn-secondary {
+  background: #f3f4f6;
+  color: #111;
+}
+.delete-modal .btn-danger {
+  background: #e53935;
+  border-color: #b71c1c;
+}
+
+/* pulsing red glow around the modal */
+.modal-backdrop .delete-modal {
+  box-shadow: 0 8px 30px rgba(229,57,53,0.08), 0 0 0 rgba(229,57,53,0);
+  animation: pulseRed 1.6s ease-in-out infinite;
+}
+
+@keyframes pulseRed {
+  0% { box-shadow: 0 8px 30px rgba(229,57,53,0.06), 0 0 0 rgba(229,57,53,0); }
+  50% { box-shadow: 0 18px 60px rgba(229,57,53,0.28), 0 0 36px rgba(229,57,53,0.12); }
+  100% { box-shadow: 0 8px 30px rgba(229,57,53,0.06), 0 0 0 rgba(229,57,53,0); }
 }
 </style>
