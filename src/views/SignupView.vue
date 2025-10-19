@@ -39,7 +39,7 @@ import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc, collection, addDoc } from "firebase/firestore";
 
 export default {
-  name: 'Signup',
+  name: 'SignupView',
   data() {
     return {
       name: '',

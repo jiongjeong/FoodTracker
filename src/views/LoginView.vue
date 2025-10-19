@@ -24,6 +24,7 @@ import { auth } from "@/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
 
 export default {
+  name: 'LoginView',
   data() {
     return {
       email: "",
@@ -35,8 +36,7 @@ export default {
     async submitForm() {
       this.errorMessage = "";
       try {
-        const result = await signInWithEmailAndPassword(auth, this.email, this.password);
-        const user = result.user;
+        await signInWithEmailAndPassword(auth, this.email, this.password);
 
         // No localStorage usage here
         window.dispatchEvent(new Event('userChange')); // Keep notifying app components if required
