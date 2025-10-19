@@ -37,9 +37,7 @@ export default {
       this.errorMessage = "";
       try {
         await signInWithEmailAndPassword(auth, this.email, this.password);
-
-        // No localStorage usage here
-        window.dispatchEvent(new Event('userChange')); // Keep notifying app components if required
+        window.dispatchEvent(new Event('userChange'));
 
         this.$router.push('/dashboard');
       } catch (error) {
@@ -66,7 +64,6 @@ export default {
 </script>
 
 <style scoped>
-/* Your existing styles remain unchanged */
 .login-container {
   max-width: 400px;
   margin: 2rem auto;
