@@ -1,5 +1,7 @@
 <template>
   <div class="signup-container">
+    <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
+    <div v-if="successMessage" class="success">{{ successMessage }}</div>
     <h2>Sign Up</h2>
     <form @submit.prevent="submitForm">
       <div class="form-group">
@@ -19,10 +21,12 @@
 
       <div class="form-group">
         <label for="confirmPassword">Confirm Password</label>
-        <input type="password" id="confirmPassword" v-model="confirmPassword" placeholder="Confirm your password" required />
+        <input type="password" id="confirmPassword" v-model="confirmPassword" placeholder="Confirm your password"
+          required />
       </div>
 
-      <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
+
+
 
       <button type="submit">Sign Up</button>
     </form>
@@ -46,25 +50,24 @@ export default {
       email: '',
       password: '',
       confirmPassword: '',
-      errorMessage: ''
+      errorMessage: '',
+      successMessage: '',
     };
   },
   methods: {
     async submitForm() {
       this.errorMessage = "";
+      this.successMessage = "";
       if (this.password !== this.confirmPassword) {
         this.errorMessage = "Passwords do not match.";
         return;
       }
       try {
-        // Create Auth user
         const userCredential = await createUserWithEmailAndPassword(auth, this.email, this.password);
         const user = userCredential.user;
 
-        // Update Firebase Auth display name
         await updateProfile(user, { displayName: this.name });
 
-        // Create Firestore user document with UID as ID
         await setDoc(doc(db, "user", user.uid), {
           name: this.name,
           email: this.email,
@@ -72,11 +75,13 @@ export default {
           createdAt: new Date()
         });
 
-        // Initialize user subcollections
         await this.initializeUserCollections(user.uid);
 
-        // Redirect to login or dashboard
-        this.$router.push('/login');
+        this.successMessage = "Registration successful! Redirecting to login...";
+
+        setTimeout(() => {
+          this.$router.push('/login');
+        }, 2000);
       } catch (error) {
         switch (error.code) {
           case 'auth/email-already-in-use':
@@ -151,7 +156,6 @@ export default {
 
 
 <style scoped>
-
 .signup-container {
   background: white;
   max-width: 400px;
@@ -239,5 +243,35 @@ button[type='submit']:hover {
   text-align: center;
   margin-bottom: 1rem;
   font-weight: 600;
+}
+
+.success {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: #059669;
+  /* bright green */
+  color: white;
+  font-weight: 700;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 150, 70, 0.3);
+  text-align: center;
+  font-size: 1.1rem;
+  animation: slideDownFade 0.7s ease forwards;
+}
+
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-15px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
