@@ -1,7 +1,7 @@
-<script setup>
+<script setup name="ProfileView">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, getDocs, updateDoc, deleteDoc, collection } from "firebase/firestore";
 import { getAuth, updateProfile, updateEmail, updatePassword, deleteUser } from "firebase/auth";
 import { db } from "@/firebase";
 
@@ -18,8 +18,6 @@ const passwords = ref({
   confirm: ''
 })
 const loading = ref(true)
-
-// Load user profile from Firestore via Auth UID
 async function loadUser() {
   loading.value = true
   auth.onAuthStateChanged(async (u) => {
@@ -37,7 +35,6 @@ async function loadUser() {
   })
 }
 
-// Save profile to Firestore and update Firebase Auth profile
 async function saveChanges() {
   if (!user.value) {
     alert('User not found.')
@@ -48,12 +45,12 @@ async function saveChanges() {
     return
   }
   try {
-    // Update Firestore
+
     await updateDoc(doc(db, "user", user.value.uid), {
       name: editableUser.value.name,
       email: editableUser.value.email,
     })
-    // Update Auth profile
+
     await updateProfile(user.value, { displayName: editableUser.value.name })
     if (user.value.email !== editableUser.value.email) {
       await updateEmail(user.value, editableUser.value.email)
@@ -61,7 +58,7 @@ async function saveChanges() {
     if (passwords.value.new) {
       await updatePassword(user.value, passwords.value.new)
     }
-    // Clear password fields
+
     passwords.value.current = ''
     passwords.value.new = ''
     passwords.value.confirm = ''
@@ -71,22 +68,40 @@ async function saveChanges() {
   }
 }
 
-// Delete user account from both Auth and Firestore
+
+async function deleteCollection(collectionRef) {
+  const snapshot = await getDocs(collectionRef);
+  const promises = [];
+  snapshot.forEach((docItem) => {
+    promises.push(deleteDoc(doc(collectionRef, docItem.id)));
+  });
+  await Promise.all(promises);
+}
+
 async function deleteAccount() {
   if (!user.value) {
-    alert('User not found.')
-    return
+    alert("User not found.");
+    return;
   }
-  if (confirm('Are you sure you want to delete your account? This is irreversible.')) {
+  if (confirm("Are you sure you want to delete your account? This is irreversible.")) {
     try {
-      // Delete Firestore user doc
-      await deleteDoc(doc(db, "user", user.value.uid))
-      // Delete Auth account
-      await deleteUser(user.value)
-      alert('Account deleted.')
-      router.push('/signup')
+      const userDocRef = doc(db, "user", user.value.uid);
+
+
+      const subcollections = ["foodItems", "activities", "recipes"];
+      for (const subcol of subcollections) {
+        const subcolRef = collection(userDocRef, subcol);
+        await deleteCollection(subcolRef);
+      }
+
+      await deleteDoc(userDocRef);
+
+      await deleteUser(user.value);
+
+      alert("Account deleted.");
+      router.push("/signup");
     } catch (error) {
-      alert('Error deleting account: ' + error.message)
+      alert("Error deleting account: " + error.message);
     }
   }
 }
