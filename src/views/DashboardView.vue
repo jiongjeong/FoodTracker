@@ -348,7 +348,8 @@ const openAdd = () => {
   addForm.name = '';
   addForm.category = '';
   addForm.expirationDate = '';
-  addForm.createdAt = '';
+  // auto-fill createdAt to today's date (YYYY-MM-DD) and keep it uneditable
+  addForm.createdAt = toInputDateString(new Date());
   addForm.price = '';
   addForm.quantity = '';
   addForm.unit = '';
@@ -651,7 +652,7 @@ const confirmDelete = async () => {
           </div>
           <div class="col-6">
             <label class="form-label">Created At</label>
-            <input v-model="editForm.createdAt" type="date" class="form-control" />
+            <input v-model="editForm.createdAt" type="date" class="form-control" disabled />
           </div>
         </div>
         <div class="row g-2 mt-2">
@@ -699,7 +700,7 @@ const confirmDelete = async () => {
           </div>
           <div class="col-6">
             <label class="form-label">Created At</label>
-            <input v-model="addForm.createdAt" type="date" class="form-control" />
+            <input v-model="addForm.createdAt" type="date" class="form-control" disabled />
           </div>
         </div>
         <div class="row g-2 mt-2">
