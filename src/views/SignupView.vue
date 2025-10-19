@@ -127,15 +127,11 @@ export default {
       const activitiesRef = collection(doc(db, "user", userId), "activities");
       await addDoc(activitiesRef, {
         _placeholder: true,
-        type: "",
-        description: "",
-        points: 0,
-        relatedItemId: "",
-        quantity: 0,
-        unit: "",
-        moneySaved: 0,
-        wasteAvoided: false,
-        category: "",
+        activityType: "",
+        foodName: "",
+        quantity:"",
+        price:"",
+        createdAt: ""
       });
     },
 
