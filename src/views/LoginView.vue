@@ -24,6 +24,7 @@ import { auth } from "@/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
 
 export default {
+  name: 'LoginView',
   data() {
     return {
       email: "",
@@ -35,11 +36,8 @@ export default {
     async submitForm() {
       this.errorMessage = "";
       try {
-        const result = await signInWithEmailAndPassword(auth, this.email, this.password);
-        const user = result.user;
-
-        // No localStorage usage here
-        window.dispatchEvent(new Event('userChange')); // Keep notifying app components if required
+        await signInWithEmailAndPassword(auth, this.email, this.password);
+        window.dispatchEvent(new Event('userChange'));
 
         this.$router.push('/dashboard');
       } catch (error) {
@@ -66,7 +64,6 @@ export default {
 </script>
 
 <style scoped>
-/* Your existing styles remain unchanged */
 .login-container {
   max-width: 400px;
   margin: 2rem auto;
