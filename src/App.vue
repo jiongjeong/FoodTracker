@@ -1,27 +1,39 @@
-<script setup>
-import { RouterView } from 'vue-router'
-import Navbar from './components/navbar/navbar.vue'
+<script>
+import { reactive, provide, onMounted } from "vue";
+import { getAuth } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/firebase";
+import Navbar from "./components/navbar/navbar.vue"
 
-let timer;
-const timeout = 15 * 60 * 1000; // 15 minutes
+export default {
+  components:{
+    Navbar
+  },
+  setup() {
+    const userState = reactive({ name: "" });
+    provide("userState", userState);
 
-function resetTimeout() {
-  clearTimeout(timer);
-  timer = setTimeout(() => {
-    localStorage.clear();
-    window.location.reload();
-  }, timeout);
-}
+    const auth = getAuth();
 
-['mousemove', 'keydown', 'scroll', 'touchstart'].forEach(event =>
-  window.addEventListener(event, resetTimeout)
-);
+    onMounted(async () => {
+      if (auth.currentUser) {
+        try {
+          const userDoc = await getDoc(doc(db, "user", auth.currentUser.uid));
+          if (userDoc.exists()) {
+            userState.name = userDoc.data().name || "";
+          }
+        } catch (error) {
+          console.error("Failed fetching user profile", error);
+        }
+      }
+    });
 
-
-
-resetTimeout();
+    return { userState };
+  },
+};
 
 </script>
+
 
 <template>
   <div class="app-container">
@@ -29,6 +41,7 @@ resetTimeout();
     <RouterView />
   </div>
 </template>
+
 
 <style scoped>
 .app-container {

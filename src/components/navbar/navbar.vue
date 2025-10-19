@@ -59,7 +59,7 @@
           <li class="nav-item dropdown" v-if="userName">
             <a class="nav-link dropdown-toggle" href="#" role="button" @click.prevent="toggleDropdown"
               :class="{ show: dropdownOpen }">
-              <i class="bi bi-person-circle me-1"></i>{{ userName }}
+              <span class="initials-avatar">{{ userInitials }}</span>{{ userName }}
             </a>
             <ul class="dropdown-menu dropdown-menu-end" :class="{ show: dropdownOpen }">
               <li>
@@ -86,7 +86,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted,computed } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { getAuth, signOut } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
@@ -142,6 +142,16 @@ async function logout() {
     console.error('Logout failed:', error)
   }
 }
+const userInitials = computed(() => {
+  if (!userName.value) return 'U'
+  const parts = userName.value.trim().split(' ')
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  } else if (parts[0]) {
+    return parts[0][0].toUpperCase()
+  }
+  return 'U'
+})
 </script>
 
 <style scoped>
@@ -184,5 +194,20 @@ async function logout() {
 
 .nav-link {
   font-size: 1.12rem;
+}
+.initials-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #0d6efd;
+  color: #fff;
+  font-weight: 700;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 1.1rem;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  user-select: none;
 }
 </style>

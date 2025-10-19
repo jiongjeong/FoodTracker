@@ -10,13 +10,17 @@ const auth = getAuth()
 const user = ref(auth.currentUser)
 const editableUser = ref({
   name: '',
-  email: ''
+  email: '',
+  contactNo: '',
+  handle: ''
 })
+
 const passwords = ref({
   current: '',
   new: '',
   confirm: ''
 })
+
 const loading = ref(true)
 async function loadUser() {
   loading.value = true
@@ -26,9 +30,14 @@ async function loadUser() {
       const userDoc = await getDoc(doc(db, "user", u.uid))
       if (userDoc.exists()) {
         const profile = userDoc.data()
-        editableUser.value = { name: profile.name || '', email: profile.email || '' }
+        editableUser.value = {
+          name: profile.name || '',
+          email: profile.email || '',
+          contactNo: profile.contactNo || '',
+          handle: profile.handle || ''
+        }
       } else {
-        editableUser.value = { name: '', email: u.email || '' }
+        editableUser.value = { name: '', email: u.email || '', contactNo: '', handle: '' }
       }
     }
     loading.value = false
@@ -49,6 +58,8 @@ async function saveChanges() {
     await updateDoc(doc(db, "user", user.value.uid), {
       name: editableUser.value.name,
       email: editableUser.value.email,
+      contactNo: editableUser.value.contactNo,
+      handle: editableUser.value.handle
     })
 
     await updateProfile(user.value, { displayName: editableUser.value.name })
@@ -62,7 +73,10 @@ async function saveChanges() {
     passwords.value.current = ''
     passwords.value.new = ''
     passwords.value.confirm = ''
+
     alert('Profile updated.')
+
+    window.location.reload()
   } catch (error) {
     alert('Error updating profile: ' + error.message)
   }
@@ -132,6 +146,14 @@ onMounted(() => {
           <label>Confirm New Password:</label>
           <input v-model="passwords.confirm" type="password" placeholder="Confirm new password" />
         </div>
+        <div class="form-group">
+          <label>Contact Number:</label>
+          <input v-model="editableUser.contactNo" type="text" placeholder="Enter contact number" />
+        </div>
+        <div class="form-group">
+          <label>Telegram Handle:</label>
+          <input v-model="editableUser.handle" type="text" placeholder="Enter Telegram handle" />
+        </div>
         <button type="submit">Save Changes</button>
       </form>
       <button class="delete-btn" @click="deleteAccount">Delete Account</button>
@@ -144,7 +166,7 @@ onMounted(() => {
 
 <style scoped>
 .profile-page {
-  max-width: 500px;
+  width: 50%;
   margin: auto;
   padding: 2rem;
   background: #fff;
