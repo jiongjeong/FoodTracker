@@ -1,7 +1,7 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import { db, auth } from '../firebase.js';
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
 import { orderBy } from 'firebase/firestore';
 
