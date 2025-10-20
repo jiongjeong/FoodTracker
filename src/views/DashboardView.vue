@@ -143,21 +143,21 @@ const filteredFoodItems = computed(() => {
   // ... rest of your sorting logic
   // Apply sorting
   const direction = sortDirection.value === 'desc' ? -1 : 1
-  
+
   switch (sortBy.value) {
     case 'expiration':
       items.sort((a, b) => {
         const dateA = new Date(a.expirationDate)
         const dateB = new Date(b.expirationDate)
-        
+
         if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0
         if (isNaN(dateA.getTime())) return 1
         if (isNaN(dateB.getTime())) return -1
-        
+
         return (dateA.getTime() - dateB.getTime()) * direction
       })
       break
-      
+
     case 'name':
       items.sort((a, b) => {
         const nameA = (a.name || '').toLowerCase()
@@ -165,21 +165,21 @@ const filteredFoodItems = computed(() => {
         return nameA.localeCompare(nameB) * direction
       })
       break
-      
+
     case 'category':
       items.sort((a, b) => {
         const catA = a.category || ''
         const catB = b.category || ''
         const categoryCompare = catA.localeCompare(catB) * direction
         if (categoryCompare !== 0) return categoryCompare
-        
+
         // Secondary sort by name
         const nameA = (a.name || '').toLowerCase()
         const nameB = (b.name || '').toLowerCase()
         return nameA.localeCompare(nameB)
       })
       break
-      
+
     case 'quantity':
       items.sort((a, b) => {
         const qtyA = parseFloat(a.quantity) || 0
@@ -187,7 +187,7 @@ const filteredFoodItems = computed(() => {
         return (qtyB - qtyA) * direction
       })
       break
-      
+
     case 'price':
       items.sort((a, b) => {
         const priceA = parseFloat(a.price) || 0
@@ -369,29 +369,61 @@ const closeAdd = () => {
 
 const saveAdd = async () => {
   if (!userId.value) {
-    console.warn('No userId available; cannot add food item');
+    console.warn('No userId available; cannot add food item')
     return;
   }
+
   const colRef = collection(db, 'user', userId.value, 'foodItems');
-  const payload = {
+  const actRef = collection(db, 'user', userId.value, 'activities');
+
+  const foodPayload = {
     name: addForm.name || '',
     category: addForm.category || '',
     price: Number(addForm.price) || 0,
     quantity: Number(addForm.quantity) || 0,
-    unit: addForm.unit || ''
+    unit: addForm.unit || '',
+    createdAt: addForm.createdAt
+      ? Timestamp.fromDate(new Date(addForm.createdAt))
+      : Timestamp.fromDate(new Date()),
   };
+
   if (addForm.expirationDate) {
-    payload.expirationDate = Timestamp.fromDate(new Date(addForm.expirationDate));
+    foodPayload.expirationDate = Timestamp.fromDate(new Date(addForm.expirationDate));
   }
-  if (addForm.createdAt) {
-    payload.createdAt = Timestamp.fromDate(new Date(addForm.createdAt));
-  } else {
-    payload.createdAt = Timestamp.fromDate(new Date());
+
+  try {
+    // Add food item to Firestore
+    const newDocRef = await addDoc(colRef, foodPayload);
+
+    // Log the activity in 'activities'
+    const activityPayload = {
+      activityType: 'addFood',
+      createdAt: new Date().toISOString(), // or use Timestamp.now() if a Firestore Timestamp is wanted
+      foodName: addForm.name || '',
+      price: String(addForm.price || ''),
+      quantity: String(addForm.quantity || ''),
+      unit: String(addForm.unit || '')
+    };
+
+    await addDoc(actRef, activityPayload);
+
+    // Add new item locally for instant UI feedback
+    foodItems.value.unshift({ id: newDocRef.id, ...foodPayload });
+
+    // Refresh activities list to show new log
+    activities.value.unshift({
+      id: Math.random().toString(36).substring(2, 9),
+      ...activityPayload,
+    });
+
+    showToastFor('Food item added and activity logged!');
+    closeAdd();
+  } catch (error) {
+    console.error('Error adding food item or activity:', error);
+    showToastFor('Failed to add food item.');
   }
-  const newDocRef = await addDoc(colRef, payload);
-  foodItems.value.unshift({ id: newDocRef.id, ...payload });
-  closeAdd();
 };
+
 
 const openEdit = (food) => {
   editFormOriginal.value = JSON.parse(JSON.stringify(food));
@@ -453,7 +485,8 @@ const saveEdit = async () => {
   closeEdit();
 };
 
-// Delete food item (performs deletion; UI confirmation handled separately)
+import { query, where } from 'firebase/firestore';
+
 const deleteFood = async (food) => {
   if (!food || food.id == null) return;
   try {
@@ -462,17 +495,43 @@ const deleteFood = async (food) => {
       console.warn('Not logged in');
       return false;
     }
+    // Delete the food item doc
     const refDoc = doc(db, 'user', uid, 'foodItems', food.id);
     await deleteDoc(refDoc);
-    // remove locally
+
+    // Delete corresponding activities
+    const actRef = collection(db, 'user', uid, 'activities');
+    // Find all activities for this food item by foodName and activityType (optional: tighten filter)
+    const q = query(
+      actRef,
+      where('foodName', '==', food.name),
+      where('activityType', '==', 'addFood')
+    );
+    const actSnapshot = await getDocs(q);
+
+    // Delete all matching activity docs
+    const deletePromises = [];
+    actSnapshot.forEach(docSnap => {
+      deletePromises.push(deleteDoc(docSnap.ref));
+    });
+    await Promise.all(deletePromises);
+
+    // Remove locally
     const idx = foodItems.value.findIndex(f => f.id === food.id);
     if (idx !== -1) foodItems.value.splice(idx, 1);
+
+    // (Optionally) update your activities UI list as well
+    activities.value = activities.value.filter(
+      a => !(a.foodName === food.name && a.activityType === 'addFood')
+    );
+
     return true;
   } catch (err) {
-    console.error('Failed to delete', err);
+    console.error('Failed to delete food and its activity log:', err);
     return false;
   }
 };
+
 
 const openDelete = (food) => {
   deleteTarget.value = food || null;
@@ -609,7 +668,8 @@ const confirmDelete = async () => {
                   <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
                     Edit</button>
                   <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
-                  <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i class="bi bi-trash"></i></button>
+                  <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
+                      class="bi bi-trash"></i></button>
                 </div>
               </div>
             </div>
@@ -625,12 +685,25 @@ const confirmDelete = async () => {
           </div>
           <div v-else class="d-flex flex-column gap-3">
             <div v-for="activity in activities" :key="activity.id" class="pb-3 border-bottom">
-              <p class="mb-1 small">{{ activity.description }}</p>
-              <small class="text-muted">{{ getRelativeTime(activity.createdAt) }}</small>
+
+               <!-- DO IF STATEMENTS FOR EACH ACTIVITY TYPE -->
+              <div v-if="actvitiy == addFood">
+                <p class="mb-1 small">
+                  <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added</strong>
+                </p>
+              </div>
+
+
+
+              <small class="text-muted">
+                {{ getRelativeTime(activity.createdAt) }}
+                <!-- Optionally also show: {{ activity.createdAt }} -->
+              </small>
             </div>
           </div>
         </div>
       </div>
+
     </div>
 
     <!-- Edit Modal -->
@@ -959,29 +1032,37 @@ const confirmDelete = async () => {
   position: fixed;
   right: 24px;
   bottom: 100px;
-  background: rgba(17,24,39,0.95);
+  background: rgba(17, 24, 39, 0.95);
   color: white;
   padding: 10px 14px;
   border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
   z-index: 6000;
   font-weight: 600;
 }
 
-.modal-card h5 { margin-bottom: 8px }
-.modal-card p { margin-bottom: 12px }
+.modal-card h5 {
+  margin-bottom: 8px
+}
+
+.modal-card p {
+  margin-bottom: 12px
+}
 
 /* Delete modal — white interior with pulsing red glow */
 .delete-modal {
-  background: #ffffff; /* keep interior white for better readability */
+  background: #ffffff;
+  /* keep interior white for better readability */
   color: #111;
-  border: 1px solid rgba(229,57,53,0.08);
+  border: 1px solid rgba(229, 57, 53, 0.08);
   position: relative;
 }
+
 .delete-modal .btn-secondary {
   background: #f3f4f6;
   color: #111;
 }
+
 .delete-modal .btn-danger {
   background: #e53935;
   border-color: #b71c1c;
@@ -989,13 +1070,21 @@ const confirmDelete = async () => {
 
 /* pulsing red glow around the modal */
 .modal-backdrop .delete-modal {
-  box-shadow: 0 8px 30px rgba(229,57,53,0.08), 0 0 0 rgba(229,57,53,0);
+  box-shadow: 0 8px 30px rgba(229, 57, 53, 0.08), 0 0 0 rgba(229, 57, 53, 0);
   animation: pulseRed 1.6s ease-in-out infinite;
 }
 
 @keyframes pulseRed {
-  0% { box-shadow: 0 8px 30px rgba(229,57,53,0.06), 0 0 0 rgba(229,57,53,0); }
-  50% { box-shadow: 0 18px 60px rgba(229,57,53,0.28), 0 0 36px rgba(229,57,53,0.12); }
-  100% { box-shadow: 0 8px 30px rgba(229,57,53,0.06), 0 0 0 rgba(229,57,53,0); }
+  0% {
+    box-shadow: 0 8px 30px rgba(229, 57, 53, 0.06), 0 0 0 rgba(229, 57, 53, 0);
+  }
+
+  50% {
+    box-shadow: 0 18px 60px rgba(229, 57, 53, 0.28), 0 0 36px rgba(229, 57, 53, 0.12);
+  }
+
+  100% {
+    box-shadow: 0 8px 30px rgba(229, 57, 53, 0.06), 0 0 0 rgba(229, 57, 53, 0);
+  }
 }
 </style>
