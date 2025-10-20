@@ -13,8 +13,10 @@ const showShareModal = ref(false)
 const selectedContact = ref(null)
 const currentUser = ref(null)
 
+
 const categories = [
-  'Fruits & Vegetables',
+  'Fruits',
+  'Vegetables',
   'Dairy & Eggs',
   'Meat & Poultry',
   'Bakery',
@@ -26,7 +28,7 @@ const categories = [
   'Other'
 ]
 
-const units = ['pieces', 'kg', 'grams', 'liters', 'cups', 'servings', 'packs']
+const units = ['pieces', 'kg', 'grams', 'liters', 'cups', 'servings', 'packs', 'bags']
 
 const handleContact = (item) => {
   selectedContact.value = item
@@ -44,8 +46,8 @@ const shareForm = ref({
   unit: '',
 })
 
+
 const handleShareFood = () => {
-  // Reset form
   shareForm.value = {
     foodName: '',
     category: 'Fruits & Vegetables',
@@ -81,6 +83,38 @@ const getDaysLeft = (food) => {
   }
 }
 
+const foodItems = ref([])
+
+async function loadFoodItems() {
+  if (!currentUser.value) return;
+  const foodItemsRef = collection(db, "user", currentUser.value.uid, "foodItems");
+  const snapshot = await getDocs(foodItemsRef);
+  foodItems.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+function onSelectFoodItem() {
+  const selected = foodItems.value.find(fi => fi.name === shareForm.value.foodName)
+  if (selected) {
+    shareForm.value.category = selected.category || ''
+
+    if (selected.expirationDate) {
+      if (typeof selected.expirationDate.toDate === 'function') {
+        shareForm.value.expirationDate = selected.expirationDate.toDate().toISOString().slice(0, 10)
+      } else if (selected.expirationDate instanceof Date) {
+        shareForm.value.expirationDate = selected.expirationDate.toISOString().slice(0, 10)
+      } else {
+
+        shareForm.value.expirationDate = selected.expirationDate.slice(0, 10)
+      }
+    } else {
+      shareForm.value.expirationDate = ''
+    }
+    shareForm.value.foodName = selected.name || ''
+    shareForm.value.quantity = selected.quantity || ''
+    shareForm.value.unit = selected.unit || ''
+
+  }
+}
 
 async function loadMyListings() {
   if (!currentUser.value) return;
@@ -99,6 +133,7 @@ async function loadMyListings() {
   })
 }
 
+
 async function loadAllListings() {
   console.log(currentUser.value?.uid)
   if (!currentUser.value) return;
@@ -108,9 +143,9 @@ async function loadAllListings() {
     where("ownerId", "!=", currentUser.value.uid),
     orderBy("ownerId")
   )
-  
+
   const snapshot = await getDocs(q)
-  
+
   sharedItems.value = snapshot.docs.map(doc => {
     const data = doc.data()
     return {
@@ -120,7 +155,7 @@ async function loadAllListings() {
     }
   })
   console.log("Loaded shared items:", sharedItems.value)
-  console.log(currentUser.value?.uid) 
+  console.log(currentUser.value?.uid)
 }
 
 
@@ -167,6 +202,7 @@ onAuthStateChanged(auth, (user) => {
     currentUser.value = user
     loadMyListings()
     loadAllListings()
+    loadFoodItems()
   } else {
     currentUser.value = null
   }
@@ -195,13 +231,9 @@ onAuthStateChanged(auth, (user) => {
         <i class="bi bi-share fs-1 text-muted"></i>
         <p class="text-muted mt-3">You haven't shared any items yet</p>
       </div>
-      
+
       <div v-else class="row g-3">
-        <div
-          v-for="item in mySharedItems"
-          :key="item.id"
-          class="col-12 col-md-6 col-lg-4"
-        >
+        <div v-for="item in mySharedItems" :key="item.id" class="col-12 col-md-6 col-lg-4">
           <div class="card h-100">
             <div class="card-body">
               <h5 class="card-title mb-2">{{ item.foodName }}</h5>
@@ -219,11 +251,7 @@ onAuthStateChanged(auth, (user) => {
       <h3 class="h5 mb-4">Available Near You</h3>
 
       <div class="row g-4">
-        <div
-          v-for="item in sharedItems"
-          :key="item.id"
-          class="col-12 col-md-6 col-lg-4"
-        >
+        <div v-for="item in sharedItems" :key="item.id" class="col-12 col-md-6 col-lg-4">
           <div class="card h-100">
             <div class="card-body">
               <div class="mb-3">
@@ -247,10 +275,7 @@ onAuthStateChanged(auth, (user) => {
                 <small class="text-muted">Shared by {{ item.sharedBy }}</small>
               </div>
 
-              <button
-                class="btn btn-primary w-100"
-                @click="handleContact(item)"
-              >
+              <button class="btn btn-primary w-100" @click="handleContact(item)">
                 <i class="bi bi-person-lines-fill me-2"></i>
                 Contact {{ item.sharedBy.split(' ')[0] }}
               </button>
@@ -278,10 +303,10 @@ onAuthStateChanged(auth, (user) => {
               <p class="mb-1"><strong>{{ selectedContact?.foodName }}</strong> - {{ selectedContact?.quantity }}</p>
               <small class="text-muted">Expires in {{ selectedContact?.daysUntilExpiration }} day(s)</small>
             </div>
-            
+
             <div class="mb-3">
               <h6 class="fw-semibold mb-3">Contact Information:</h6>
-              
+
               <div class="mb-3">
                 <div class="d-flex align-items-center gap-2 mb-1">
                   <i class="bi bi-envelope text-primary"></i>
@@ -291,7 +316,7 @@ onAuthStateChanged(auth, (user) => {
                   {{ selectedContact?.contact.email }}
                 </a>
               </div>
-              
+
               <div class="mb-3">
                 <div class="d-flex align-items-center gap-2 mb-1">
                   <i class="bi bi-telephone text-success"></i>
@@ -301,7 +326,7 @@ onAuthStateChanged(auth, (user) => {
                   {{ selectedContact?.contact.phone }}
                 </a>
               </div>
-              
+
               <div class="mb-3">
                 <div class="d-flex align-items-center gap-2 mb-1">
                   <i class="bi bi-geo-alt text-danger"></i>
@@ -315,10 +340,8 @@ onAuthStateChanged(auth, (user) => {
             <button type="button" class="btn btn-secondary" @click="showContactModal = false">
               Close
             </button>
-            <a 
-              :href="`mailto:${selectedContact?.contact.email}?subject=Food Request - ${selectedContact?.foodName}&body=Hi ${selectedContact?.sharedBy}, I'm interested in your ${selectedContact?.foodName}. Could we arrange a pickup?`"
-              class="btn btn-primary"
-            >
+            <a :href="`mailto:${selectedContact?.contact.email}?subject=Food Request - ${selectedContact?.foodName}&body=Hi ${selectedContact?.sharedBy}, I'm interested in your ${selectedContact?.foodName}. Could we arrange a pickup?`"
+              class="btn btn-primary">
               <i class="bi bi-envelope me-2"></i>
               Send Email
             </a>
@@ -344,15 +367,14 @@ onAuthStateChanged(auth, (user) => {
             <form @submit.prevent="submitShare">
               <div class="mb-3">
                 <label class="form-label">Food Name *</label>
-                <input 
-                  v-model="shareForm.foodName" 
-                  type="text" 
-                  class="form-control" 
-                  placeholder="e.g., Apples, Milk, Bread"
-                  required
-                >
+                <select v-model="shareForm.foodName" class="form-select" @change="onSelectFoodItem" required>
+                  <option value="" disabled>Select a food item...</option>
+                  <option v-for="item in foodItems" :key="item.id" :value="item.name">
+                    {{ item.name }}
+                  </option>
+                </select>
               </div>
-              
+
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
                   <label class="form-label">Category</label>
@@ -362,26 +384,15 @@ onAuthStateChanged(auth, (user) => {
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Expiration Date *</label>
-                  <input 
-                    v-model="shareForm.expirationDate" 
-                    type="date" 
-                    class="form-control"
-                    :min="new Date().toISOString().split('T')[0]"
-                    required
-                  >
+                  <input v-model="shareForm.expirationDate" type="date" class="form-control"
+                    :min="new Date().toISOString().split('T')[0]" required>
                 </div>
               </div>
-              
+
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
                   <label class="form-label">Quantity</label>
-                  <input 
-                    v-model.number="shareForm.quantity" 
-                    type="number" 
-                    class="form-control"
-                    min="1"
-                    step="0.01"
-                  >
+                  <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="0.01">
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Unit</label>
@@ -390,25 +401,17 @@ onAuthStateChanged(auth, (user) => {
                   </select>
                 </div>
               </div>
-              
+
               <div class="mb-3">
                 <label class="form-label">Preferred Pickup Time</label>
-                <input 
-                  v-model="shareForm.pickupTime" 
-                  type="text" 
-                  class="form-control"
-                  placeholder="e.g., Weekdays after 6pm, Weekends anytime"
-                >
+                <input v-model="shareForm.pickupTime" type="text" class="form-control"
+                  placeholder="e.g., Weekdays after 6pm, Weekends anytime">
               </div>
-              
+
               <div class="mb-3">
                 <label class="form-label">Additional Notes</label>
-                <textarea 
-                  v-model="shareForm.notes" 
-                  class="form-control" 
-                  rows="3"
-                  placeholder="Any special instructions or notes about the food item..."
-                ></textarea>
+                <textarea v-model="shareForm.notes" class="form-control" rows="3"
+                  placeholder="Any special instructions or notes about the food item..."></textarea>
               </div>
             </form>
           </div>

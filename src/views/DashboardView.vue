@@ -4,6 +4,7 @@ import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp } fro
 import { ref, computed, onMounted, reactive, watch } from 'vue';
 import { getAuth } from 'firebase/auth';
 
+
 const searchText = ref('');
 const selectedCategory = ref('All Categories');
 const sortBy = ref('expiration');
@@ -12,6 +13,7 @@ const sortDirection = ref('asc');
 const showEditModal = ref(false);
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
+
 
 const editForm = reactive({
   id: null,
@@ -103,7 +105,8 @@ watch(userId, () => {
 // Categories for select input
 const categories = [
   'All Categories',
-  'Fruits & Vegetables',
+  'Fruits',
+  'Vegetables',
   'Dairy & Eggs',
   'Meat & Poultry',
   'Bakery',
@@ -687,7 +690,7 @@ const confirmDelete = async () => {
             <div v-for="activity in activities" :key="activity.id" class="pb-3 border-bottom">
 
                <!-- DO IF STATEMENTS FOR EACH ACTIVITY TYPE -->
-              <div v-if="actvitiy == addFood">
+              <div v-if="activity.activityType === 'addFood'">
                 <p class="mb-1 small">
                   <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added</strong>
                 </p>

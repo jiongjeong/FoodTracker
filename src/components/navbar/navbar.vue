@@ -2,15 +2,27 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <!-- Brand -->
-      <RouterLink to="/dashboard" class="navbar-brand fw-bold text-primary p-2 text-decoration-none"
-        :class="{ active: $route.path === '/dashboard' }" @click="closeNavbar">
+      <RouterLink
+        to="/dashboard"
+        class="navbar-brand fw-bold text-primary p-2 text-decoration-none"
+        exact-active-class="active"
+        @click="closeNavbar"
+      >
         <img src="/bigbackicon.jpg" alt="Logo" class="me-2" style="height: 40px; border-radius: 50%;" />
         BigBack
       </RouterLink>
 
       <!-- Mobile hamburger button (auto-hidden on lg+) -->
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-        @click="toggleNavbar">
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#navbarNav"
+        @click="toggleNavbar"
+        aria-controls="navbarNav"
+        :aria-expanded="navbarOpen.toString()"
+        aria-label="Toggle navigation"
+      >
         <span class="navbar-toggler-icon"></span>
       </button>
 
@@ -18,37 +30,62 @@
       <div class="collapse navbar-collapse flex-grow-1" id="navbarNav" :class="{ show: navbarOpen }">
         <ul class="navbar-nav mx-auto">
           <li class="nav-item">
-            <RouterLink to="/dashboard" class="nav-link" :class="{ active: $route.path === '/dashboard' }"
-              @click="closeNavbar">
+            <RouterLink
+              to="/dashboard"
+              class="nav-link"
+              exact-active-class="active"
+              @click="closeNavbar"
+            >
               <i class="bi bi-house-door me-1"></i>Dashboard
             </RouterLink>
           </li>
           <li class="nav-item">
-            <RouterLink to="/recipes" class="nav-link" :class="{ active: $route.path === '/recipes' }"
-              @click="closeNavbar">
+            <RouterLink
+              to="/recipes"
+              class="nav-link"
+              exact-active-class="active"
+              @click="closeNavbar"
+            >
               <i class="bi bi-egg-fried me-1"></i>Recipes
             </RouterLink>
           </li>
           <li class="nav-item">
-            <RouterLink to="/chat" class="nav-link" :class="{ active: $route.path === '/chat' }" @click="closeNavbar">
+            <RouterLink
+              to="/chat"
+              class="nav-link"
+              exact-active-class="active"
+              @click="closeNavbar"
+            >
               <i class="bi bi-robot me-1"></i>AI Chat
             </RouterLink>
           </li>
           <li class="nav-item">
-            <RouterLink to="/community" class="nav-link" :class="{ active: $route.path === '/community' }"
-              @click="closeNavbar">
+            <RouterLink
+              to="/community"
+              class="nav-link"
+              exact-active-class="active"
+              @click="closeNavbar"
+            >
               <i class="bi bi-people me-1"></i>Community
             </RouterLink>
           </li>
           <li class="nav-item">
-            <RouterLink to="/analytics" class="nav-link" :class="{ active: $route.path === '/analytics' }"
-              @click="closeNavbar">
+            <RouterLink
+              to="/analytics"
+              class="nav-link"
+              exact-active-class="active"
+              @click="closeNavbar"
+            >
               <i class="bi bi-bar-chart me-1"></i>Analytics
             </RouterLink>
           </li>
           <li class="nav-item">
-            <RouterLink to="/leaderboard" class="nav-link" :class="{ active: $route.path === '/leaderboard' }"
-              @click="closeNavbar">
+            <RouterLink
+              to="/leaderboard"
+              class="nav-link"
+              exact-active-class="active"
+              @click="closeNavbar"
+            >
               <i class="bi bi-trophy me-1"></i>Leaderboard
             </RouterLink>
           </li>
@@ -57,8 +94,15 @@
         <!-- User section -->
         <ul class="navbar-nav ms-auto">
           <li class="nav-item dropdown" v-if="userName">
-            <a class="nav-link dropdown-toggle" href="#" role="button" @click.prevent="toggleDropdown"
-              :class="{ show: dropdownOpen }">
+            <a
+              class="nav-link dropdown-toggle"
+              href="#"
+              role="button"
+              @click.prevent="toggleDropdown"
+              :class="{ show: dropdownOpen }"
+              aria-haspopup="true"
+              :aria-expanded="dropdownOpen.toString()"
+            >
               <span class="initials-avatar">{{ userInitials }}</span>{{ userName }}
             </a>
             <ul class="dropdown-menu dropdown-menu-end" :class="{ show: dropdownOpen }">
@@ -75,7 +119,7 @@
             </ul>
           </li>
           <li class="nav-item" v-else>
-            <RouterLink to="/login" class="nav-link" :class="{ active: $route.path === '/login' }" @click="closeNavbar">
+            <RouterLink to="/login" class="nav-link" exact-active-class="active" @click="closeNavbar">
               <i class="bi bi-person-plus me-1"></i>Login/Sign Up
             </RouterLink>
           </li>
@@ -86,7 +130,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted,computed } from 'vue'
+import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { getAuth, signOut } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
@@ -103,23 +147,35 @@ const auth = getAuth()
 const user = ref(auth.currentUser)
 const userName = ref('')
 
-// Listen for Auth changes and update userName from Firestore
-onMounted(() => {
-  auth.onAuthStateChanged(async (u) => {
+let unsubscribeAuth = null
+
+// Register auth listener once and clean up on unmount
+function authListener() {
+  unsubscribeAuth = auth.onAuthStateChanged(async (u) => {
     user.value = u
     userName.value = ''
     if (u) {
       try {
-        const userDocRef = doc(db, "user", u.uid)
+        const userDocRef = doc(db, 'user', u.uid) // Corrected collection name to 'users'
         const userDocSnap = await getDoc(userDocRef)
         if (userDocSnap.exists()) {
           userName.value = userDocSnap.data().name
         }
       } catch (error) {
-        console.error("Failed to fetch user profile:", error)
+        console.error('Failed to fetch user profile:', error)
       }
     }
   })
+}
+authListener()
+
+onUnmounted(() => {
+  if (unsubscribeAuth) unsubscribeAuth()
+})
+
+// Close navbar and dropdown on route change
+watch($route, () => {
+  closeNavbar()
 })
 
 function toggleNavbar() {
@@ -195,6 +251,7 @@ const userInitials = computed(() => {
 .nav-link {
   font-size: 1.12rem;
 }
+
 .initials-avatar {
   display: inline-flex;
   align-items: center;
@@ -208,6 +265,7 @@ const userInitials = computed(() => {
   font-size: 1.1rem;
   margin-right: 0.5rem;
   vertical-align: middle;
+  line-height: 1; /* Improved vertical alignment */
   user-select: none;
 }
 </style>
