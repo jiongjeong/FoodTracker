@@ -716,7 +716,9 @@ const confirmDelete = async () => {
         </div>
         <div class="mb-2">
           <label class="form-label">Category</label>
-          <input v-model="editForm.category" class="form-control" />
+          <select v-model="addForm.category" class="form-select" >
+            <option v-for="cat in categories">{{ cat }}</option>
+          </select>
         </div>
         <div class="row g-2">
           <div class="col-6">
@@ -764,7 +766,9 @@ const confirmDelete = async () => {
         </div>
         <div class="mb-2">
           <label class="form-label">Category</label>
-          <input v-model="addForm.category" class="form-control" />
+          <select v-model="addForm.category" class="form-select" >
+            <option v-for="cat in categories">{{ cat }}</option>
+          </select>
         </div>
         <div class="row g-2">
           <div class="col-6">
