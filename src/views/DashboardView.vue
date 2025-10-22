@@ -1,7 +1,7 @@
 <script setup>
 import { db } from '../firebase.js';
 import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import { ref, computed, onMounted, reactive, watch } from 'vue';
+import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
 
 
@@ -331,6 +331,56 @@ const expired = computed(() =>
   }).length
 );
 
+watchEffect(() => {
+  const expiredFoods = foodItems.value.filter(food => getDaysLeft(food) < 0)
+
+  expiredFoods.forEach(food => {
+    const alreadyLogged = activities.value.some(a => a.name === food.name && a.actionType === 'expFood')
+    if (!alreadyLogged) {
+      activities.value.push({
+        activityType: 'expFood',
+        createdAt: new Date().toISOString(),
+        foodName: food.name || '',
+        price: String(food.price || ''),
+      quantity: String(food.quantity || ''),
+      unit: String(food.unit || '')
+      })
+    }
+  })
+})
+
+const analytics = computed(() => {
+  // const items = activeFoodItems.value
+  const wasteActivities = activities.value.filter(a => a.activityType === 'expFood')
+  const usedActivities = activities.value.filter(a => a.activityFood === 'conFood')
+  
+  // Total waste calculation
+  const totalWasteItems = wasteActivities.length
+  const totalWasteMoney = wasteActivities.reduce((total, activity) => {
+  // Multiply price by quantity (convert price to number since it's a string)
+  return total + (Number(activity.price) );
+}, 0);
+  
+  // Total saved calculation  
+  const totalSavedItems = usedActivities.length
+  const totalSavedMoney = totalSavedItems * 5 // Assume $5 average per saved item
+  
+  // Reduction percentage - items used before expiry vs total items
+  const totalItemsHandled = totalWasteItems + totalSavedItems
+  const reductionPercentage = totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
+  
+  // Current inventory
+  // const inventoryValue = items.reduce((sum, item) => sum + item.price, 0)
+  // const inventoryItems = items.length
+  
+  return {
+    totalWaste: { money: totalWasteMoney, items: totalWasteItems },
+    totalSaved: { money: totalSavedMoney, items: totalSavedItems },
+    reduction: reductionPercentage
+    // inventory: { value: inventoryValue, items: inventoryItems }
+  }
+})
+
 const potentialLoss = computed(() =>
   foodItems.value
     .filter(item => {
@@ -565,7 +615,7 @@ const confirmDelete = async () => {
         </div>
       </div>
 
-      <div class="row g-3">
+      <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
           <div class="glass-card stat-card p-3">
             <div class="d-flex align-items-center gap-2 mb-2">
@@ -606,6 +656,20 @@ const confirmDelete = async () => {
             <small class="text-muted">items</small>
           </div>
         </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-trash text-danger"></i>
+            <small class="text-muted">Total Waste</small>
+          </div>
+          <h3 class="h4 text-danger mb-1">${{ analytics.totalWaste.money }}</h3>
+          <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
+        </div>
+        
+      </div>
       </div>
     </div>
 
