@@ -13,6 +13,7 @@ const sortDirection = ref('asc');
 const showEditModal = ref(false);
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
+const showUseModal = ref(false);
 
 
 const editForm = reactive({
@@ -35,6 +36,12 @@ const addForm = reactive({
   createdAt: '',
   price: '',
   quantity: '',
+  unit: ''
+});
+const useForm = reactive({
+  id: null,
+  name: '',
+  quantity: 0,
   unit: ''
 });
 
@@ -353,7 +360,8 @@ const analytics = computed(() => {
   // const items = activeFoodItems.value
   const wasteActivities = activities.value.filter(a => a.activityType === 'expFood')
   const usedActivities = activities.value.filter(a => a.activityFood === 'conFood')
-  
+  console.log(wasteActivities)
+  console.log(usedActivities)
   // Total waste calculation
   const totalWasteItems = wasteActivities.length
   const totalWasteMoney = wasteActivities.reduce((total, activity) => {
@@ -395,6 +403,70 @@ const toInputDateString = (d) => {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+};
+
+const openUse = (food) => {
+  useForm.id = food.id;
+  useForm.name = food.name;
+  useForm.quantity = 1; // default quantity to use
+  useForm.unit = food.unit || '';
+  showUseModal.value = true;
+};
+const closeUse = () => {
+  showUseModal.value = false;
+  useForm.id = null;
+  useForm.name = '';
+  useForm.quantity = 0;
+  useForm.unit = '';
+};
+const saveUse = async () => {
+  if (!useForm.id || useForm.quantity <= 0) return;
+
+  const uid = userId.value;
+  if (!uid) return;
+
+  try {
+    // Find the food item locally
+    const foodIndex = foodItems.value.findIndex(f => f.id === useForm.id);
+    if (foodIndex === -1) return;
+
+    const food = foodItems.value[foodIndex];
+
+    // Ensure we don't use more than available
+    const usedQty = Math.min(useForm.quantity, food.quantity);
+
+    // Update Firestore food quantity
+    const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id);
+    await updateDoc(refDoc, {
+      quantity: food.quantity - usedQty
+    });
+
+    // Update local foodItems
+    foodItems.value[foodIndex].quantity -= usedQty;
+
+    // Log activity
+    const actRef = collection(db, 'user', uid, 'activities');
+    const activityPayload = {
+      activityType: 'conFood',
+      createdAt: new Date().toISOString(),
+      foodName: food.name,
+      price: String(food.price || 0),
+      quantity: String(usedQty),
+      unit: food.unit || ''
+    };
+
+    await addDoc(actRef, activityPayload);
+    activities.value.unshift({
+      id: Math.random().toString(36).substring(2, 9),
+      ...activityPayload
+    });
+
+    showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`);
+    closeUse();
+  } catch (err) {
+    console.error('Failed to log used food:', err);
+    showToastFor('Failed to update food usage.');
+  }
 };
 
 const openAdd = () => {
@@ -734,7 +806,7 @@ const confirmDelete = async () => {
                 <div class="food-actions">
                   <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
                     Edit</button>
-                  <button class="food-btn food-btn-use"><i class="bi bi-check2"></i> Use</button>
+                  <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i> Use</button>
                   <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
                       class="bi bi-trash"></i></button>
                 </div>
@@ -817,6 +889,27 @@ const confirmDelete = async () => {
         </div>
       </div>
     </div>
+    <!-- Use Food Modal -->
+  <div v-if="showUseModal" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="h5 mb-3">Use Food Item</h3>
+      <p>How much of <strong>{{ useForm.name }}</strong> did you use?</p>
+      <div class="row g-2 mt-2">
+        <div class="col-6">
+          <label class="form-label">Quantity</label>
+          <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" />
+        </div>
+        <div class="col-6">
+          <label class="form-label">Unit</label>
+          <input v-model="useForm.unit" type="text" class="form-control" />
+        </div>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-secondary" @click="closeUse">Cancel</button>
+        <button class="btn btn-primary" @click="saveUse">Use</button>
+      </div>
+    </div>
+  </div>
 
     <!-- Floating Add Button -->
     <button class="fab-add" @click="openAdd" title="Add Food">
