@@ -342,7 +342,7 @@ watchEffect(() => {
   const expiredFoods = foodItems.value.filter(food => getDaysLeft(food) < 0)
 
   expiredFoods.forEach(food => {
-    const alreadyLogged = activities.value.some(a => a.name === food.name && a.actionType === 'expFood')
+    const alreadyLogged = activities.value.some(a => a.foodName === food.name && a.activityType === 'expFood')
     if (!alreadyLogged) {
       activities.value.push({
         activityType: 'expFood',
@@ -359,7 +359,8 @@ watchEffect(() => {
 const analytics = computed(() => {
   // const items = activeFoodItems.value
   const wasteActivities = activities.value.filter(a => a.activityType === 'expFood')
-  const usedActivities = activities.value.filter(a => a.activityFood === 'conFood')
+  // fix: check activityType for consumed food activities
+  const usedActivities = activities.value.filter(a => a.activityType === 'conFood')
   console.log(wasteActivities)
   console.log(usedActivities)
   // Total waste calculation
@@ -454,7 +455,6 @@ const saveUse = async () => {
       quantity: String(usedQty),
       unit: food.unit || ''
     };
-
     await addDoc(actRef, activityPayload);
     activities.value.unshift({
       id: Math.random().toString(36).substring(2, 9),
@@ -832,6 +832,24 @@ const confirmDelete = async () => {
                 </p>
               </div>
 
+              <div v-else-if="activity.activityType === 'conFood'">
+                <p class="mb-1 small">
+                  <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} used</strong>
+                </p>
+              </div>
+
+              <div v-else-if="activity.activityType === 'expFood'">
+                <p class="mb-1 small text-danger">
+                  <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired</strong>
+                </p>
+              </div>
+
+              <div v-else>
+                <p class="mb-1 small">
+                  <strong>{{ activity.foodName }} — {{ activity.activityType }}</strong>
+                </p>
+              </div>
+
 
 
               <small class="text-muted">
@@ -979,6 +997,7 @@ const confirmDelete = async () => {
 </template>
 
 <style scoped>
+
 .dashboard-overview {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.08) 100%);
   border: 1px solid rgba(16, 185, 129, 0.1);
