@@ -101,8 +101,17 @@ export const useRecipesStore = defineStore('recipes', () => {
 
   const getBookmarkCount = () => bookmarkedRecipes.value.length
 
-  // Initialize
-  loadBookmarks()
+  // Initialize bookmarks - make it explicit that this is async
+  const initialized = ref(false)
+  const initializeStore = async () => {
+    if (!initialized.value) {
+      await loadBookmarks()
+      initialized.value = true
+    }
+  }
+
+  // Auto-initialize, but components can await this if needed
+  initializeStore()
 
   return {
     bookmarkedRecipes,
@@ -111,6 +120,8 @@ export const useRecipesStore = defineStore('recipes', () => {
     toggleBookmark,
     isRecipeBookmarked,
     getBookmarkCount,
-    loadBookmarks
+    loadBookmarks,
+    initializeStore,
+    initialized
   }
 })

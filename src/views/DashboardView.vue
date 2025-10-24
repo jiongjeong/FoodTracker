@@ -682,9 +682,9 @@ const saveUse = async () => {
       quantity: String(usedQty),
       unit: food.unit || ''
     };
-    await addDoc(actRef, activityPayload);
+    const docRef = await addDoc(actRef, activityPayload);
     activities.value.unshift({
-      id: Math.random().toString(36).substring(2, 9),
+      id: docRef.id,
       ...activityPayload
     });
 
@@ -704,9 +704,9 @@ const saveUse = async () => {
         unit: food.unit || '',
         note: 'fully consumed'
       };
-      await addDoc(actRef, fullConsumedPayload);
+      const docRef = await addDoc(actRef, fullConsumedPayload);
       activities.value.unshift({
-        id: Math.random().toString(36).substring(2, 9),
+        id: docRef.id,
         ...fullConsumedPayload
       });
 
@@ -795,14 +795,14 @@ const saveAdd = async () => {
       unit: String(addForm.unit || '')
     };
 
-    await addDoc(actRef, activityPayload);
+    const activityDocRef = await addDoc(actRef, activityPayload);
 
     // Add new item locally for instant UI feedback
     foodItems.value.unshift({ id: newDocRef.id, ...foodPayload });
 
     // Refresh activities list to show new log
     activities.value.unshift({
-      id: Math.random().toString(36).substring(2, 9),
+      id: activityDocRef.id,
       ...activityPayload,
     });
 
