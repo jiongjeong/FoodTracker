@@ -1,13 +1,19 @@
+
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import { auth } from '../firebase.js'
+import { onAuthStateChanged } from 'firebase/auth'
+import { useRecipesStore } from '../stores/recipes.js'
+
 
 // Configuration constants
 const API_BASE_URL = 'https://www.themealdb.com/api/json/v1/1'
 const MAX_INGREDIENTS = 20
 const REQUEST_TIMEOUT = 10000 // 10 seconds
 const POPULAR_CATEGORIES = ['Chicken', 'Beef', 'Pasta', 'Seafood', 'Dessert']
+
 
 // Reactive state
 const activeTab = ref('search')
@@ -16,10 +22,78 @@ const route = useRoute()
 const isLoading = ref(false)
 const searchResults = ref([])
 const popularRecipes = ref([])
-const bookmarkedRecipes = ref([])
 const selectedRecipe = ref(null)
 const showRecipeModal = ref(false)
 const errorMessage = ref('')
+const user = ref(auth.currentUser)
+
+// Pinia store
+const recipesStore = useRecipesStore()
+const bookmarkedRecipes = computed(() => recipesStore.bookmarkedRecipes)
+const isRecipeBookmarked = recipesStore.isRecipeBookmarked
+const toggleBookmark = recipesStore.toggleBookmark
+
+// Computed properties
+const userId = computed(() => user.value?.uid || null)
+
+const bookmarkedRecipeObjects = ref([])
+
+const displayedRecipes = computed(() => {
+  switch (activeTab.value) {
+    case 'search':
+      return searchResults.value
+    case 'popular':
+      return popularRecipes.value
+    case 'bookmarked':
+      return bookmarkedRecipeObjects.value
+    default:
+      return []
+  }
+})
+
+// Fetch full recipe objects for bookmarked IDs
+const fetchBookmarkedRecipes = async () => {
+  const ids = bookmarkedRecipes.value
+    .map(r => (typeof r === 'object' ? r.idMeal || r.id : r))
+    .filter(Boolean)
+  const recipes = []
+  for (const id of ids) {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/lookup.php`, { params: { i: id }, timeout: REQUEST_TIMEOUT })
+      if (response.data.meals && response.data.meals[0]) {
+        const meal = response.data.meals[0]
+        recipes.push({
+          id: meal.idMeal,
+          name: meal.strMeal,
+          image: meal.strMealThumb,
+          category: meal.strCategory,
+          area: meal.strArea,
+          instructions: meal.strInstructions,
+          ingredients: getIngredientsList(meal),
+          video: meal.strYoutube,
+          source: meal.strSource
+        })
+      }
+    } catch (e) {
+      // skip failed fetches
+    }
+  }
+  bookmarkedRecipeObjects.value = recipes
+}
+
+// Watch for tab change to 'bookmarked' and fetch recipes
+watch(activeTab, async (tab) => {
+  if (tab === 'bookmarked') {
+    await fetchBookmarkedRecipes()
+  }
+})
+
+// Also refetch when bookmarks change and tab is 'bookmarked'
+watch(bookmarkedRecipes, async () => {
+  if (activeTab.value === 'bookmarked') {
+    await fetchBookmarkedRecipes()
+  }
+})
 
 // Error handling helper
 const handleApiError = (error) => {
@@ -61,8 +135,7 @@ const searchRecipes = async (query) => {
         instructions: meal.strInstructions,
         ingredients: getIngredientsList(meal),
         video: meal.strYoutube,
-        source: meal.strSource,
-        isBookmarked: bookmarkedRecipes.value.some(r => r.id === meal.idMeal)
+        source: meal.strSource
       }))
     } else {
       searchResults.value = []
@@ -107,8 +180,7 @@ const getPopularRecipes = async () => {
       instructions: meal.strInstructions,
       ingredients: getIngredientsList(meal),
       video: meal.strYoutube,
-      source: meal.strSource,
-      isBookmarked: bookmarkedRecipes.value.some(r => r.id === meal.idMeal)
+      source: meal.strSource
     }))
     
   } catch (error) {
@@ -144,64 +216,16 @@ const viewRecipe = (recipe) => {
   showRecipeModal.value = true
 }
 
-// Toggle bookmark
-const toggleBookmark = (recipe) => {
-  const existingIndex = bookmarkedRecipes.value.findIndex(r => r.id === recipe.id)
-  if (existingIndex >= 0) {
-    bookmarkedRecipes.value.splice(existingIndex, 1)
-    recipe.isBookmarked = false
-  } else {
-    bookmarkedRecipes.value.push({ ...recipe, isBookmarked: true })
-    recipe.isBookmarked = true
-  }
-  
-  // Update bookmark status in other lists
-  const updateInList = (list) => {
-    const item = list.find(r => r.id === recipe.id)
-    if (item) item.isBookmarked = recipe.isBookmarked
-  }
-  
-  updateInList(searchResults.value)
-  updateInList(popularRecipes.value)
-  
-  // Save to localStorage
-  try {
-    localStorage.setItem('bookmarked_recipes', JSON.stringify(bookmarkedRecipes.value))
-  } catch (error) {
-    console.error('Error saving bookmarked recipes:', error)
-  }
-}
 
-// Load bookmarked recipes from localStorage
-const loadBookmarkedRecipes = () => {
-  const stored = localStorage.getItem('bookmarked_recipes')
-  if (stored) {
-    try {
-      bookmarkedRecipes.value = JSON.parse(stored)
-    } catch (error) {
-      console.error('Error loading bookmarked recipes:', error)
-      bookmarkedRecipes.value = []
-    }
-  }
-}
+// Remove local toggleBookmark logic; use store's toggleBookmark
 
-// Get displayed recipes based on active tab
-const displayedRecipes = computed(() => {
-  switch (activeTab.value) {
-    case 'search':
-      return searchResults.value
-    case 'popular':
-      return popularRecipes.value
-    case 'bookmarked':
-      return bookmarkedRecipes.value
-    default:
-      return []
-  }
-})
+
+// Remove local loadBookmarkedRecipes; use store's loadBookmarks
+
 
 // Initialize popular recipes and load bookmarks
 const initializeRecipes = async () => {
-  loadBookmarkedRecipes()
+  await recipesStore.loadBookmarks()
   await getPopularRecipes()
 }
 
@@ -221,6 +245,12 @@ watch(
 // Initialize on component mount
 onMounted(() => {
   initializeRecipes()
+})
+
+// Auth state change listener
+onAuthStateChanged(auth, async (u) => {
+  user.value = u
+  await recipesStore.loadBookmarks()
 })
 </script>
 
@@ -340,9 +370,9 @@ onMounted(() => {
               <button 
                 @click="toggleBookmark(recipe)"
                 class="bookmark-btn"
-                :class="{ bookmarked: recipe.isBookmarked }"
+                :class="{ bookmarked: isRecipeBookmarked(recipe.id) }"
               >
-                <i :class="recipe.isBookmarked ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'"></i>
+                <i :class="isRecipeBookmarked(recipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'"></i>
               </button>
             </div>
             
@@ -435,10 +465,10 @@ onMounted(() => {
                       <button 
                         @click="toggleBookmark(selectedRecipe)"
                         class="btn btn-sm flex-fill"
-                        :class="selectedRecipe.isBookmarked ? 'btn-warning' : 'btn-outline-warning'"
+                        :class="isRecipeBookmarked(selectedRecipe.id) ? 'btn-warning' : 'btn-outline-warning'"
                       >
-                        <i :class="selectedRecipe.isBookmarked ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'" class="me-1"></i>
-                        {{ selectedRecipe.isBookmarked ? 'Saved' : 'Save' }}
+                        <i :class="isRecipeBookmarked(selectedRecipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'" class="me-1"></i>
+                        {{ isRecipeBookmarked(selectedRecipe.id) ? 'Saved' : 'Save' }}
                       </button>
                       
                       <a v-if="selectedRecipe.video" :href="selectedRecipe.video" target="_blank" class="btn btn-outline-danger btn-sm flex-fill">
