@@ -79,6 +79,7 @@ function showToastFor(msg, ms = 2200) {
 const foodItems = ref([]);
 const recipes = ref([]);
 const activities = ref([]);
+const activitiesLoaded = ref(false);
 
 // Activity filter and sort controls
 const activityTypeFilter = ref(''); // default to placeholder
@@ -163,24 +164,36 @@ watch(userId, async (val) => {
   }
 });
 
+
 // Fetch food items function
 async function loadFoodItems() {
   if (userId.value) {
     const foodItemsRef = collection(db, 'user', userId.value, 'foodItems');
     const foodItemsSnapshot = await getDocs(foodItemsRef);
     foodItems.value = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
   }
 }
 
-// Call loadFoodItems on load
+// Fetch activities function
+async function loadActivities() {
+  if (userId.value) {
+    const activityRef = collection(db, 'user', userId.value, 'activities');
+    const activitySnapshot = await getDocs(activityRef);
+    activities.value = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    activitiesLoaded.value = true;
+  }
+}
+
+// Call loadFoodItems and loadActivities on load
 onMounted(() => {
   loadFoodItems();
+  loadActivities();
 });
 
 // Also, watch for userId changes (like login)
 watch(userId, () => {
   loadFoodItems();
+  loadActivities();
 });
 
 // Categories for select input
@@ -229,18 +242,25 @@ const filteredFoodItems = computed(() => {
   const direction = sortDirection.value === 'desc' ? -1 : 1
 
   switch (sortBy.value) {
-    case 'expiration':
-      items.sort((a, b) => {
-        const dateA = new Date(a.expirationDate)
-        const dateB = new Date(b.expirationDate)
+      case 'expiration':
+        items.sort((a, b) => {
+          function parseDate(val) {
+            if (!val) return null;
+            if (typeof val.toDate === 'function') return val.toDate();
+            if (val instanceof Date) return val;
+            const d = new Date(val);
+            return isNaN(d.getTime()) ? null : d;
+          }
+          const dateA = parseDate(a.expirationDate);
+          const dateB = parseDate(b.expirationDate);
 
-        if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0
-        if (isNaN(dateA.getTime())) return 1
-        if (isNaN(dateB.getTime())) return -1
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
 
-        return (dateA.getTime() - dateB.getTime()) * direction
-      })
-      break
+          return (dateA.getTime() - dateB.getTime()) * direction;
+        });
+        break;
 
     case 'name':
       items.sort((a, b) => {
@@ -413,20 +433,35 @@ const expired = computed(() =>
 );
 
 watchEffect(() => {
+  if (!activitiesLoaded.value) return;
   const expiredFoods = foodItems.value.filter(food => getDaysLeft(food) < 0)
-
-  expiredFoods.forEach(food => {
-    const alreadyLogged = activities.value.some(a => a.foodName === food.name && a.activityType === 'expFood')
-    if (!alreadyLogged) {
-      activities.value.push({
-        activityType: 'expFood',
-        createdAt: new Date().toISOString(),
-        foodName: food.name || '',
-  category: food.category || 'Other',
-        price: String(food.price || ''),
-      quantity: String(food.quantity || ''),
-      unit: String(food.unit || '')
-      })
+  const uid = userId.value;
+  expiredFoods.forEach(async food => {
+    // Prevent duplicate logs by checking both local and Firestore activities
+    const alreadyLogged = activities.value.some(a => a.foodName === food.name && a.activityType === 'expFood');
+    if (!alreadyLogged && uid) {
+      // Check Firestore for existing expFood activity for this food
+      const actRef = collection(db, 'user', uid, 'activities');
+      const q = query(actRef, where('foodName', '==', food.name), where('activityType', '==', 'expFood'));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        // Add to Firestore
+        const payload = {
+          activityType: 'expFood',
+          createdAt: new Date().toISOString(),
+          foodName: food.name || '',
+          category: food.category || 'Other',
+          price: String(food.price || ''),
+          quantity: String(food.quantity || ''),
+          unit: String(food.unit || ''),
+          note: 'expired'
+        };
+        await addDoc(actRef, payload);
+        activities.value.unshift({
+          id: Math.random().toString(36).substring(2, 9),
+          ...payload
+        });
+      }
     }
   })
 })
@@ -448,8 +483,8 @@ const analytics = computed(() => {
   return total + (Number(activity.price) );
 }, 0);
   
-  // Total saved calculation  
-  const totalSavedItems = usedActivities.length
+  // Total saved calculation: count only fully consumed food
+  const totalSavedItems = activities.value.filter(a => a.activityType === 'conFood' && a.note === 'fully consumed').length
   const totalSavedMoney = totalSavedItems * 5 // Assume $5 average per saved item
   
   // Reduction percentage - items used before expiry vs total items
@@ -581,23 +616,17 @@ const saveUse = async () => {
 
     // Ensure we don't use more than available
     const usedQty = Math.min(useForm.quantity, food.quantity);
+    const newQty = food.quantity - usedQty;
 
-    // Update Firestore food quantity
     const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id);
-    await updateDoc(refDoc, {
-      quantity: food.quantity - usedQty
-    });
-
-    // Update local foodItems
-    foodItems.value[foodIndex].quantity -= usedQty;
-
-    // Log activity
     const actRef = collection(db, 'user', uid, 'activities');
+
+    // Log normal use activity
     const activityPayload = {
       activityType: 'conFood',
       createdAt: new Date().toISOString(),
       foodName: food.name,
-  category: food.category || '',
+      category: food.category || '',
       price: String(food.price || 0),
       quantity: String(usedQty),
       unit: food.unit || ''
@@ -608,7 +637,38 @@ const saveUse = async () => {
       ...activityPayload
     });
 
-    showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`);
+    if (newQty <= 0) {
+      // Remove from Firestore and local list
+      await deleteDoc(refDoc);
+      foodItems.value.splice(foodIndex, 1);
+
+      // Log fully consumed activity
+      const fullConsumedPayload = {
+        activityType: 'conFood',
+        createdAt: new Date().toISOString(),
+        foodName: food.name,
+        category: food.category || '',
+        price: String(food.price || 0),
+        quantity: '0',
+        unit: food.unit || '',
+        note: 'fully consumed'
+      };
+      await addDoc(actRef, fullConsumedPayload);
+      activities.value.unshift({
+        id: Math.random().toString(36).substring(2, 9),
+        ...fullConsumedPayload
+      });
+
+      showToastFor(`${food.name} fully consumed and removed`);
+    } else {
+      // Update Firestore food quantity
+      await updateDoc(refDoc, {
+        quantity: newQty
+      });
+      // Update local foodItems
+      foodItems.value[foodIndex].quantity = newQty;
+      showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`);
+    }
     closeUse();
   } catch (err) {
     console.error('Failed to log used food:', err);
@@ -973,32 +1033,36 @@ const confirmDelete = async () => {
           </div>
           <div v-else class="food-scroll-container">
             <div class="food-scroll-section">
-              <div v-for="food in filteredFoodItems" :key="food.id" :class="['food-card', getFoodCardClass(food)]">
-                <div class="food-header">
-                  <div>
-                    <div class="food-title-group">
-                      <span class="food-name">{{ food.name }}</span>
-                      <span class="expired-badge" :class="getBadgeClass(food)">
-                        <span v-if="getDaysLeft(food) < 0">Expired</span>
-                        <span v-else-if="getDaysLeft(food) == 0">Today</span>
-                        <span v-else>{{ getDaysLeft(food) }} days</span>
-                      </span>
+              <div v-for="food in filteredFoodItems" :key="food.id" :class="['food-card', getFoodCardClass(food), 'd-flex', 'flex-column', 'justify-content-between']">
+                <div>
+                  <div class="food-header">
+                    <div>
+                      <div class="food-title-group align-items-center d-flex gap-2">
+                        <span class="food-name">{{ food.name }}</span>
+                        <span class="expired-badge" :class="getBadgeClass(food)">
+                          <span v-if="getDaysLeft(food) < 0">Expired</span>
+                          <span v-else-if="getDaysLeft(food) == 0">Today</span>
+                          <span v-else>{{ getDaysLeft(food) }} days</span>
+                        </span>
+                      </div>
+                      <div class="food-category">{{ food.category }}</div>
+                      <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
                     </div>
-                    <div class="food-category">{{ food.category }}</div>
-                    <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
-                  </div>
-                  <div class="food-right">
-                    <div class="food-price">${{ food.price }}</div>
-                    <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
+                    <div class="food-right">
+                      <div class="food-price">${{ food.price }}</div>
+                      <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
+                    </div>
                   </div>
                 </div>
-                <div class="food-actions">
-                  <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
-                    Edit</button>
-                  <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i> Use</button>
-                  <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
-                      class="bi bi-trash"></i></button>
-                  <button class="food-btn food-btn-recipe" @click.prevent="goToRecipes(food)"><i class="bi bi-book"></i> Recipe</button>
+                <div class="d-flex align-items-end justify-content-between mt-auto w-100">
+                  <button class="food-btn food-btn-recipe px-2 py-1" style="font-size: 0.92em; min-width: 0;" @click.prevent="goToRecipes(food)"><i class="bi bi-book"></i> Recipes</button>
+                  <div class="food-actions d-flex gap-2">
+                    <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
+                      Edit</button>
+                    <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i> Use</button>
+                    <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
+                        class="bi bi-trash"></i></button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1037,12 +1101,22 @@ const confirmDelete = async () => {
                 </div>
                 <div v-else-if="activity.activityType === 'conFood'">
                   <p class="mb-1 small">
-                    <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} used</strong>
+                    <strong v-if="activity.note === 'fully consumed'" class="text-success">
+                      All of {{ activity.foodName }} fully consumed
+                    </strong>
+                    <strong v-else>
+                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} used
+                    </strong>
                   </p>
                 </div>
                 <div v-else-if="activity.activityType === 'expFood'">
-                  <p class="mb-1 small text-danger">
-                    <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired</strong>
+                  <p class="mb-1 small">
+                    <strong v-if="activity.note === 'expired'" class="text-danger">
+                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
+                    </strong>
+                    <strong v-else>
+                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
+                    </strong>
                   </p>
                 </div>
                 <div v-else>
