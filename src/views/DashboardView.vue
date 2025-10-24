@@ -954,7 +954,6 @@ const confirmDelete = async () => {
 
         </div>
         
-      </div>
       <div class="col-6 col-lg-3">
         <div class="glass-card stat-card p-3">
           <div class="d-flex align-items-center gap-2 mb-2">
@@ -998,9 +997,10 @@ const confirmDelete = async () => {
             Waste vs Savings
           </h5>
           <div style="height: 300px;">
-            <Bar v-if="wasteVsSavingsChart && wasteVsSavingsChart.labels && wasteVsSavingsChart.labels.length" :data="wasteVsSavingsChart" :options="chartOptions" />
+            <Bar :data="wasteVsSavingsChart" :options="chartOptions" />
           </div>
         </div>
+  </div>
 
       <!-- Waste by Category Pie Chart -->
       <div class="col-lg-4">
@@ -1010,9 +1010,10 @@ const confirmDelete = async () => {
             Waste by Category
           </h5>
           <div style="height: 300px;">
-            <Pie v-if="wasteByCategoryChart && wasteByCategoryChart.labels && wasteByCategoryChart.labels.length" :data="wasteByCategoryChart" :options="chartOptions" />
+            <Pie :data="wasteByCategoryChart" :options="chartOptions" />
           </div>
         </div>
+  </div>
 
       <!-- Monthly Spending Trend -->
       <div class="col-lg-4">
@@ -1022,12 +1023,12 @@ const confirmDelete = async () => {
             Monthly Spending Trend
           </h5>
           <div style="height: 300px;">
-            <Line v-if="monthlySpendingChart && monthlySpendingChart.labels && monthlySpendingChart.labels.length" :data="monthlySpendingChart" :options="chartOptions" />
+            <Line :data="monthlySpendingChart" :options="chartOptions" />
           </div>
         </div>
       </div>
     </div>
-
+      </div>
     <div class="row g-4">
       <div class="col-lg-8">
         <div class="glass-card p-4">
