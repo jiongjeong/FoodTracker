@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
 
 // Configuration constants
@@ -11,6 +12,7 @@ const POPULAR_CATEGORIES = ['Chicken', 'Beef', 'Pasta', 'Seafood', 'Dessert']
 // Reactive state
 const activeTab = ref('search')
 const searchQuery = ref('')
+const route = useRoute()
 const isLoading = ref(false)
 const searchResults = ref([])
 const popularRecipes = ref([])
@@ -203,8 +205,23 @@ const initializeRecipes = async () => {
   await getPopularRecipes()
 }
 
+// Watch for route query changes to auto-search
+watch(
+  () => route.query.search,
+  async (newSearch) => {
+    if (typeof newSearch === 'string' && newSearch.trim()) {
+      searchQuery.value = newSearch
+      activeTab.value = 'search'
+      await searchRecipes(newSearch)
+    }
+  },
+  { immediate: true }
+)
+
 // Initialize on component mount
-initializeRecipes()
+onMounted(() => {
+  initializeRecipes()
+})
 </script>
 
 <template>
@@ -293,8 +310,14 @@ initializeRecipes()
       <div v-else-if="displayedRecipes.length === 0" class="text-center py-5">
         <div v-if="activeTab === 'search'">
           <i class="bi bi-search display-1 text-muted mb-3"></i>
-          <h5>Search for recipes</h5>
-          <p class="text-muted">Enter a recipe name, ingredient, or cuisine type to get started</p>
+          <template v-if="searchQuery && searchQuery.trim()">
+            <h5>No recipes found</h5>
+            <p class="text-muted">Try a different ingredient or recipe name</p>
+          </template>
+          <template v-else>
+            <h5>Search for recipes</h5>
+            <p class="text-muted">Enter a recipe name, ingredient, or cuisine type to get started</p>
+          </template>
         </div>
         <div v-else-if="activeTab === 'popular'">
           <i class="bi bi-star display-1 text-muted mb-3"></i>
