@@ -51,7 +51,7 @@
           </li>
           <li class="nav-item">
             <RouterLink
-              to="/chat"
+              to="/chatbot"
               class="nav-link"
               exact-active-class="active"
               @click="closeNavbar"

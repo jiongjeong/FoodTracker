@@ -79,6 +79,7 @@ function showToastFor(msg, ms = 2200) {
 const foodItems = ref([]);
 const recipes = ref([]);
 const activities = ref([]);
+const activitiesLoaded = ref(false);
 
 // Activity filter and sort controls
 const activityTypeFilter = ref(''); // default to placeholder
@@ -124,30 +125,17 @@ const filteredSortedActivities = computed(() => {
   }
   // Sort by createdAt
   acts.sort((a, b) => {
-    const dateA = parseCreatedAt(a.createdAt);
-    const dateB = parseCreatedAt(b.createdAt);
-    if (!dateA && !dateB) return 0;
-    if (!dateA) return activitySortDirection.value === 'desc' ? 1 : -1;
-    if (!dateB) return activitySortDirection.value === 'desc' ? -1 : 1;
+    const dateA = new Date(a.createdAt);
+    const dateB = new Date(b.createdAt);
+    if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+    if (isNaN(dateA.getTime())) return activitySortDirection.value === 'desc' ? 1 : -1;
+    if (isNaN(dateB.getTime())) return activitySortDirection.value === 'desc' ? -1 : 1;
     return activitySortDirection.value === 'desc'
       ? dateB - dateA
       : dateA - dateB;
   });
   return acts;
 });
-
-// Helper to parse createdAt values (ISO string, JS Date, or Firestore Timestamp)
-function parseCreatedAt(value) {
-  if (!value) return null;
-  try {
-    if (typeof value.toDate === 'function') return value.toDate();
-    if (value instanceof Date) return value;
-    const d = new Date(value);
-    return isNaN(d) ? null : d;
-  } catch (error) {
-    return error;
-  }
-}
 
 const auth = getAuth();
 const user = ref(auth.currentUser);
@@ -185,18 +173,31 @@ async function loadFoodItems() {
     const foodItemsRef = collection(db, 'user', userId.value, 'foodItems');
     const foodItemsSnapshot = await getDocs(foodItemsRef);
     foodItems.value = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
   }
 }
 
-// Call loadFoodItems on load
+// Fetch activities function
+async function loadActivities() {
+  if (userId.value) {
+    const activityRef = collection(db, 'user', userId.value, 'activities');
+    const activitySnapshot = await getDocs(activityRef);
+    activities.value = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    activitiesLoaded.value = true;
+  }
+}
+
+// Call loadFoodItems and loadActivities on load
 onMounted(() => {
   loadFoodItems();
-});
+  loadActivities();
+
+  }
+);
 
 // Also, watch for userId changes (like login)
 watch(userId, () => {
   loadFoodItems();
+  loadActivities();
 });
 
 // Categories for select input
@@ -281,18 +282,25 @@ const filteredFoodItems = computed(() => {
   const direction = sortDirection.value === 'desc' ? -1 : 1
 
   switch (sortBy.value) {
-    case 'expiration':
-      items.sort((a, b) => {
-        const dateA = new Date(a.expirationDate)
-        const dateB = new Date(b.expirationDate)
+      case 'expiration':
+        items.sort((a, b) => {
+          function parseDate(val) {
+            if (!val) return null;
+            if (typeof val.toDate === 'function') return val.toDate();
+            if (val instanceof Date) return val;
+            const d = new Date(val);
+            return isNaN(d.getTime()) ? null : d;
+          }
+          const dateA = parseDate(a.expirationDate);
+          const dateB = parseDate(b.expirationDate);
 
-        if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0
-        if (isNaN(dateA.getTime())) return 1
-        if (isNaN(dateB.getTime())) return -1
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
 
-        return (dateA.getTime() - dateB.getTime()) * direction
-      })
-      break
+          return (dateA.getTime() - dateB.getTime()) * direction;
+        });
+        break;
 
     case 'name':
       items.sort((a, b) => {
@@ -375,7 +383,7 @@ const formatDate = (dateObj) => {
 };
 
 const getRelativeTime = (dateString) => {
-  const date = parseCreatedAt(dateString) || new Date(dateString);
+  const date = new Date(dateString);
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
   if (diffInSeconds < 60) return 'Just now';
@@ -464,23 +472,39 @@ const expired = computed(() =>
   }).length
 );
 
-watchEffect(() => {
+watchEffect(async () => {
+  if (!activitiesLoaded.value) return;
   const expiredFoods = foodItems.value.filter(food => getDaysLeft(food) < 0)
-
-  expiredFoods.forEach(food => {
-    const alreadyLogged = activities.value.some(a => a.foodName === food.name && a.activityType === 'expFood')
-    if (!alreadyLogged) {
-      activities.value.push({
-        activityType: 'expFood',
-        createdAt: new Date().toISOString(),
-        foodName: food.name || '',
-        category: food.category || 'Other',
-        price: String(food.price || ''),
-        quantity: String(food.quantity || ''),
-        unit: String(food.unit || '')
-      })
+  const uid = userId.value;
+  
+  for (const food of expiredFoods) {
+    // Prevent duplicate logs by checking both local and Firestore activities
+    const alreadyLogged = activities.value.some(a => a.foodName === food.name && a.activityType === 'expFood');
+    if (!alreadyLogged && uid) {
+      // Check Firestore for existing expFood activity for this food
+      const actRef = collection(db, 'user', uid, 'activities');
+      const q = query(actRef, where('foodName', '==', food.name), where('activityType', '==', 'expFood'));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        // Add to Firestore
+        const payload = {
+          activityType: 'expFood',
+          createdAt: new Date().toISOString(),
+          foodName: food.name || '',
+          category: food.category || 'Other',
+          price: String(food.price || ''),
+          quantity: String(food.quantity || ''),
+          unit: String(food.unit || ''),
+          note: 'expired'
+        };
+        const docRef = await addDoc(actRef, payload);
+        activities.value.unshift({
+          id: docRef.id,
+          ...payload
+        });
+      }
     }
-  })
+  }
 })
 
 const analytics = computed(() => {
@@ -496,16 +520,20 @@ const analytics = computed(() => {
   // Total waste calculation
   const totalWasteItems = wasteActivities.length
   const totalWasteMoney = wasteActivities.reduce((total, activity) => {
-    // Multiply price by quantity (convert price to number since it's a string)
-    return total + (Number(activity.price));
-  }, 0);
-
-  // Total saved calculation
-  const totalSavedItems = usedActivities.length
-  const totalSavedMoney =  usedActivities.reduce((total, activity) => {
   // Multiply price by quantity (convert price to number since it's a string)
   return total + (Number(activity.price) );
 }, 0);
+  
+  // Total saved calculation: count only fully consumed food
+  // Only activities with note === 'fully consumed' are counted as saved items.
+  // Partial consumption events are intentionally excluded from the saved count,
+  // as per current business logic. If partial consumption should contribute,
+  // update this filter accordingly.
+  const totalSavedItems = activities.value.filter(a => a.activityType === 'conFood' && a.note === 'fully consumed').length
+  const totalSavedMoney =  usedActivities.reduce((total, activity) => {
+    return total + (Number(activity.price) );
+  }, 0);  
+  
   // Reduction percentage - items used before expiry vs total items
   const totalItemsHandled = totalWasteItems + totalSavedItems
   const reductionPercentage = totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
@@ -639,18 +667,12 @@ const saveUse = async () => {
 
     // Ensure we don't use more than available
     const usedQty = Math.min(useForm.quantity, food.quantity);
+    const newQty = food.quantity - usedQty;
 
-    // Update Firestore food quantity
     const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id);
-    await updateDoc(refDoc, {
-      quantity: food.quantity - usedQty
-    });
-
-    // Update local foodItems
-    foodItems.value[foodIndex].quantity -= usedQty;
-
-    // Log activity
     const actRef = collection(db, 'user', uid, 'activities');
+
+    // Log normal use activity
     const activityPayload = {
       activityType: 'conFood',
       createdAt: new Date().toISOString(),
@@ -660,13 +682,44 @@ const saveUse = async () => {
       quantity: String(usedQty),
       unit: food.unit || ''
     };
-    await addDoc(actRef, activityPayload);
+    const docRef = await addDoc(actRef, activityPayload);
     activities.value.unshift({
-      id: Math.random().toString(36).substring(2, 9),
+      id: docRef.id,
       ...activityPayload
     });
 
-    showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`);
+    if (newQty <= 0) {
+      // Remove from Firestore and local list
+      await deleteDoc(refDoc);
+      foodItems.value.splice(foodIndex, 1);
+
+      // Log fully consumed activity
+      const fullConsumedPayload = {
+        activityType: 'conFood',
+        createdAt: new Date().toISOString(),
+        foodName: food.name,
+        category: food.category || '',
+        price: String(food.price || 0),
+        quantity: '0',
+        unit: food.unit || '',
+        note: 'fully consumed'
+      };
+      const docRef = await addDoc(actRef, fullConsumedPayload);
+      activities.value.unshift({
+        id: docRef.id,
+        ...fullConsumedPayload
+      });
+
+      showToastFor(`${food.name} fully consumed and removed`);
+    } else {
+      // Update Firestore food quantity
+      await updateDoc(refDoc, {
+        quantity: newQty
+      });
+      // Update local foodItems
+      foodItems.value[foodIndex].quantity = newQty;
+      showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`);
+    }
     closeUse();
   } catch (err) {
     console.error('Failed to log used food:', err);
@@ -742,14 +795,14 @@ const saveAdd = async () => {
       unit: String(addForm.unit || '')
     };
 
-    await addDoc(actRef, activityPayload);
+    const activityDocRef = await addDoc(actRef, activityPayload);
 
     // Add new item locally for instant UI feedback
     foodItems.value.unshift({ id: newDocRef.id, ...foodPayload });
 
     // Refresh activities list to show new log
     activities.value.unshift({
-      id: Math.random().toString(36).substring(2, 9),
+      id: activityDocRef.id,
       ...activityPayload,
     });
 
@@ -1001,7 +1054,7 @@ const confirmDelete = async () => {
             <Bar :data="wasteVsSavingsChart" :options="chartOptions" />
           </div>
         </div>
-  </div>
+      </div>
 
       <!-- Waste by Category Pie Chart -->
       <div class="col-lg-4">
@@ -1014,7 +1067,7 @@ const confirmDelete = async () => {
             <Pie :data="wasteByCategoryChart" :options="chartOptions" />
           </div>
         </div>
-  </div>
+      </div>
 
       <!-- Monthly Spending Trend -->
       <div class="col-lg-4">
@@ -1029,7 +1082,8 @@ const confirmDelete = async () => {
         </div>
       </div>
     </div>
-      </div>
+    </div>
+
     <div class="row g-4">
       <div class="col-lg-8">
         <div class="glass-card p-4">
@@ -1069,34 +1123,36 @@ const confirmDelete = async () => {
           </div>
           <div v-else class="food-scroll-container">
             <div class="food-scroll-section">
-              <div v-for="food in filteredFoodItems" :key="food.id" :class="['food-card', getFoodCardClass(food)]">
-                <div class="food-header">
-                  <div>
-                    <div class="food-title-group">
-                      <span class="food-name">{{ food.name }}</span>
-                      <span class="expired-badge" :class="getBadgeClass(food)">
-                        <span v-if="getDaysLeft(food) < 0">Expired</span>
-                        <span v-else-if="getDaysLeft(food) == 0">Today</span>
-                        <span v-else>{{ getDaysLeft(food) }} days</span>
-                      </span>
+              <div v-for="food in filteredFoodItems" :key="food.id" :class="['food-card', getFoodCardClass(food), 'd-flex', 'flex-column', 'justify-content-between']">
+                <div>
+                  <div class="food-header">
+                    <div>
+                      <div class="food-title-group align-items-center d-flex gap-2">
+                        <span class="food-name">{{ food.name }}</span>
+                        <span class="expired-badge" :class="getBadgeClass(food)">
+                          <span v-if="getDaysLeft(food) < 0">Expired</span>
+                          <span v-else-if="getDaysLeft(food) == 0">Today</span>
+                          <span v-else>{{ getDaysLeft(food) }} days</span>
+                        </span>
+                      </div>
+                      <div class="food-category">{{ food.category }}</div>
+                      <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
                     </div>
-                    <div class="food-category">{{ food.category }}</div>
-                    <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
-                  </div>
-                  <div class="food-right">
-                    <div class="food-price">${{ food.price }}</div>
-                    <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
+                    <div class="food-right">
+                      <div class="food-price">${{ food.price }}</div>
+                      <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
+                    </div>
                   </div>
                 </div>
-                <div class="food-actions">
-                  <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
-                    Edit</button>
-                  <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i>
-                    Use</button>
-                  <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
-                      class="bi bi-trash"></i></button>
-                  <button class="food-btn food-btn-recipe" @click.prevent="goToRecipes(food)"><i class="bi bi-book"></i>
-                    Recipe</button>
+                <div class="d-flex align-items-end justify-content-between mt-auto w-100">
+                  <button class="food-btn food-btn-recipe px-2 py-1" style="font-size: 0.92em; min-width: 0;" @click.prevent="goToRecipes(food)"><i class="bi bi-book"></i> Recipes</button>
+                  <div class="food-actions d-flex gap-2">
+                    <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
+                      Edit</button>
+                    <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i> Use</button>
+                    <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
+                        class="bi bi-trash"></i></button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1109,20 +1165,15 @@ const confirmDelete = async () => {
           <h3 class="h5 mb-2">Recent Activity</h3>
           <div class="d-flex align-items-center justify-content-between mb-3">
             <div class="d-flex gap-2 w-100">
-              <select v-model="activityTypeFilter" class="form-select form-select-sm"
-                style="width: auto; min-width: 110px;">
+              <select v-model="activityTypeFilter" class="form-select form-select-sm" style="width: auto; min-width: 110px;">
                 <option disabled value="">Activity</option>
                 <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
-              <select v-model="activityTimeFrame" class="form-select form-select-sm"
-                style="width: auto; min-width: 90px;">
+              <select v-model="activityTimeFrame" class="form-select form-select-sm" style="width: auto; min-width: 90px;">
                 <option disabled value="">Time</option>
-                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">{{ opt.label }}
-                </option>
+                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
-              <button class="btn btn-outline-secondary btn-sm"
-                :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'"
-                @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'">
+              <button class="btn btn-outline-secondary btn-sm" :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'" @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'">
                 <i :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"></i>
               </button>
             </div>
@@ -1140,12 +1191,19 @@ const confirmDelete = async () => {
                 </div>
                 <div v-else-if="activity.activityType === 'conFood'">
                   <p class="mb-1 small">
-                    <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} used</strong>
+                    <strong v-if="activity.note === 'fully consumed'" class="text-success">
+                      All of {{ activity.foodName }} fully consumed
+                    </strong>
+                    <strong v-else>
+                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} used
+                    </strong>
                   </p>
                 </div>
                 <div v-else-if="activity.activityType === 'expFood'">
-                  <p class="mb-1 small text-danger">
-                    <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired</strong>
+                  <p class="mb-1 small">
+                    <strong :class="{ 'text-danger': activity.note === 'expired' }">
+                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
+                    </strong>
                   </p>
                 </div>
                 <div v-else>
@@ -1214,28 +1272,27 @@ const confirmDelete = async () => {
         </div>
       </div>
     </div>
-
     <!-- Use Food Modal -->
-    <div v-if="showUseModal" class="modal-backdrop">
-      <div class="modal-card">
-        <h3 class="h5 mb-3">Use Food Item</h3>
-        <p>How much of <strong>{{ useForm.name }}</strong> did you use?</p>
-        <div class="row g-2 mt-2">
-          <div class="col-6">
-            <label class="form-label">Quantity</label>
-            <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" />
-          </div>
-          <div class="col-6">
-            <label class="form-label">Unit</label>
-            <input v-model="useForm.unit" type="text" class="form-control" />
-          </div>
+  <div v-if="showUseModal" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="h5 mb-3">Use Food Item</h3>
+      <p>How much of <strong>{{ useForm.name }}</strong> did you use?</p>
+      <div class="row g-2 mt-2">
+        <div class="col-6">
+          <label class="form-label">Quantity</label>
+          <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" />
         </div>
-        <div class="d-flex justify-content-end gap-2 mt-3">
-          <button class="btn btn-secondary" @click="closeUse">Cancel</button>
-          <button class="btn btn-primary" @click="saveUse">Use</button>
+        <div class="col-6">
+          <label class="form-label">Unit</label>
+          <input v-model="useForm.unit" type="text" class="form-control" />
         </div>
       </div>
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-secondary" @click="closeUse">Cancel</button>
+        <button class="btn btn-primary" @click="saveUse">Use</button>
+      </div>
     </div>
+  </div>
 
     <!-- Floating Add Button -->
     <button class="fab-add" @click="openAdd" title="Add Food">
@@ -1408,8 +1465,7 @@ const confirmDelete = async () => {
 }
 
 .food-name {
-  font-size: 1.25rem;
-  /* reduced slightly */
+  font-size: 1.25rem; /* reduced slightly */
   font-weight: bold;
 }
 
@@ -1460,8 +1516,7 @@ const confirmDelete = async () => {
 }
 
 .food-price {
-  font-size: 1.1rem;
-  /* reduced slightly */
+  font-size: 1.1rem; /* reduced slightly */
   font-weight: bold;
   margin-left: 12px;
 }
@@ -1583,7 +1638,6 @@ const confirmDelete = async () => {
     box-shadow: 0 8px 30px rgba(229, 57, 53, 0.06), 0 0 0 rgba(229, 57, 53, 0);
   }
 }
-
 /* Make activity card scrollable and match inventory height */
 .activity-scroll {
   min-height: 0;
@@ -1591,7 +1645,6 @@ const confirmDelete = async () => {
   overflow-y: auto;
   flex: 1 1 auto;
 }
-
 .min-h-0 {
   min-height: 0;
 }

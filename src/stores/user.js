@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import { auth } from '../firebase.js'
+import { onAuthStateChanged } from 'firebase/auth'
 
 export const useUserStore = defineStore('user', () => {
   // State
@@ -32,6 +34,25 @@ export const useUserStore = defineStore('user', () => {
     }
   }, { deep: true })
 
+  // Listen to Firebase Auth state changes
+  onAuthStateChanged(auth, (firebaseUser) => {
+    if (firebaseUser) {
+      // User is signed in
+      user.value = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: firebaseUser.displayName || firebaseUser.email,
+        photoURL: firebaseUser.photoURL
+      }
+      isAuthenticated.value = true
+    } else {
+      // User is signed out
+      user.value = null
+      isAuthenticated.value = false
+      localStorage.removeItem('user')
+    }
+  })
+
   // Actions
   const login = (userData) => {
     user.value = userData
@@ -58,7 +79,7 @@ export const useUserStore = defineStore('user', () => {
   // Getters
   const getUserName = () => user.value?.name || 'Guest'
   const getUserEmail = () => user.value?.email || ''
-  const getUserId = () => user.value?.id || null
+  const getUserId = () => user.value?.uid || null
 
   // Initialize store
   loadUser()
