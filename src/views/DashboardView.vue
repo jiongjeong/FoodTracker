@@ -198,6 +198,43 @@ const categories = [
   'Other'
 ];
 
+const categoryUnits = {
+  'All Categories': [
+    'piece(s)', 'kg(s)', 'gram(s)', 'liter(s)', 'milliliter(s)',
+    'pack(s)', 'bag(s)', 'box(es)', 'bottle(s)'
+  ],
+  'Fruits & Vegetables': [
+    'piece(s)', 'kg(s)', 'gram(s)', 'bag(s)', 'bunch(es)'
+  ],
+  'Dairy & Eggs': [
+    'liter(s)', 'milliliter(s)', 'dozen(s)', 'piece(s)', 'carton(s)'
+  ],
+  'Meat & Poultry': [
+    'kg(s)', 'gram(s)', 'pound(s)', 'ounce(s)', 'pack(s)', 'piece(s)'
+  ],
+  'Bakery': [
+    'piece(s)', 'slice(s)', 'loaf(s)', 'dozen(s)', 'gram(s)'
+  ],
+  'Snacks': [
+    'piece(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)'
+  ],
+  'Beverages': [
+    'liter(s)', 'milliliter(s)', 'bottle(s)', 'can(s)', 'pack(s)'
+  ],
+  'Condiments & Sauces': [
+    'milliliter(s)', 'liter(s)', 'jar(s)', 'bottle(s)'
+  ],
+  'Frozen Foods': [
+    'kg(s)', 'gram(s)', 'pack(s)', 'bag(s)'
+  ],
+  'Grains & Pasta': [
+    'kg(s)', 'gram(s)', 'bag(s)', 'box(es)'
+  ],
+  'Other': [
+    'piece(s)', 'unit(s)', 'pack(s)', 'box(es)'
+  ]
+};
+
 // Filtered food items (remove duplicates, search, filter, sort)
 const filteredFoodItems = computed(() => {
   const uniqueItems = foodItems.value.filter(
@@ -613,43 +650,6 @@ const saveUse = async () => {
     console.error('Failed to log used food:', err);
     showToastFor('Failed to update food usage.');
   }
-};
-
-const categoryUnits = {
-  'All Categories': [
-    'piece(s)', 'kg(s)', 'gram(s)', 'liter(s)', 'milliliter(s)',
-    'pack(s)', 'bag(s)', 'box(es)', 'bottle(s)'
-  ],
-  'Fruits & Vegetables': [
-    'piece(s)', 'kg(s)', 'gram(s)', 'bag(s)', 'bunch(es)'
-  ],
-  'Dairy & Eggs': [
-    'liter(s)', 'milliliter(s)', 'dozen(s)', 'piece(s)', 'carton(s)'
-  ],
-  'Meat & Poultry': [
-    'kg(s)', 'gram(s)', 'pound(s)', 'ounce(s)', 'pack(s)', 'piece(s)'
-  ],
-  'Bakery': [
-    'piece(s)', 'slice(s)', 'loaf(s)', 'dozen(s)', 'gram(s)'
-  ],
-  'Snacks': [
-    'piece(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)'
-  ],
-  'Beverages': [
-    'liter(s)', 'milliliter(s)', 'bottle(s)', 'can(s)', 'pack(s)'
-  ],
-  'Condiments & Sauces': [
-    'milliliter(s)', 'liter(s)', 'jar(s)', 'bottle(s)'
-  ],
-  'Frozen Foods': [
-    'kg(s)', 'gram(s)', 'pack(s)', 'bag(s)'
-  ],
-  'Grains & Pasta': [
-    'kg(s)', 'gram(s)', 'bag(s)', 'box(es)'
-  ],
-  'Other': [
-    'piece(s)', 'unit(s)', 'pack(s)', 'box(es)'
-  ]
 };
 
 // Add computed property to get units based on selected category

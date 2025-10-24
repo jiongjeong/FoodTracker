@@ -3,7 +3,6 @@ import { ref } from 'vue';
 import { db, auth } from '../firebase.js';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
-import { orderBy } from 'firebase/firestore';
 import LocationPicker from '@/components/LocationPicker.vue';
 import { loadGoogleMaps } from '@/composables/loadGoogleMap.js'
 import { onMounted } from 'vue';
@@ -15,30 +14,6 @@ const showContactModal = ref(false)
 const showShareModal = ref(false)
 const selectedContact = ref(null)
 const currentUser = ref(null)
-
-
-const categories = [
-  'All Categories',
-  'Fruits & Vegetables',
-  'Dairy & Eggs',
-  'Meat & Poultry',
-  'Bakery',
-  'Snacks',
-  'Beverages',
-  'Condiments & Sauces',
-  'Frozen Foods',
-  'Grains & Pasta',
-  'Other'
-];
-
-const units = [
-  'piece(s)', 'kg(s)', 'gram(s)', 'milligram(s)', 'pound(s)', 'ounce(s)',
-  'liter(s)', 'milliliter(s)', 'cup(s)', 'tablespoon(s)', 'teaspoon(s)',
-  'pint(s)', 'quart(s)', 'gallon(s)',
-  'serving(s)', 'pack(s)', 'bag(s)', 'box(es)', 'bottle(s)', 'carton(s)',
-  'container(s)', 'jar(s)', 'can(s)', 'bar(s)',
-  'slice(s)', 'portion(s)', 'set(s)', 'bundle(s)', 'dozen(s)'
-];
 
 
 const handleContact = (item) => {
