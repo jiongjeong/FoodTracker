@@ -485,30 +485,37 @@ const analytics = computed(() => {
   
   // Total saved calculation: count only fully consumed food
   const totalSavedItems = activities.value.filter(a => a.activityType === 'conFood' && a.note === 'fully consumed').length
-  const totalSavedMoney = totalSavedItems * 5 // Assume $5 average per saved item
+  const totalSavedMoney =  usedActivities.reduce((total, activity) => {
+    return total + (Number(activity.price) );
+  }, 0);  
   
   // Reduction percentage - items used before expiry vs total items
   const totalItemsHandled = totalWasteItems + totalSavedItems
   const reductionPercentage = totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
+  //test
   
   // Current inventory
   // const inventoryValue = items.reduce((sum, item) => sum + item.price, 0)
   // const inventoryItems = items.length
-
+  const inventoryValue = foodItems.value.reduce((sum, item) => {
+    const price = Number(item.price) || 0;
+    return sum + price;
+  }, 0);
+  const inventoryItems = foodItems.value.length;
   // TODO Food Donated
   // const foodDonated = donatedActivities.length
   
   // foodScore algo = itemssaved - itemswasted + moneysaved 
   const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4);
   const moneyScore = Math.max(0,(totalSavedMoney*0.2) - (totalWasteMoney*0.2) )
-  const foodScore= itemsScore + moneyScore
+  const foodScore= Math.round(itemsScore + moneyScore)
 
   return {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
     reduction: reductionPercentage,
-    // inventory: { value: inventoryValue, items: inventoryItems }
-    foodScore:foodScore
+    inventory: { value: inventoryValue, items: inventoryItems },
+    foodScore: foodScore
   }
 })
 
