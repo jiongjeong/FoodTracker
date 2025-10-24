@@ -1,4 +1,10 @@
 <script setup>
+import { useRouter } from 'vue-router';
+const router = useRouter();
+function goToRecipes(food) {
+  // Navigate to /recipes with a query param for search
+  router.push({ path: '/recipes', query: { search: food.name } });
+}
 import { db } from '../firebase.js';
 import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue';
@@ -58,6 +64,59 @@ function showToastFor(msg, ms = 2200) {
 const foodItems = ref([]);
 const recipes = ref([]);
 const activities = ref([]);
+
+// Activity filter and sort controls
+const activityTypeFilter = ref(''); // default to placeholder
+const activitySortDirection = ref('desc'); // 'desc' = newest first, 'asc' = oldest first
+
+const activityTypeOptions = [
+  { label: 'All', value: 'All' },
+  { label: 'Added', value: 'addFood' },
+  { label: 'Used', value: 'conFood' },
+  { label: 'Expired', value: 'expFood' },
+];
+
+// Time frame filter
+const activityTimeFrame = ref(''); // default to placeholder
+const activityTimeFrameOptions = [
+  { label: 'All', value: 'all' },
+  { label: '24h', value: '24h' },
+  { label: '7d', value: '7d' },
+  { label: '30d', value: '30d' },
+];
+
+const filteredSortedActivities = computed(() => {
+  let acts = [...activities.value];
+  // Filter by type
+  if (activityTypeFilter.value && activityTypeFilter.value !== 'All') {
+    acts = acts.filter(a => a.activityType === activityTypeFilter.value);
+  }
+  // Filter by time frame
+  if (activityTimeFrame.value && activityTimeFrame.value !== 'all') {
+    const now = new Date();
+    let cutoff;
+    if (activityTimeFrame.value === '24h') {
+      cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    } else if (activityTimeFrame.value === '7d') {
+      cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (activityTimeFrame.value === '30d') {
+      cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+    acts = acts.filter(a => {
+      const d = new Date(a.createdAt);
+      return d >= cutoff;
+    });
+  }
+  // Sort by createdAt
+  acts.sort((a, b) => {
+    const dateA = new Date(a.createdAt);
+    const dateB = new Date(b.createdAt);
+    return activitySortDirection.value === 'desc'
+      ? dateB - dateA
+      : dateA - dateB;
+  });
+  return acts;
+});
 
 const auth = getAuth();
 const user = ref(auth.currentUser);
@@ -809,6 +868,7 @@ const confirmDelete = async () => {
                   <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i> Use</button>
                   <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
                       class="bi bi-trash"></i></button>
+                  <button class="food-btn food-btn-recipe" @click.prevent="goToRecipes(food)"><i class="bi bi-book"></i> Recipe</button>
                 </div>
               </div>
             </div>
@@ -816,46 +876,54 @@ const confirmDelete = async () => {
         </div>
       </div>
 
-      <div class="col-lg-4 d-none d-lg-block">
-        <div class="glass-card p-4">
-          <h3 class="h5 mb-3">Recent Activity</h3>
-          <div v-if="activities.length === 0" class="text-center py-4">
-            <p class="text-muted">No recent activity</p>
+      <div class="col-lg-4 d-none d-lg-block d-flex flex-column h-100">
+        <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0;">
+          <h3 class="h5 mb-2">Recent Activity</h3>
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="d-flex gap-2 w-100">
+              <select v-model="activityTypeFilter" class="form-select form-select-sm" style="width: auto; min-width: 110px;">
+                <option disabled value="">Activity</option>
+                <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+              <select v-model="activityTimeFrame" class="form-select form-select-sm" style="width: auto; min-width: 90px;">
+                <option disabled value="">Time</option>
+                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+              <button class="btn btn-outline-secondary btn-sm" :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'" @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'">
+                <i :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"></i>
+              </button>
+            </div>
           </div>
-          <div v-else class="d-flex flex-column gap-3">
-            <div v-for="activity in activities" :key="activity.id" class="pb-3 border-bottom">
-
-               <!-- DO IF STATEMENTS FOR EACH ACTIVITY TYPE -->
-              <div v-if="activity.activityType === 'addFood'">
-                <p class="mb-1 small">
-                  <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added</strong>
-                </p>
+          <div class="flex-grow-1 d-flex flex-column min-h-0">
+            <div v-if="filteredSortedActivities.length === 0" class="text-center py-4 flex-grow-1">
+              <p class="text-muted">No recent activity</p>
+            </div>
+            <div v-else class="d-flex flex-column gap-3 activity-scroll flex-grow-1">
+              <div v-for="activity in filteredSortedActivities" :key="activity.id" class="pb-3 border-bottom">
+                <div v-if="activity.activityType === 'addFood'">
+                  <p class="mb-1 small">
+                    <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added</strong>
+                  </p>
+                </div>
+                <div v-else-if="activity.activityType === 'conFood'">
+                  <p class="mb-1 small">
+                    <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} used</strong>
+                  </p>
+                </div>
+                <div v-else-if="activity.activityType === 'expFood'">
+                  <p class="mb-1 small text-danger">
+                    <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired</strong>
+                  </p>
+                </div>
+                <div v-else>
+                  <p class="mb-1 small">
+                    <strong>{{ activity.foodName }} — {{ activity.activityType }}</strong>
+                  </p>
+                </div>
+                <small class="text-muted">
+                  {{ getRelativeTime(activity.createdAt) }}
+                </small>
               </div>
-
-              <div v-else-if="activity.activityType === 'conFood'">
-                <p class="mb-1 small">
-                  <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} used</strong>
-                </p>
-              </div>
-
-              <div v-else-if="activity.activityType === 'expFood'">
-                <p class="mb-1 small text-danger">
-                  <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired</strong>
-                </p>
-              </div>
-
-              <div v-else>
-                <p class="mb-1 small">
-                  <strong>{{ activity.foodName }} — {{ activity.activityType }}</strong>
-                </p>
-              </div>
-
-
-
-              <small class="text-muted">
-                {{ getRelativeTime(activity.createdAt) }}
-                <!-- Optionally also show: {{ activity.createdAt }} -->
-              </small>
             </div>
           </div>
         </div>
@@ -1097,7 +1165,7 @@ const confirmDelete = async () => {
 }
 
 .food-name {
-  font-size: 1.5rem;
+  font-size: 1.25rem; /* reduced slightly */
   font-weight: bold;
 }
 
@@ -1148,9 +1216,9 @@ const confirmDelete = async () => {
 }
 
 .food-price {
-  font-size: 1.3rem;
+  font-size: 1.1rem; /* reduced slightly */
   font-weight: bold;
-  margin-left: 16px;
+  margin-left: 12px;
 }
 
 .sort-direction-btn {
@@ -1269,5 +1337,15 @@ const confirmDelete = async () => {
   100% {
     box-shadow: 0 8px 30px rgba(229, 57, 53, 0.06), 0 0 0 rgba(229, 57, 53, 0);
   }
+}
+/* Make activity card scrollable and match inventory height */
+.activity-scroll {
+  min-height: 0;
+  max-height: 400px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+.min-h-0 {
+  min-height: 0;
 }
 </style>
