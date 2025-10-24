@@ -36,7 +36,7 @@ export default {
 
 
 <template>
-  <div class="app-container">
+  <div class="container-fluid min-vh-100 d-flex flex-column p-0 m-0">
     <Navbar />
     <RouterView />
   </div>
@@ -44,23 +44,5 @@ export default {
 
 
 <style scoped>
-.app-container {
-  min-height: 100vh;
-  width: 100vw;
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  overflow-x: hidden;
-}
-
-@media (min-width: 992px) {
-  .navbar,
-  .container-fluid {
-    width: 100vw !important;
-    max-width: 100vw !important;
-    margin: 0 !important;
-    left: 0;
-    right: 0;
-  }
-}
+/* No custom layout styles needed; all handled by Bootstrap classes. */
 </style>
