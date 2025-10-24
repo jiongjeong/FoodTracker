@@ -472,11 +472,12 @@ const expired = computed(() =>
   }).length
 );
 
-watchEffect(() => {
+watchEffect(async () => {
   if (!activitiesLoaded.value) return;
   const expiredFoods = foodItems.value.filter(food => getDaysLeft(food) < 0)
   const uid = userId.value;
-  expiredFoods.forEach(async food => {
+  
+  for (const food of expiredFoods) {
     // Prevent duplicate logs by checking both local and Firestore activities
     const alreadyLogged = activities.value.some(a => a.foodName === food.name && a.activityType === 'expFood');
     if (!alreadyLogged && uid) {
@@ -503,7 +504,7 @@ watchEffect(() => {
         });
       }
     }
-  })
+  }
 })
 
 const analytics = computed(() => {
