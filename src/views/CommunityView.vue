@@ -195,9 +195,12 @@ onMounted(async () => {
 
 <template>
   <div class="container-fluid p-4">
-    <div class="mb-4">
-      <h1 class="h2 mb-2">Community Food Sharing</h1>
-      <p class="text-muted">Share expiring food with neighbors to reduce waste</p>
+    <div class="mb-4 d-flex justify-content-between align-items-start">
+      <div>
+        <h1 class="h2 mb-2">Community Food Sharing</h1>
+        <p class="text-muted">Share expiring food with neighbors to reduce waste</p>
+      </div>
+      <LocationPicker @location-selected="handleLocationSelected" />
     </div>
 
     <div class="glass-card p-4 mb-4">
@@ -420,7 +423,8 @@ onMounted(async () => {
   left: 0;
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .modal-backdrop {
@@ -438,6 +442,8 @@ onMounted(async () => {
   margin: 1.75rem auto;
   pointer-events: auto;
   max-width: 500px;
+  width: 100%;
+  padding: 0 1rem;
 }
 
 .modal-content {
@@ -447,12 +453,173 @@ onMounted(async () => {
   border-radius: 0.75rem;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   pointer-events: auto;
+  max-height: calc(100vh - 3.5rem);
+  display: flex;
+  flex-direction: column;
 }
 
 /* Ensure modal appears above everything */
 .modal.show {
   display: flex !important;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding-top: 1.75rem;
+  padding-bottom: 1.75rem;
+}
+
+/* Make modal body scrollable */
+.modal-body {
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .modal-dialog {
+    margin: 0.5rem auto;
+    max-width: calc(100% - 1rem);
+    padding: 0 0.5rem;
+  }
+
+  .modal-content {
+    max-height: calc(100vh - 1rem);
+  }
+
+  .modal-body {
+    max-height: calc(100vh - 150px);
+    padding: 1rem;
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding: 0.75rem 1rem;
+  }
+
+  .modal-title {
+    font-size: 1.1rem;
+  }
+
+  /* Stack buttons on small screens */
+  .modal-footer {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  .modal-dialog {
+    margin: 0.25rem auto;
+    max-width: calc(100% - 0.5rem);
+    padding: 0 0.25rem;
+  }
+
+  .modal-content {
+    max-height: calc(100vh - 0.5rem);
+    border-radius: 0.5rem;
+  }
+
+  .modal-body {
+    max-height: calc(100vh - 120px);
+    padding: 0.75rem;
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .modal-title {
+    font-size: 1rem;
+  }
+
+  /* Smaller form elements on mobile */
+  .form-label {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .form-control,
+  .form-select {
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  textarea.form-control {
+    min-height: 80px;
+  }
+
+  .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Landscape mobile devices */
+@media (max-height: 600px) and (orientation: landscape) {
+  .modal-dialog {
+    margin: 0.25rem auto;
+  }
+
+  .modal-content {
+    max-height: calc(100vh - 0.5rem);
+  }
+
+  .modal-body {
+    max-height: calc(100vh - 100px);
+    padding: 0.5rem 1rem;
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding: 0.5rem 1rem;
+  }
+}
+
+/* Tablet portrait */
+@media (min-width: 577px) and (max-width: 768px) {
+  .modal-dialog {
+    max-width: 90%;
+  }
+}
+
+/* Tablet landscape and small desktop */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .modal-dialog {
+    max-width: 600px;
+  }
+}
+
+/* Large screens */
+@media (min-width: 1025px) {
+  .modal-dialog {
+    max-width: 650px;
+  }
+
+  .modal-body {
+    max-height: calc(100vh - 250px);
+  }
+}
+
+/* Ensure scrollbar is visible but styled */
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 </style>

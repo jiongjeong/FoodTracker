@@ -144,8 +144,8 @@ function parseCreatedAt(value) {
     if (value instanceof Date) return value;
     const d = new Date(value);
     return isNaN(d) ? null : d;
-  } catch (e) {
-    return null;
+  } catch (error) {
+    return error;
   }
 }
 
@@ -510,7 +510,7 @@ const analytics = computed(() => {
   const totalItemsHandled = totalWasteItems + totalSavedItems
   const reductionPercentage = totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
   //test
-  
+
   // Current inventory
   const inventoryValue = foodItems.value.reduce((sum, item) => {
     const price = Number(item.price) || 0;
@@ -954,7 +954,7 @@ const confirmDelete = async () => {
           </div>
 
         </div>
-        
+
       <div class="col-6 col-lg-3">
         <div class="glass-card stat-card p-3">
           <div class="d-flex align-items-center gap-2 mb-2">
@@ -965,7 +965,7 @@ const confirmDelete = async () => {
           <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
         </div>
       </div>
-      
+
       <div class="col-6 col-lg-3">
         <div class="glass-card stat-card p-3">
           <div class="d-flex align-items-center gap-2 mb-2">
@@ -976,7 +976,7 @@ const confirmDelete = async () => {
           <small class="text-muted">food used before expiry</small>
         </div>
       </div>
-      
+
       <div class="col-6 col-lg-3">
         <div class="glass-card stat-card p-3">
           <div class="d-flex align-items-center gap-2 mb-2">
