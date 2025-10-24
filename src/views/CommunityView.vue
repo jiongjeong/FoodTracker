@@ -384,62 +384,57 @@ onMounted(async () => {
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
                   <label class="form-label">Category</label>
-                  <select v-model="shareForm.category" class="form-select">
-                    <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-                  </select>
+                    <input v-model="shareForm.category" type="text" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Expiration Date *</label>
+                    <input v-model="shareForm.expirationDate" type="date" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
+                  </div>
+                  </div>
+
+                  <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Quantity</label>
+                    <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="0.01">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Unit</label>
+                    <input v-model="shareForm.unit" type="text" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
+                  </div>
+                  </div>
+
+                  <div class="mb-3">
+                  <label class="form-label">Preferred Pickup Time</label>
+                  <input v-model="shareForm.pickupTime" type="text" class="form-control"
+                    placeholder="e.g., Weekdays after 6pm, Weekends anytime">
+                  </div>
+
+                  <div class="mb-3">
+                  <LocationPicker @location-selected="handleLocationSelected" />
+                  </div>
+
+
+
+                  <div class="mb-3">
+                  <label class="form-label">Additional Notes</label>
+                  <textarea v-model="shareForm.notes" class="form-control" rows="3"
+                    placeholder="Any special instructions or notes about the food item..."></textarea>
+                  </div>
+                </form>
                 </div>
-                <div class="col-md-6">
-                  <label class="form-label">Expiration Date *</label>
-                  <input v-model="shareForm.expirationDate" type="date" class="form-control"
-                    :min="new Date().toISOString().split('T')[0]" required>
+                <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @click="showShareModal = false">
+                  Cancel
+                </button>
+                <button type="button" class="btn btn-primary" @click="submitShare">
+                  <i class="bi bi-share me-2"></i>
+                  Share Food
+                </button>
                 </div>
               </div>
-
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">Quantity</label>
-                  <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="0.01">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Unit</label>
-                  <select v-model="shareForm.unit" class="form-select">
-                    <option v-for="unit in units" :key="unit" :value="unit">{{ unit }}</option>
-                  </select>
-                </div>
               </div>
-
-              <div class="mb-3">
-                <label class="form-label">Preferred Pickup Time</label>
-                <input v-model="shareForm.pickupTime" type="text" class="form-control"
-                  placeholder="e.g., Weekdays after 6pm, Weekends anytime">
-              </div>
-
-              <div class="mb-3">
-                <LocationPicker @location-selected="handleLocationSelected" />
-              </div>
-
-
-
-              <div class="mb-3">
-                <label class="form-label">Additional Notes</label>
-                <textarea v-model="shareForm.notes" class="form-control" rows="3"
-                  placeholder="Any special instructions or notes about the food item..."></textarea>
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showShareModal = false">
-              Cancel
-            </button>
-            <button type="button" class="btn btn-primary" @click="submitShare">
-              <i class="bi bi-share me-2"></i>
-              Share Food
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+            </div>
+            </div>
 </template>
 
 <style scoped>

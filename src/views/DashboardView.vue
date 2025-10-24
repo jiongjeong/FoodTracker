@@ -1150,7 +1150,7 @@ const confirmDelete = async () => {
             <label class="form-label">Unit</label>
             <select v-model="editForm.unit" class="form-select">
               <option disabled value="">{{ editForm.unit || 'Select a unit' }}</option>
-              <option v-for="unit in categoryUnits[editForm.category] || categoryUnits['All Categories']" :key="unit" :value="unit">{{ unit }}</option>
+              <option v-for="unit in availableUnits" :key="unit" :value="unit">{{ unit }}</option>
             </select>
           </div>
         </div>
@@ -1226,7 +1226,7 @@ const confirmDelete = async () => {
             <label class="form-label">Unit</label>
             <select v-model="addForm.unit" class="form-select">
               <option disabled value="">Select a unit</option>
-              <option v-for="unit in categoryUnits[addForm.category] || categoryUnits['All Categories']" :key="unit" :value="unit">{{ unit }}</option>
+              <option v-for="unit in availableUnits" :key="unit" :value="unit">{{ unit }}</option>
             </select>
           </div>
         </div>
