@@ -8,7 +8,6 @@ export const useRecipesStore = defineStore('recipes', () => {
   const bookmarkedRecipes = ref([])
   
   // Future: Add database sync capability
-  const dbSyncEnabled = ref(false) // Toggle when backend is ready
   
   const loadBookmarks = async () => {
     try {

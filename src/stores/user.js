@@ -79,7 +79,7 @@ export const useUserStore = defineStore('user', () => {
   // Getters
   const getUserName = () => user.value?.name || 'Guest'
   const getUserEmail = () => user.value?.email || ''
-  const getUserId = () => user.value?.uid || user.value?.id || null
+  const getUserId = () => user.value?.uid || null
 
   // Initialize store
   loadUser()

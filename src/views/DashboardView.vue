@@ -497,9 +497,9 @@ watchEffect(async () => {
           unit: String(food.unit || ''),
           note: 'expired'
         };
-        await addDoc(actRef, payload);
+        const docRef = await addDoc(actRef, payload);
         activities.value.unshift({
-          id: Math.random().toString(36).substring(2, 9),
+          id: docRef.id,
           ...payload
         });
       }
@@ -525,6 +525,10 @@ const analytics = computed(() => {
 }, 0);
   
   // Total saved calculation: count only fully consumed food
+  // Only activities with note === 'fully consumed' are counted as saved items.
+  // Partial consumption events are intentionally excluded from the saved count,
+  // as per current business logic. If partial consumption should contribute,
+  // update this filter accordingly.
   const totalSavedItems = activities.value.filter(a => a.activityType === 'conFood' && a.note === 'fully consumed').length
   const totalSavedMoney =  usedActivities.reduce((total, activity) => {
     return total + (Number(activity.price) );
@@ -1197,10 +1201,7 @@ const confirmDelete = async () => {
                 </div>
                 <div v-else-if="activity.activityType === 'expFood'">
                   <p class="mb-1 small">
-                    <strong v-if="activity.note === 'expired'" class="text-danger">
-                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
-                    </strong>
-                    <strong v-else>
+                    <strong :class="{ 'text-danger': activity.note === 'expired' }">
                       {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
                     </strong>
                   </p>
