@@ -496,9 +496,9 @@ watchEffect(() => {
           unit: String(food.unit || ''),
           note: 'expired'
         };
-        await addDoc(actRef, payload);
+        const docRef = await addDoc(actRef, payload);
         activities.value.unshift({
-          id: Math.random().toString(36).substring(2, 9),
+          id: docRef.id,
           ...payload
         });
       }
