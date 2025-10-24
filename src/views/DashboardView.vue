@@ -1200,10 +1200,7 @@ const confirmDelete = async () => {
                 </div>
                 <div v-else-if="activity.activityType === 'expFood'">
                   <p class="mb-1 small">
-                    <strong v-if="activity.note === 'expired'" class="text-danger">
-                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
-                    </strong>
-                    <strong v-else>
+                    <strong :class="{ 'text-danger': activity.note === 'expired' }">
                       {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
                     </strong>
                   </p>
