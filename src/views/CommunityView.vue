@@ -3,7 +3,9 @@ import { ref } from 'vue';
 import { db, auth } from '../firebase.js';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
-import { orderBy } from 'firebase/firestore';
+import LocationPicker from '@/components/LocationPicker.vue';
+import { loadGoogleMaps } from '@/composables/loadGoogleMap.js'
+import { onMounted } from 'vue';
 
 
 const mySharedItems = ref([])
@@ -14,28 +16,12 @@ const selectedContact = ref(null)
 const currentUser = ref(null)
 
 
-const categories = [
-  'Fruits',
-  'Vegetables',
-  'Dairy & Eggs',
-  'Meat & Poultry',
-  'Bakery',
-  'Snacks',
-  'Beverages',
-  'Condiments & Sauces',
-  'Frozen Foods',
-  'Grains & Pasta',
-  'Other'
-]
-
-const units = ['pieces', 'kg', 'grams', 'liters', 'cups', 'servings', 'packs', 'bags']
-
 const handleContact = (item) => {
   selectedContact.value = item
   showContactModal.value = true
 }
 
-// form to upload food item for sharing
+
 const shareForm = ref({
   foodName: '',
   category: '',
@@ -44,15 +30,19 @@ const shareForm = ref({
   pickupTime: '',
   notes: '',
   unit: '',
+  location: null,
 })
 
+const handleLocationSelected = (location) => {
+  shareForm.value.location = location
+}
 
 const handleShareFood = () => {
   shareForm.value = {
     foodName: '',
-    category: 'Fruits & Vegetables',
-    quantity: 1,
-    unit: 'pieces',
+    category: '',
+    quantity: 0,
+    unit: '',
     expirationDate: '',
     pickupTime: '',
     notes: ''
@@ -89,7 +79,9 @@ async function loadFoodItems() {
   if (!currentUser.value) return;
   const foodItemsRef = collection(db, "user", currentUser.value.uid, "foodItems");
   const snapshot = await getDocs(foodItemsRef);
-  foodItems.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  foodItems.value = snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(item => item.quantity > 0);
 }
 
 function onSelectFoodItem() {
@@ -134,28 +126,12 @@ async function loadMyListings() {
 }
 
 
-async function loadAllListings() {
-  console.log(currentUser.value?.uid)
-  if (!currentUser.value) return;
-
-  const q = query(
-    collection(db, "communityListings"),
-    where("ownerId", "!=", currentUser.value.uid),
-    orderBy("ownerId")
-  )
-
-  const snapshot = await getDocs(q)
-
-  sharedItems.value = snapshot.docs.map(doc => {
-    const data = doc.data()
-    return {
-      id: doc.id,
-      ...data,
-      daysUntilExpiration: getDaysLeft(data.expirationDate),
-    }
-  })
-  console.log("Loaded shared items:", sharedItems.value)
-  console.log(currentUser.value?.uid)
+async function loadAvailableListings() {
+  const sharedItemsRef = collection(db, "communityListings")
+  const sharedItemsSnapshot = await getDocs(sharedItemsRef)
+  sharedItems.value = sharedItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+  .filter(item => item.ownerId !== currentUser.value?.uid);
+  console.log("Available listings loaded:", sharedItems.value)
 }
 
 
@@ -174,18 +150,18 @@ async function submitShare() {
       unit: shareForm.value.unit,
       expirationDate: expDate,
       distance: 0,
-      sharedBy: currentUser.value.displayName || currentUser.value.email.split("@")[0],
+      sharedBy: currentUser.value.displayName || (currentUser.value.email ? currentUser.value.email.split("@")[0] : 'User'),
       contact: {
         email: shareForm.value.contactEmail || currentUser.value.email,
         phone: shareForm.value.contactPhone || "",
         address: shareForm.value.contactAddress || "",
       },
       createdAt: serverTimestamp(),
+      location: shareForm.value.location,
     }
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
 
-    // Fetch the final saved document instead of immediately reloading
     const savedDoc = await getDoc(docRef)
     console.log("Verified Firestore document:", savedDoc.data())
 
@@ -201,11 +177,16 @@ onAuthStateChanged(auth, (user) => {
   if (user) {
     currentUser.value = user
     loadMyListings()
-    loadAllListings()
+    loadAvailableListings()
     loadFoodItems()
   } else {
     currentUser.value = null
   }
+})
+
+onMounted(async () => {
+  const googleMaps = await loadGoogleMaps()
+  console.log("Google Maps loaded:", googleMaps)
 })
 
 
@@ -277,7 +258,7 @@ onAuthStateChanged(auth, (user) => {
 
               <button class="btn btn-primary w-100" @click="handleContact(item)">
                 <i class="bi bi-person-lines-fill me-2"></i>
-                Contact {{ item.sharedBy.split(' ')[0] }}
+                Contact {{ item.sharedBy ? item.sharedBy.split(' ')[0] : 'User' }}
               </button>
             </div>
           </div>
@@ -378,56 +359,57 @@ onAuthStateChanged(auth, (user) => {
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
                   <label class="form-label">Category</label>
-                  <select v-model="shareForm.category" class="form-select">
-                    <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Expiration Date *</label>
-                  <input v-model="shareForm.expirationDate" type="date" class="form-control"
-                    :min="new Date().toISOString().split('T')[0]" required>
-                </div>
-              </div>
+                    <input v-model="shareForm.category" type="text" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Expiration Date *</label>
+                    <input v-model="shareForm.expirationDate" type="date" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
+                  </div>
+                  </div>
 
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">Quantity</label>
-                  <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="0.01">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Unit</label>
-                  <select v-model="shareForm.unit" class="form-select">
-                    <option v-for="unit in units" :key="unit" :value="unit">{{ unit }}</option>
-                  </select>
-                </div>
-              </div>
+                  <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Quantity</label>
+                    <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="0.01">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Unit</label>
+                    <input v-model="shareForm.unit" type="text" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
+                  </div>
+                  </div>
 
-              <div class="mb-3">
-                <label class="form-label">Preferred Pickup Time</label>
-                <input v-model="shareForm.pickupTime" type="text" class="form-control"
-                  placeholder="e.g., Weekdays after 6pm, Weekends anytime">
-              </div>
+                  <div class="mb-3">
+                  <label class="form-label">Preferred Pickup Time</label>
+                  <input v-model="shareForm.pickupTime" type="text" class="form-control"
+                    placeholder="e.g., Weekdays after 6pm, Weekends anytime">
+                  </div>
 
-              <div class="mb-3">
-                <label class="form-label">Additional Notes</label>
-                <textarea v-model="shareForm.notes" class="form-control" rows="3"
-                  placeholder="Any special instructions or notes about the food item..."></textarea>
+                  <div class="mb-3">
+                  <LocationPicker @location-selected="handleLocationSelected" />
+                  </div>
+
+
+
+                  <div class="mb-3">
+                  <label class="form-label">Additional Notes</label>
+                  <textarea v-model="shareForm.notes" class="form-control" rows="3"
+                    placeholder="Any special instructions or notes about the food item..."></textarea>
+                  </div>
+                </form>
+                </div>
+                <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @click="showShareModal = false">
+                  Cancel
+                </button>
+                <button type="button" class="btn btn-primary" @click="submitShare">
+                  <i class="bi bi-share me-2"></i>
+                  Share Food
+                </button>
+                </div>
               </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showShareModal = false">
-              Cancel
-            </button>
-            <button type="button" class="btn btn-primary" @click="submitShare">
-              <i class="bi bi-share me-2"></i>
-              Share Food
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+              </div>
+            </div>
+            </div>
 </template>
 
 <style scoped>

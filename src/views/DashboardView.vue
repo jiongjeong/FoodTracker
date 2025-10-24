@@ -125,14 +125,30 @@ const filteredSortedActivities = computed(() => {
   }
   // Sort by createdAt
   acts.sort((a, b) => {
-    const dateA = new Date(a.createdAt);
-    const dateB = new Date(b.createdAt);
+    const dateA = parseCreatedAt(a.createdAt);
+    const dateB = parseCreatedAt(b.createdAt);
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return activitySortDirection.value === 'desc' ? 1 : -1;
+    if (!dateB) return activitySortDirection.value === 'desc' ? -1 : 1;
     return activitySortDirection.value === 'desc'
       ? dateB - dateA
       : dateA - dateB;
   });
   return acts;
 });
+
+// Helper to parse createdAt values (ISO string, JS Date, or Firestore Timestamp)
+function parseCreatedAt(value) {
+  if (!value) return null;
+  try {
+    if (typeof value.toDate === 'function') return value.toDate();
+    if (value instanceof Date) return value;
+    const d = new Date(value);
+    return isNaN(d) ? null : d;
+  } catch (e) {
+    return null;
+  }
+}
 
 const auth = getAuth();
 const user = ref(auth.currentUser);
@@ -199,8 +215,7 @@ watch(userId, () => {
 // Categories for select input
 const categories = [
   'All Categories',
-  'Fruits',
-  'Vegetables',
+  'Fruits & Vegetables',
   'Dairy & Eggs',
   'Meat & Poultry',
   'Bakery',
@@ -211,6 +226,43 @@ const categories = [
   'Grains & Pasta',
   'Other'
 ];
+
+const categoryUnits = {
+  'All Categories': [
+    'piece(s)', 'kg(s)', 'gram(s)', 'liter(s)', 'milliliter(s)',
+    'pack(s)', 'bag(s)', 'box(es)', 'bottle(s)'
+  ],
+  'Fruits & Vegetables': [
+    'piece(s)', 'kg(s)', 'gram(s)', 'bag(s)', 'bunch(es)'
+  ],
+  'Dairy & Eggs': [
+    'liter(s)', 'milliliter(s)', 'dozen(s)', 'piece(s)', 'carton(s)'
+  ],
+  'Meat & Poultry': [
+    'kg(s)', 'gram(s)', 'pound(s)', 'ounce(s)', 'pack(s)', 'piece(s)'
+  ],
+  'Bakery': [
+    'piece(s)', 'slice(s)', 'loaf(s)', 'dozen(s)', 'gram(s)'
+  ],
+  'Snacks': [
+    'piece(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)'
+  ],
+  'Beverages': [
+    'liter(s)', 'milliliter(s)', 'bottle(s)', 'can(s)', 'pack(s)'
+  ],
+  'Condiments & Sauces': [
+    'milliliter(s)', 'liter(s)', 'jar(s)', 'bottle(s)'
+  ],
+  'Frozen Foods': [
+    'kg(s)', 'gram(s)', 'pack(s)', 'bag(s)'
+  ],
+  'Grains & Pasta': [
+    'kg(s)', 'gram(s)', 'bag(s)', 'box(es)'
+  ],
+  'Other': [
+    'piece(s)', 'unit(s)', 'pack(s)', 'box(es)'
+  ]
+};
 
 // Filtered food items (remove duplicates, search, filter, sort)
 const filteredFoodItems = computed(() => {
@@ -343,7 +395,7 @@ const formatDate = (dateObj) => {
 };
 
 const getRelativeTime = (dateString) => {
-  const date = new Date(dateString);
+  const date = parseCreatedAt(dateString) || new Date(dateString);
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
   if (diffInSeconds < 60) return 'Just now';
@@ -471,44 +523,50 @@ const analytics = computed(() => {
   const wasteActivities = activities.value.filter(a => a.activityType === 'expFood')
   // fix: check activityType for consumed food activities
   const usedActivities = activities.value.filter(a => a.activityType === 'conFood')
-  const donatedActivities = activities.value.filter(a=> a.activityType === "donFood")
+  const donatedActivities = activities.value.filter(a => a.activityType === "donFood")
   console.log(wasteActivities)
   console.log(usedActivities)
-  console.log("mine"+donatedActivities)
+  console.log("mine" + donatedActivities)
   console.log("end")
   // Total waste calculation
   const totalWasteItems = wasteActivities.length
   const totalWasteMoney = wasteActivities.reduce((total, activity) => {
+    // Multiply price by quantity (convert price to number since it's a string)
+    return total + (Number(activity.price));
+  }, 0);
+
+  // Total saved calculation: count only fully consumed food
+  const totalSavedItems = activities.value.filter(a => a.activityType === 'conFood' && a.note === 'fully consumed').length
+  const totalSavedMoney = usedActivities.reduce((total, activity) => {
   // Multiply price by quantity (convert price to number since it's a string)
   return total + (Number(activity.price) );
 }, 0);
   
-  // Total saved calculation: count only fully consumed food
-  const totalSavedItems = activities.value.filter(a => a.activityType === 'conFood' && a.note === 'fully consumed').length
-  const totalSavedMoney = totalSavedItems * 5 // Assume $5 average per saved item
-  
   // Reduction percentage - items used before expiry vs total items
   const totalItemsHandled = totalWasteItems + totalSavedItems
   const reductionPercentage = totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
-  
+
   // Current inventory
-  // const inventoryValue = items.reduce((sum, item) => sum + item.price, 0)
-  // const inventoryItems = items.length
+  const inventoryValue = foodItems.value.reduce((sum, item) => {
+    const price = Number(item.price) || 0;
+    return sum + price;
+  }, 0);
+  const inventoryItems = foodItems.value.length;
 
   // TODO Food Donated
   // const foodDonated = donatedActivities.length
-  
-  // foodScore algo = itemssaved - itemswasted + moneysaved 
+
+  // foodScore algo = itemssaved - itemswasted + moneysaved
   const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4);
   const moneyScore = Math.max(0,(totalSavedMoney*0.2) - (totalWasteMoney*0.2) )
-  const foodScore= itemsScore + moneyScore
+  const foodScore= Math.round(itemsScore + moneyScore)
 
   return {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
     reduction: reductionPercentage,
-    // inventory: { value: inventoryValue, items: inventoryItems }
-    foodScore:foodScore
+  inventory: { value: inventoryValue, items: inventoryItems },
+  foodScore: foodScore
   }
 })
 
@@ -550,7 +608,7 @@ const wasteByCategoryChart = computed(() => {
   const data = labels.map(l => counts[l]);
   return {
     labels,
-    datasets: [{ data, backgroundColor: ['#eab308', '#f43f5e', '#10b981', '#3b82f6', '#a78bfa']}]
+    datasets: [{ data, backgroundColor: ['#eab308', '#f43f5e', '#10b981', '#3b82f6', '#a78bfa'] }]
   };
 });
 
@@ -676,6 +734,12 @@ const saveUse = async () => {
   }
 };
 
+// Add computed property to get units based on selected category
+const availableUnits = computed(() => {
+  const category = editForm.category || addForm.category || 'All Categories';
+  return categoryUnits[category] || categoryUnits['All Categories'];
+});
+
 const openAdd = () => {
   addForm.name = '';
   addForm.category = '';
@@ -732,7 +796,7 @@ const saveAdd = async () => {
       activityType: 'addFood',
       createdAt: new Date().toISOString(), // or use Timestamp.now() if a Firestore Timestamp is wanted
       foodName: addForm.name || '',
-  category: addForm.category || '',
+      category: addForm.category || '',
       price: String(addForm.price || ''),
       quantity: String(addForm.quantity || ''),
       unit: String(addForm.unit || '')
@@ -902,7 +966,7 @@ const confirmDelete = async () => {
               <i class="bi bi-graph-up-arrow text-success"></i>
               <small class="text-muted">Food Score</small>
             </div>
-            <h3 class="h4">{{analytics.foodScore}}</h3>
+            <h3 class="h4">{{ analytics.foodScore }}</h3>
             <small class="text-muted">points</small>
           </div>
         </div>
@@ -939,17 +1003,49 @@ const confirmDelete = async () => {
       </div>
 
       <div class="row g-3 mb-4">
-      <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <i class="bi bi-trash text-danger"></i>
-            <small class="text-muted">Total Waste</small>
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-trash text-danger"></i>
+              <small class="text-muted">Total Waste</small>
+            </div>
+            <h3 class="h4 text-danger mb-1">${{ analytics.totalWaste.money }}</h3>
+            <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
           </div>
-          <h3 class="h4 text-danger mb-1">${{ analytics.totalWaste.money }}</h3>
-          <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
         </div>
         
-      </div>
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-piggy-bank text-success"></i>
+              <small class="text-muted">Total Saved</small>
+            </div>
+            <h3 class="h4 text-success mb-1">${{ analytics.totalSaved.money }}</h3>
+            <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
+          </div>
+        </div>
+        
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-arrow-up text-primary"></i>
+              <small class="text-muted">Reduction</small>
+            </div>
+            <h3 class="h4 text-primary mb-1">{{ analytics.reduction }}%</h3>
+            <small class="text-muted">food used before expiry</small>
+          </div>
+        </div>
+        
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-box text-info"></i>
+              <small class="text-muted">Inventory</small>
+            </div>
+            <h3 class="h4 text-info mb-1">${{ analytics.inventory.value.toFixed(2) }}</h3>
+            <small class="text-muted">{{ analytics.inventory.items }} items</small>
+          </div>
+        </div>
       </div>
       <!-- Charts Section -->
     <div class="row g-4 mb-3">
@@ -961,7 +1057,7 @@ const confirmDelete = async () => {
             Waste vs Savings
           </h5>
           <div style="height: 300px;">
-            <Bar :data="wasteVsSavingsChart" :options="chartOptions" />
+            <Bar v-if="wasteVsSavingsChart && wasteVsSavingsChart.labels && wasteVsSavingsChart.labels.length" :data="wasteVsSavingsChart" :options="chartOptions" />
           </div>
         </div>
       </div>
@@ -974,7 +1070,7 @@ const confirmDelete = async () => {
             Waste by Category
           </h5>
           <div style="height: 300px;">
-            <Pie :data="wasteByCategoryChart" :options="chartOptions" />
+            <Pie v-if="wasteByCategoryChart && wasteByCategoryChart.labels && wasteByCategoryChart.labels.length" :data="wasteByCategoryChart" :options="chartOptions" />
           </div>
         </div>
       </div>
@@ -987,7 +1083,7 @@ const confirmDelete = async () => {
             Monthly Spending Trend
           </h5>
           <div style="height: 300px;">
-            <Line :data="monthlySpendingChart" :options="chartOptions" />
+            <Line v-if="monthlySpendingChart && monthlySpendingChart.labels && monthlySpendingChart.labels.length" :data="monthlySpendingChart" :options="chartOptions" />
           </div>
         </div>
       </div>
@@ -1075,15 +1171,20 @@ const confirmDelete = async () => {
           <h3 class="h5 mb-2">Recent Activity</h3>
           <div class="d-flex align-items-center justify-content-between mb-3">
             <div class="d-flex gap-2 w-100">
-              <select v-model="activityTypeFilter" class="form-select form-select-sm" style="width: auto; min-width: 110px;">
+              <select v-model="activityTypeFilter" class="form-select form-select-sm"
+                style="width: auto; min-width: 110px;">
                 <option disabled value="">Activity</option>
                 <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
-              <select v-model="activityTimeFrame" class="form-select form-select-sm" style="width: auto; min-width: 90px;">
+              <select v-model="activityTimeFrame" class="form-select form-select-sm"
+                style="width: auto; min-width: 90px;">
                 <option disabled value="">Time</option>
-                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">{{ opt.label }}
+                </option>
               </select>
-              <button class="btn btn-outline-secondary btn-sm" :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'" @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'">
+              <button class="btn btn-outline-secondary btn-sm"
+                :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'"
+                @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'">
                 <i :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"></i>
               </button>
             </div>
@@ -1145,8 +1246,11 @@ const confirmDelete = async () => {
         </div>
         <div class="mb-2">
           <label class="form-label">Category</label>
-          <select v-model="addForm.category" class="form-select" >
-            <option v-for="cat in categories">{{ cat }}</option>
+          <select v-model="editForm.category" class="form-select">
+            <option disabled value="">{{ editForm.category || 'Select a category' }}</option>
+            <option v-for="cat in categories.filter(c => c !== 'All Categories')" :key="cat" :value="cat">
+              {{ cat }}
+            </option>
           </select>
         </div>
         <div class="row g-2">
@@ -1170,7 +1274,10 @@ const confirmDelete = async () => {
           </div>
           <div class="col-4">
             <label class="form-label">Unit</label>
-            <input v-model="editForm.unit" class="form-control" />
+            <select v-model="editForm.unit" class="form-select">
+              <option disabled value="">{{ editForm.unit || 'Select a unit' }}</option>
+              <option v-for="unit in availableUnits" :key="unit" :value="unit">{{ unit }}</option>
+            </select>
           </div>
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
@@ -1179,27 +1286,28 @@ const confirmDelete = async () => {
         </div>
       </div>
     </div>
+
     <!-- Use Food Modal -->
-  <div v-if="showUseModal" class="modal-backdrop">
-    <div class="modal-card">
-      <h3 class="h5 mb-3">Use Food Item</h3>
-      <p>How much of <strong>{{ useForm.name }}</strong> did you use?</p>
-      <div class="row g-2 mt-2">
-        <div class="col-6">
-          <label class="form-label">Quantity</label>
-          <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" />
+    <div v-if="showUseModal" class="modal-backdrop">
+      <div class="modal-card">
+        <h3 class="h5 mb-3">Use Food Item</h3>
+        <p>How much of <strong>{{ useForm.name }}</strong> did you use?</p>
+        <div class="row g-2 mt-2">
+          <div class="col-6">
+            <label class="form-label">Quantity</label>
+            <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" />
+          </div>
+          <div class="col-6">
+            <label class="form-label">Unit</label>
+            <input v-model="useForm.unit" type="text" class="form-control" />
+          </div>
         </div>
-        <div class="col-6">
-          <label class="form-label">Unit</label>
-          <input v-model="useForm.unit" type="text" class="form-control" />
+        <div class="d-flex justify-content-end gap-2 mt-3">
+          <button class="btn btn-secondary" @click="closeUse">Cancel</button>
+          <button class="btn btn-primary" @click="saveUse">Use</button>
         </div>
-      </div>
-      <div class="d-flex justify-content-end gap-2 mt-3">
-        <button class="btn btn-secondary" @click="closeUse">Cancel</button>
-        <button class="btn btn-primary" @click="saveUse">Use</button>
       </div>
     </div>
-  </div>
 
     <!-- Floating Add Button -->
     <button class="fab-add" @click="openAdd" title="Add Food">
@@ -1216,8 +1324,9 @@ const confirmDelete = async () => {
         </div>
         <div class="mb-2">
           <label class="form-label">Category</label>
-          <select v-model="addForm.category" class="form-select" >
-            <option v-for="cat in categories">{{ cat }}</option>
+          <select v-model="addForm.category" class="form-select">
+            <option disabled value="">Select a category</option>
+            <option v-for="cat in categories.filter(c => c !== 'All Categories')" :key="cat" :value="cat">{{ cat }}</option>
           </select>
         </div>
         <div class="row g-2">
@@ -1241,7 +1350,10 @@ const confirmDelete = async () => {
           </div>
           <div class="col-4">
             <label class="form-label">Unit</label>
-            <input v-model="addForm.unit" class="form-control" />
+            <select v-model="addForm.unit" class="form-select">
+              <option disabled value="">Select a unit</option>
+              <option v-for="unit in availableUnits" :key="unit" :value="unit">{{ unit }}</option>
+            </select>
           </div>
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
@@ -1269,7 +1381,6 @@ const confirmDelete = async () => {
 </template>
 
 <style scoped>
-
 .dashboard-overview {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.08) 100%);
   border: 1px solid rgba(16, 185, 129, 0.1);
@@ -1369,7 +1480,8 @@ const confirmDelete = async () => {
 }
 
 .food-name {
-  font-size: 1.25rem; /* reduced slightly */
+  font-size: 1.25rem;
+  /* reduced slightly */
   font-weight: bold;
 }
 
@@ -1420,7 +1532,8 @@ const confirmDelete = async () => {
 }
 
 .food-price {
-  font-size: 1.1rem; /* reduced slightly */
+  font-size: 1.1rem;
+  /* reduced slightly */
   font-weight: bold;
   margin-left: 12px;
 }
@@ -1542,6 +1655,7 @@ const confirmDelete = async () => {
     box-shadow: 0 8px 30px rgba(229, 57, 53, 0.06), 0 0 0 rgba(229, 57, 53, 0);
   }
 }
+
 /* Make activity card scrollable and match inventory height */
 .activity-scroll {
   min-height: 0;
@@ -1549,6 +1663,7 @@ const confirmDelete = async () => {
   overflow-y: auto;
   flex: 1 1 auto;
 }
+
 .min-h-0 {
   min-height: 0;
 }
