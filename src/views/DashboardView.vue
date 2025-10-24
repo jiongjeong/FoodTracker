@@ -524,6 +524,10 @@ const analytics = computed(() => {
 }, 0);
   
   // Total saved calculation: count only fully consumed food
+  // Only activities with note === 'fully consumed' are counted as saved items.
+  // Partial consumption events are intentionally excluded from the saved count,
+  // as per current business logic. If partial consumption should contribute,
+  // update this filter accordingly.
   const totalSavedItems = activities.value.filter(a => a.activityType === 'conFood' && a.note === 'fully consumed').length
   const totalSavedMoney =  usedActivities.reduce((total, activity) => {
     return total + (Number(activity.price) );
