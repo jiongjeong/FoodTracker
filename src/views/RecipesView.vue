@@ -221,12 +221,6 @@ watch(
 // Initialize on component mount
 onMounted(() => {
   initializeRecipes()
-  // If search param exists on first load, trigger search
-  if (typeof route.query.search === 'string' && route.query.search.trim()) {
-    searchQuery.value = route.query.search
-    activeTab.value = 'search'
-    searchRecipes(route.query.search)
-  }
 })
 </script>
 
