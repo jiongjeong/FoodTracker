@@ -1057,7 +1057,7 @@ const confirmDelete = async () => {
             Waste vs Savings
           </h5>
           <div style="height: 300px;">
-            <Bar v-if="wasteVsSavingsChart && wasteVsSavingsChart.labels && wasteVsSavingsChart.labels.length" :data="wasteVsSavingsChart" :options="chartOptions" />
+            <Bar :data="wasteVsSavingsChart" :options="chartOptions" />
           </div>
         </div>
       </div>
@@ -1070,7 +1070,7 @@ const confirmDelete = async () => {
             Waste by Category
           </h5>
           <div style="height: 300px;">
-            <Pie v-if="wasteByCategoryChart && wasteByCategoryChart.labels && wasteByCategoryChart.labels.length" :data="wasteByCategoryChart" :options="chartOptions" />
+            <Pie :data="wasteByCategoryChart" :options="chartOptions" />
           </div>
         </div>
       </div>
@@ -1083,7 +1083,7 @@ const confirmDelete = async () => {
             Monthly Spending Trend
           </h5>
           <div style="height: 300px;">
-            <Line v-if="monthlySpendingChart && monthlySpendingChart.labels && monthlySpendingChart.labels.length" :data="monthlySpendingChart" :options="chartOptions" />
+            <Line :data="monthlySpendingChart" :options="chartOptions" />
           </div>
         </div>
       </div>
