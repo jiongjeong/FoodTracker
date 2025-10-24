@@ -419,8 +419,11 @@ const analytics = computed(() => {
   const wasteActivities = activities.value.filter(a => a.activityType === 'expFood')
   // fix: check activityType for consumed food activities
   const usedActivities = activities.value.filter(a => a.activityType === 'conFood')
+  const donatedActivities = activities.value.filter(a=> a.activityType === "donFood")
   console.log(wasteActivities)
   console.log(usedActivities)
+  console.log("mine"+donatedActivities)
+  console.log("end")
   // Total waste calculation
   const totalWasteItems = wasteActivities.length
   const totalWasteMoney = wasteActivities.reduce((total, activity) => {
@@ -439,12 +442,19 @@ const analytics = computed(() => {
   // Current inventory
   // const inventoryValue = items.reduce((sum, item) => sum + item.price, 0)
   // const inventoryItems = items.length
+
+  // TODO Food Donated
+  // const foodDonated = donatedActivities.length
   
+  // foodScore algo = itemssaved - itemswasted + moneysaved 
+  const foodScore= (totalSavedItems*0.4) - (totalWasteItems *0.4) + (totalSavedMoney*0.2) - (totalWasteMoney*0.2)
+
   return {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
-    reduction: reductionPercentage
+    reduction: reductionPercentage,
     // inventory: { value: inventoryValue, items: inventoryItems }
+    foodScore:foodScore
   }
 })
 
@@ -752,7 +762,7 @@ const confirmDelete = async () => {
               <i class="bi bi-graph-up-arrow text-success"></i>
               <small class="text-muted">Food Score</small>
             </div>
-            <h3 class="h4">placeholder</h3>
+            <h3 class="h4">{{analytics.foodScore}}</h3>
             <small class="text-muted">points</small>
           </div>
         </div>
