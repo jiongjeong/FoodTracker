@@ -30,15 +30,21 @@ export default {
       email: "",
       password: "",
       errorMessage: "",
+      remember: false, // Add remember me data property
     };
   },
   methods: {
     async submitForm() {
       this.errorMessage = "";
       try {
-        await signInWithEmailAndPassword(auth, this.email, this.password);
-        window.dispatchEvent(new Event('userChange'));
+        const userCredential = await signInWithEmailAndPassword(auth, this.email, this.password);
+        const user = userCredential.user;
 
+        // Save user data to storage based on remember me option
+        const storage = this.remember ? localStorage : sessionStorage;
+        storage.setItem("user", JSON.stringify(user));
+
+        window.dispatchEvent(new Event('userChange'));
         this.$router.push('/dashboard');
       } catch (error) {
         switch (error.code) {

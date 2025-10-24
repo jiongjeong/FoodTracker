@@ -71,16 +71,6 @@
           </li>
           <li class="nav-item">
             <RouterLink
-              to="/analytics"
-              class="nav-link"
-              exact-active-class="active"
-              @click="closeNavbar"
-            >
-              <i class="bi bi-bar-chart me-1"></i>Analytics
-            </RouterLink>
-          </li>
-          <li class="nav-item">
-            <RouterLink
               to="/leaderboard"
               class="nav-link"
               exact-active-class="active"
@@ -191,11 +181,13 @@ function toggleDropdown() {
 async function logout() {
   try {
     await signOut(auth)
-    dropdownOpen.value = false
-    navbarOpen.value = false
+    localStorage.removeItem('user')
+    sessionStorage.removeItem('user')
+    window.dispatchEvent(new Event('userChange'))
     router.push('/login')
   } catch (error) {
-    console.error('Logout failed:', error)
+    console.error('Logout error:', error)
+    alert('Error logging out: ' + error.message)
   }
 }
 const userInitials = computed(() => {
