@@ -4,6 +4,9 @@ import { db, auth } from '../firebase.js';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
 import { orderBy } from 'firebase/firestore';
+import LocationPicker from '@/components/LocationPicker.vue';
+import { loadGoogleMaps } from '@/composables/loadGoogleMap.js'
+import { onMounted } from 'vue';
 
 
 const mySharedItems = ref([])
@@ -44,15 +47,19 @@ const shareForm = ref({
   pickupTime: '',
   notes: '',
   unit: '',
+  location: null,
 })
 
+const handleLocationSelected = (location) => {
+  shareForm.value.location = location
+}
 
 const handleShareFood = () => {
   shareForm.value = {
     foodName: '',
-    category: 'Fruits & Vegetables',
-    quantity: 1,
-    unit: 'pieces',
+    category: '',
+    quantity: 0,
+    unit: '',
     expirationDate: '',
     pickupTime: '',
     notes: ''
@@ -134,28 +141,13 @@ async function loadMyListings() {
 }
 
 
-async function loadAllListings() {
-  console.log(currentUser.value?.uid)
-  if (!currentUser.value) return;
+async function loadAvailableListings() {
 
-  const q = query(
-    collection(db, "communityListings"),
-    where("ownerId", "!=", currentUser.value.uid),
-    orderBy("ownerId")
-  )
-
-  const snapshot = await getDocs(q)
-
-  sharedItems.value = snapshot.docs.map(doc => {
-    const data = doc.data()
-    return {
-      id: doc.id,
-      ...data,
-      daysUntilExpiration: getDaysLeft(data.expirationDate),
-    }
-  })
-  console.log("Loaded shared items:", sharedItems.value)
-  console.log(currentUser.value?.uid)
+  const sharedItemsRef = collection(db, "communityListings")
+  const sharedItemsSnapshot = await getDocs(sharedItemsRef)
+  sharedItems.value = sharedItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+  .filter(item => item.ownerId !== currentUser.value?.uid);
+  console.log("Available listings loaded:", sharedItems.value)
 }
 
 
@@ -174,13 +166,14 @@ async function submitShare() {
       unit: shareForm.value.unit,
       expirationDate: expDate,
       distance: 0,
-      sharedBy: currentUser.value.displayName || currentUser.value.email.split("@")[0],
+      sharedBy: currentUser.value.displayName || (currentUser.value.email ? currentUser.value.email.split("@")[0] : 'User'),
       contact: {
         email: shareForm.value.contactEmail || currentUser.value.email,
         phone: shareForm.value.contactPhone || "",
         address: shareForm.value.contactAddress || "",
       },
       createdAt: serverTimestamp(),
+      location: shareForm.value.location,
     }
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
@@ -201,11 +194,16 @@ onAuthStateChanged(auth, (user) => {
   if (user) {
     currentUser.value = user
     loadMyListings()
-    loadAllListings()
+    loadAvailableListings()
     loadFoodItems()
   } else {
     currentUser.value = null
   }
+})
+
+onMounted(async () => {
+  const googleMaps = await loadGoogleMaps()
+  console.log("Google Maps loaded:", googleMaps)
 })
 
 
@@ -277,7 +275,7 @@ onAuthStateChanged(auth, (user) => {
 
               <button class="btn btn-primary w-100" @click="handleContact(item)">
                 <i class="bi bi-person-lines-fill me-2"></i>
-                Contact {{ item.sharedBy.split(' ')[0] }}
+                Contact {{ item.sharedBy ? item.sharedBy.split(' ')[0] : 'User' }}
               </button>
             </div>
           </div>
@@ -407,6 +405,12 @@ onAuthStateChanged(auth, (user) => {
                 <input v-model="shareForm.pickupTime" type="text" class="form-control"
                   placeholder="e.g., Weekdays after 6pm, Weekends anytime">
               </div>
+
+              <div class="mb-3">
+                <LocationPicker @location-selected="handleLocationSelected" />
+              </div>
+
+
 
               <div class="mb-3">
                 <label class="form-label">Additional Notes</label>
