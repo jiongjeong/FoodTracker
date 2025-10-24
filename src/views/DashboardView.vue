@@ -125,11 +125,11 @@ const filteredSortedActivities = computed(() => {
   }
   // Sort by createdAt
   acts.sort((a, b) => {
-    const dateA = parseCreatedAt(a.createdAt);
-    const dateB = parseCreatedAt(b.createdAt);
-    if (!dateA && !dateB) return 0;
-    if (!dateA) return activitySortDirection.value === 'desc' ? 1 : -1;
-    if (!dateB) return activitySortDirection.value === 'desc' ? -1 : 1;
+    const dateA = new Date(a.createdAt);
+    const dateB = new Date(b.createdAt);
+    if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+    if (isNaN(dateA.getTime())) return activitySortDirection.value === 'desc' ? 1 : -1;
+    if (isNaN(dateB.getTime())) return activitySortDirection.value === 'desc' ? -1 : 1;
     return activitySortDirection.value === 'desc'
       ? dateB - dateA
       : dateA - dateB;
