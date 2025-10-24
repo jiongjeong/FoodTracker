@@ -18,8 +18,8 @@ const currentUser = ref(null)
 
 
 const categories = [
-  'Fruits',
-  'Vegetables',
+  'All Categories',
+  'Fruits & Vegetables',
   'Dairy & Eggs',
   'Meat & Poultry',
   'Bakery',
@@ -29,16 +29,24 @@ const categories = [
   'Frozen Foods',
   'Grains & Pasta',
   'Other'
-]
+];
 
-const units = ['pieces', 'kg', 'grams', 'liters', 'cups', 'servings', 'packs', 'bags']
+const units = [
+  'piece(s)', 'kg(s)', 'gram(s)', 'milligram(s)', 'pound(s)', 'ounce(s)',
+  'liter(s)', 'milliliter(s)', 'cup(s)', 'tablespoon(s)', 'teaspoon(s)',
+  'pint(s)', 'quart(s)', 'gallon(s)',
+  'serving(s)', 'pack(s)', 'bag(s)', 'box(es)', 'bottle(s)', 'carton(s)',
+  'container(s)', 'jar(s)', 'can(s)', 'bar(s)',
+  'slice(s)', 'portion(s)', 'set(s)', 'bundle(s)', 'dozen(s)'
+];
+
 
 const handleContact = (item) => {
   selectedContact.value = item
   showContactModal.value = true
 }
 
-// form to upload food item for sharing
+
 const shareForm = ref({
   foodName: '',
   category: '',
@@ -96,7 +104,9 @@ async function loadFoodItems() {
   if (!currentUser.value) return;
   const foodItemsRef = collection(db, "user", currentUser.value.uid, "foodItems");
   const snapshot = await getDocs(foodItemsRef);
-  foodItems.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  foodItems.value = snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(item => item.quantity > 0);
 }
 
 function onSelectFoodItem() {
@@ -142,7 +152,6 @@ async function loadMyListings() {
 
 
 async function loadAvailableListings() {
-
   const sharedItemsRef = collection(db, "communityListings")
   const sharedItemsSnapshot = await getDocs(sharedItemsRef)
   sharedItems.value = sharedItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
@@ -178,7 +187,6 @@ async function submitShare() {
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
 
-    // Fetch the final saved document instead of immediately reloading
     const savedDoc = await getDoc(docRef)
     console.log("Verified Firestore document:", savedDoc.data())
 
