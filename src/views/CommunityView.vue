@@ -3,7 +3,9 @@ import { ref } from 'vue';
 import { db, auth } from '../firebase.js';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
-import { orderBy } from 'firebase/firestore';
+import LocationPicker from '@/components/LocationPicker.vue';
+import { loadGoogleMaps } from '@/composables/loadGoogleMap.js'
+import { onMounted } from 'vue';
 
 
 const mySharedItems = ref([])
@@ -14,28 +16,12 @@ const selectedContact = ref(null)
 const currentUser = ref(null)
 
 
-const categories = [
-  'Fruits',
-  'Vegetables',
-  'Dairy & Eggs',
-  'Meat & Poultry',
-  'Bakery',
-  'Snacks',
-  'Beverages',
-  'Condiments & Sauces',
-  'Frozen Foods',
-  'Grains & Pasta',
-  'Other'
-]
-
-const units = ['pieces', 'kg', 'grams', 'liters', 'cups', 'servings', 'packs', 'bags']
-
 const handleContact = (item) => {
   selectedContact.value = item
   showContactModal.value = true
 }
 
-// form to upload food item for sharing
+
 const shareForm = ref({
   foodName: '',
   category: '',
@@ -44,15 +30,19 @@ const shareForm = ref({
   pickupTime: '',
   notes: '',
   unit: '',
+  location: null,
 })
 
+const handleLocationSelected = (location) => {
+  shareForm.value.location = location
+}
 
 const handleShareFood = () => {
   shareForm.value = {
     foodName: '',
-    category: 'Fruits & Vegetables',
-    quantity: 1,
-    unit: 'pieces',
+    category: '',
+    quantity: 0,
+    unit: '',
     expirationDate: '',
     pickupTime: '',
     notes: ''
@@ -89,7 +79,9 @@ async function loadFoodItems() {
   if (!currentUser.value) return;
   const foodItemsRef = collection(db, "user", currentUser.value.uid, "foodItems");
   const snapshot = await getDocs(foodItemsRef);
-  foodItems.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  foodItems.value = snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(item => item.quantity > 0);
 }
 
 function onSelectFoodItem() {
@@ -134,28 +126,12 @@ async function loadMyListings() {
 }
 
 
-async function loadAllListings() {
-  console.log(currentUser.value?.uid)
-  if (!currentUser.value) return;
-
-  const q = query(
-    collection(db, "communityListings"),
-    where("ownerId", "!=", currentUser.value.uid),
-    orderBy("ownerId")
-  )
-
-  const snapshot = await getDocs(q)
-
-  sharedItems.value = snapshot.docs.map(doc => {
-    const data = doc.data()
-    return {
-      id: doc.id,
-      ...data,
-      daysUntilExpiration: getDaysLeft(data.expirationDate),
-    }
-  })
-  console.log("Loaded shared items:", sharedItems.value)
-  console.log(currentUser.value?.uid)
+async function loadAvailableListings() {
+  const sharedItemsRef = collection(db, "communityListings")
+  const sharedItemsSnapshot = await getDocs(sharedItemsRef)
+  sharedItems.value = sharedItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+  .filter(item => item.ownerId !== currentUser.value?.uid);
+  console.log("Available listings loaded:", sharedItems.value)
 }
 
 
@@ -174,18 +150,18 @@ async function submitShare() {
       unit: shareForm.value.unit,
       expirationDate: expDate,
       distance: 0,
-      sharedBy: currentUser.value.displayName || currentUser.value.email.split("@")[0],
+      sharedBy: currentUser.value.displayName || (currentUser.value.email ? currentUser.value.email.split("@")[0] : 'User'),
       contact: {
         email: shareForm.value.contactEmail || currentUser.value.email,
         phone: shareForm.value.contactPhone || "",
         address: shareForm.value.contactAddress || "",
       },
       createdAt: serverTimestamp(),
+      location: shareForm.value.location,
     }
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
 
-    // Fetch the final saved document instead of immediately reloading
     const savedDoc = await getDoc(docRef)
     console.log("Verified Firestore document:", savedDoc.data())
 
@@ -201,11 +177,16 @@ onAuthStateChanged(auth, (user) => {
   if (user) {
     currentUser.value = user
     loadMyListings()
-    loadAllListings()
+    loadAvailableListings()
     loadFoodItems()
   } else {
     currentUser.value = null
   }
+})
+
+onMounted(async () => {
+  const googleMaps = await loadGoogleMaps()
+  console.log("Google Maps loaded:", googleMaps)
 })
 
 
@@ -214,9 +195,12 @@ onAuthStateChanged(auth, (user) => {
 
 <template>
   <div class="container-fluid p-4">
-    <div class="mb-4">
-      <h1 class="h2 mb-2">Community Food Sharing</h1>
-      <p class="text-muted">Share expiring food with neighbors to reduce waste</p>
+    <div class="mb-4 d-flex justify-content-between align-items-start">
+      <div>
+        <h1 class="h2 mb-2">Community Food Sharing</h1>
+        <p class="text-muted">Share expiring food with neighbors to reduce waste</p>
+      </div>
+      <LocationPicker @location-selected="handleLocationSelected" />
     </div>
 
     <div class="glass-card p-4 mb-4">
@@ -277,7 +261,7 @@ onAuthStateChanged(auth, (user) => {
 
               <button class="btn btn-primary w-100" @click="handleContact(item)">
                 <i class="bi bi-person-lines-fill me-2"></i>
-                Contact {{ item.sharedBy.split(' ')[0] }}
+                Contact {{ item.sharedBy ? item.sharedBy.split(' ')[0] : 'User' }}
               </button>
             </div>
           </div>
@@ -378,56 +362,57 @@ onAuthStateChanged(auth, (user) => {
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
                   <label class="form-label">Category</label>
-                  <select v-model="shareForm.category" class="form-select">
-                    <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Expiration Date *</label>
-                  <input v-model="shareForm.expirationDate" type="date" class="form-control"
-                    :min="new Date().toISOString().split('T')[0]" required>
-                </div>
-              </div>
+                    <input v-model="shareForm.category" type="text" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Expiration Date *</label>
+                    <input v-model="shareForm.expirationDate" type="date" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
+                  </div>
+                  </div>
 
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">Quantity</label>
-                  <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="0.01">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Unit</label>
-                  <select v-model="shareForm.unit" class="form-select">
-                    <option v-for="unit in units" :key="unit" :value="unit">{{ unit }}</option>
-                  </select>
-                </div>
-              </div>
+                  <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Quantity</label>
+                    <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="0.01">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Unit</label>
+                    <input v-model="shareForm.unit" type="text" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
+                  </div>
+                  </div>
 
-              <div class="mb-3">
-                <label class="form-label">Preferred Pickup Time</label>
-                <input v-model="shareForm.pickupTime" type="text" class="form-control"
-                  placeholder="e.g., Weekdays after 6pm, Weekends anytime">
-              </div>
+                  <div class="mb-3">
+                  <label class="form-label">Preferred Pickup Time</label>
+                  <input v-model="shareForm.pickupTime" type="text" class="form-control"
+                    placeholder="e.g., Weekdays after 6pm, Weekends anytime">
+                  </div>
 
-              <div class="mb-3">
-                <label class="form-label">Additional Notes</label>
-                <textarea v-model="shareForm.notes" class="form-control" rows="3"
-                  placeholder="Any special instructions or notes about the food item..."></textarea>
+                  <div class="mb-3">
+                  <LocationPicker @location-selected="handleLocationSelected" />
+                  </div>
+
+
+
+                  <div class="mb-3">
+                  <label class="form-label">Additional Notes</label>
+                  <textarea v-model="shareForm.notes" class="form-control" rows="3"
+                    placeholder="Any special instructions or notes about the food item..."></textarea>
+                  </div>
+                </form>
+                </div>
+                <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @click="showShareModal = false">
+                  Cancel
+                </button>
+                <button type="button" class="btn btn-primary" @click="submitShare">
+                  <i class="bi bi-share me-2"></i>
+                  Share Food
+                </button>
+                </div>
               </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showShareModal = false">
-              Cancel
-            </button>
-            <button type="button" class="btn btn-primary" @click="submitShare">
-              <i class="bi bi-share me-2"></i>
-              Share Food
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+              </div>
+            </div>
+            </div>
 </template>
 
 <style scoped>
@@ -438,7 +423,8 @@ onAuthStateChanged(auth, (user) => {
   left: 0;
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .modal-backdrop {
@@ -456,6 +442,8 @@ onAuthStateChanged(auth, (user) => {
   margin: 1.75rem auto;
   pointer-events: auto;
   max-width: 500px;
+  width: 100%;
+  padding: 0 1rem;
 }
 
 .modal-content {
@@ -465,12 +453,173 @@ onAuthStateChanged(auth, (user) => {
   border-radius: 0.75rem;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   pointer-events: auto;
+  max-height: calc(100vh - 3.5rem);
+  display: flex;
+  flex-direction: column;
 }
 
 /* Ensure modal appears above everything */
 .modal.show {
   display: flex !important;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding-top: 1.75rem;
+  padding-bottom: 1.75rem;
+}
+
+/* Make modal body scrollable */
+.modal-body {
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .modal-dialog {
+    margin: 0.5rem auto;
+    max-width: calc(100% - 1rem);
+    padding: 0 0.5rem;
+  }
+
+  .modal-content {
+    max-height: calc(100vh - 1rem);
+  }
+
+  .modal-body {
+    max-height: calc(100vh - 150px);
+    padding: 1rem;
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding: 0.75rem 1rem;
+  }
+
+  .modal-title {
+    font-size: 1.1rem;
+  }
+
+  /* Stack buttons on small screens */
+  .modal-footer {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  .modal-dialog {
+    margin: 0.25rem auto;
+    max-width: calc(100% - 0.5rem);
+    padding: 0 0.25rem;
+  }
+
+  .modal-content {
+    max-height: calc(100vh - 0.5rem);
+    border-radius: 0.5rem;
+  }
+
+  .modal-body {
+    max-height: calc(100vh - 120px);
+    padding: 0.75rem;
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .modal-title {
+    font-size: 1rem;
+  }
+
+  /* Smaller form elements on mobile */
+  .form-label {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .form-control,
+  .form-select {
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  textarea.form-control {
+    min-height: 80px;
+  }
+
+  .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Landscape mobile devices */
+@media (max-height: 600px) and (orientation: landscape) {
+  .modal-dialog {
+    margin: 0.25rem auto;
+  }
+
+  .modal-content {
+    max-height: calc(100vh - 0.5rem);
+  }
+
+  .modal-body {
+    max-height: calc(100vh - 100px);
+    padding: 0.5rem 1rem;
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding: 0.5rem 1rem;
+  }
+}
+
+/* Tablet portrait */
+@media (min-width: 577px) and (max-width: 768px) {
+  .modal-dialog {
+    max-width: 90%;
+  }
+}
+
+/* Tablet landscape and small desktop */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .modal-dialog {
+    max-width: 600px;
+  }
+}
+
+/* Large screens */
+@media (min-width: 1025px) {
+  .modal-dialog {
+    max-width: 650px;
+  }
+
+  .modal-body {
+    max-height: calc(100vh - 250px);
+  }
+}
+
+/* Ensure scrollbar is visible but styled */
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 </style>

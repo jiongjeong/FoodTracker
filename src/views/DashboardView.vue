@@ -125,8 +125,11 @@ const filteredSortedActivities = computed(() => {
   }
   // Sort by createdAt
   acts.sort((a, b) => {
-    const dateA = new Date(a.createdAt);
-    const dateB = new Date(b.createdAt);
+    const dateA = parseCreatedAt(a.createdAt);
+    const dateB = parseCreatedAt(b.createdAt);
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return activitySortDirection.value === 'desc' ? 1 : -1;
+    if (!dateB) return activitySortDirection.value === 'desc' ? -1 : 1;
     return activitySortDirection.value === 'desc'
       ? dateB - dateA
       : dateA - dateB;
@@ -164,7 +167,6 @@ watch(userId, async (val) => {
   }
 });
 
-
 // Fetch food items function
 async function loadFoodItems() {
   if (userId.value) {
@@ -188,7 +190,9 @@ async function loadActivities() {
 onMounted(() => {
   loadFoodItems();
   loadActivities();
-});
+
+  }
+);
 
 // Also, watch for userId changes (like login)
 watch(userId, () => {
@@ -199,8 +203,7 @@ watch(userId, () => {
 // Categories for select input
 const categories = [
   'All Categories',
-  'Fruits',
-  'Vegetables',
+  'Fruits & Vegetables',
   'Dairy & Eggs',
   'Meat & Poultry',
   'Bakery',
@@ -211,6 +214,43 @@ const categories = [
   'Grains & Pasta',
   'Other'
 ];
+
+const categoryUnits = {
+  'All Categories': [
+    'piece(s)', 'kg(s)', 'gram(s)', 'liter(s)', 'milliliter(s)',
+    'pack(s)', 'bag(s)', 'box(es)', 'bottle(s)'
+  ],
+  'Fruits & Vegetables': [
+    'piece(s)', 'kg(s)', 'gram(s)', 'bag(s)', 'bunch(es)'
+  ],
+  'Dairy & Eggs': [
+    'liter(s)', 'milliliter(s)', 'dozen(s)', 'piece(s)', 'carton(s)'
+  ],
+  'Meat & Poultry': [
+    'kg(s)', 'gram(s)', 'pound(s)', 'ounce(s)', 'pack(s)', 'piece(s)'
+  ],
+  'Bakery': [
+    'piece(s)', 'slice(s)', 'loaf(s)', 'dozen(s)', 'gram(s)'
+  ],
+  'Snacks': [
+    'piece(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)'
+  ],
+  'Beverages': [
+    'liter(s)', 'milliliter(s)', 'bottle(s)', 'can(s)', 'pack(s)'
+  ],
+  'Condiments & Sauces': [
+    'milliliter(s)', 'liter(s)', 'jar(s)', 'bottle(s)'
+  ],
+  'Frozen Foods': [
+    'kg(s)', 'gram(s)', 'pack(s)', 'bag(s)'
+  ],
+  'Grains & Pasta': [
+    'kg(s)', 'gram(s)', 'bag(s)', 'box(es)'
+  ],
+  'Other': [
+    'piece(s)', 'unit(s)', 'pack(s)', 'box(es)'
+  ]
+};
 
 // Filtered food items (remove duplicates, search, filter, sort)
 const filteredFoodItems = computed(() => {
@@ -471,10 +511,10 @@ const analytics = computed(() => {
   const wasteActivities = activities.value.filter(a => a.activityType === 'expFood')
   // fix: check activityType for consumed food activities
   const usedActivities = activities.value.filter(a => a.activityType === 'conFood')
-  const donatedActivities = activities.value.filter(a=> a.activityType === "donFood")
+  const donatedActivities = activities.value.filter(a => a.activityType === "donFood")
   console.log(wasteActivities)
   console.log(usedActivities)
-  console.log("mine"+donatedActivities)
+  console.log("mine" + donatedActivities)
   console.log("end")
   // Total waste calculation
   const totalWasteItems = wasteActivities.length
@@ -493,19 +533,18 @@ const analytics = computed(() => {
   const totalItemsHandled = totalWasteItems + totalSavedItems
   const reductionPercentage = totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
   //test
-  
+
   // Current inventory
-  // const inventoryValue = items.reduce((sum, item) => sum + item.price, 0)
-  // const inventoryItems = items.length
   const inventoryValue = foodItems.value.reduce((sum, item) => {
     const price = Number(item.price) || 0;
     return sum + price;
   }, 0);
   const inventoryItems = foodItems.value.length;
+
   // TODO Food Donated
   // const foodDonated = donatedActivities.length
-  
-  // foodScore algo = itemssaved - itemswasted + moneysaved 
+
+  // foodScore algo = itemssaved - itemswasted + moneysaved
   const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4);
   const moneyScore = Math.max(0,(totalSavedMoney*0.2) - (totalWasteMoney*0.2) )
   const foodScore= Math.round(itemsScore + moneyScore)
@@ -514,8 +553,8 @@ const analytics = computed(() => {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
     reduction: reductionPercentage,
-    inventory: { value: inventoryValue, items: inventoryItems },
-    foodScore: foodScore
+  inventory: { value: inventoryValue, items: inventoryItems },
+  foodScore: foodScore
   }
 })
 
@@ -557,7 +596,7 @@ const wasteByCategoryChart = computed(() => {
   const data = labels.map(l => counts[l]);
   return {
     labels,
-    datasets: [{ data, backgroundColor: ['#eab308', '#f43f5e', '#10b981', '#3b82f6', '#a78bfa']}]
+    datasets: [{ data, backgroundColor: ['#eab308', '#f43f5e', '#10b981', '#3b82f6', '#a78bfa'] }]
   };
 });
 
@@ -683,6 +722,12 @@ const saveUse = async () => {
   }
 };
 
+// Add computed property to get units based on selected category
+const availableUnits = computed(() => {
+  const category = editForm.category || addForm.category || 'All Categories';
+  return categoryUnits[category] || categoryUnits['All Categories'];
+});
+
 const openAdd = () => {
   addForm.name = '';
   addForm.category = '';
@@ -739,7 +784,7 @@ const saveAdd = async () => {
       activityType: 'addFood',
       createdAt: new Date().toISOString(), // or use Timestamp.now() if a Firestore Timestamp is wanted
       foodName: addForm.name || '',
-  category: addForm.category || '',
+      category: addForm.category || '',
       price: String(addForm.price || ''),
       quantity: String(addForm.quantity || ''),
       unit: String(addForm.unit || '')
@@ -909,7 +954,7 @@ const confirmDelete = async () => {
               <i class="bi bi-graph-up-arrow text-success"></i>
               <small class="text-muted">Food Score</small>
             </div>
-            <h3 class="h4">{{analytics.foodScore}}</h3>
+            <h3 class="h4">{{ analytics.foodScore }}</h3>
             <small class="text-muted">points</small>
           </div>
         </div>
@@ -946,16 +991,49 @@ const confirmDelete = async () => {
       </div>
 
       <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-trash text-danger"></i>
+              <small class="text-muted">Total Waste</small>
+            </div>
+            <h3 class="h4 text-danger mb-1">${{ analytics.totalWaste.money }}</h3>
+            <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
+          </div>
+
+        </div>
+
       <div class="col-6 col-lg-3">
         <div class="glass-card stat-card p-3">
           <div class="d-flex align-items-center gap-2 mb-2">
-            <i class="bi bi-trash text-danger"></i>
-            <small class="text-muted">Total Waste</small>
+            <i class="bi bi-piggy-bank text-success"></i>
+            <small class="text-muted">Total Saved</small>
           </div>
-          <h3 class="h4 text-danger mb-1">${{ analytics.totalWaste.money }}</h3>
-          <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
+          <h3 class="h4 text-success mb-1">${{ analytics.totalSaved.money }}</h3>
+          <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
         </div>
-        
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-arrow-up text-primary"></i>
+            <small class="text-muted">Reduction</small>
+          </div>
+          <h3 class="h4 text-primary mb-1">{{ analytics.reduction }}%</h3>
+          <small class="text-muted">food used before expiry</small>
+        </div>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-box text-info"></i>
+            <small class="text-muted">Inventory</small>
+          </div>
+          <h3 class="h4 text-info mb-1">${{ analytics.inventory.value.toFixed(2) }}</h3>
+          <small class="text-muted">{{ analytics.inventory.items }} items</small>
+        </div>
       </div>
       </div>
       <!-- Charts Section -->
@@ -1152,8 +1230,11 @@ const confirmDelete = async () => {
         </div>
         <div class="mb-2">
           <label class="form-label">Category</label>
-          <select v-model="addForm.category" class="form-select" >
-            <option v-for="cat in categories">{{ cat }}</option>
+          <select v-model="editForm.category" class="form-select">
+            <option disabled value="">{{ editForm.category || 'Select a category' }}</option>
+            <option v-for="cat in categories.filter(c => c !== 'All Categories')" :key="cat" :value="cat">
+              {{ cat }}
+            </option>
           </select>
         </div>
         <div class="row g-2">
@@ -1177,7 +1258,10 @@ const confirmDelete = async () => {
           </div>
           <div class="col-4">
             <label class="form-label">Unit</label>
-            <input v-model="editForm.unit" class="form-control" />
+            <select v-model="editForm.unit" class="form-select">
+              <option disabled value="">{{ editForm.unit || 'Select a unit' }}</option>
+              <option v-for="unit in availableUnits" :key="unit" :value="unit">{{ unit }}</option>
+            </select>
           </div>
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
@@ -1223,8 +1307,9 @@ const confirmDelete = async () => {
         </div>
         <div class="mb-2">
           <label class="form-label">Category</label>
-          <select v-model="addForm.category" class="form-select" >
-            <option v-for="cat in categories">{{ cat }}</option>
+          <select v-model="addForm.category" class="form-select">
+            <option disabled value="">Select a category</option>
+            <option v-for="cat in categories.filter(c => c !== 'All Categories')" :key="cat" :value="cat">{{ cat }}</option>
           </select>
         </div>
         <div class="row g-2">
@@ -1248,7 +1333,10 @@ const confirmDelete = async () => {
           </div>
           <div class="col-4">
             <label class="form-label">Unit</label>
-            <input v-model="addForm.unit" class="form-control" />
+            <select v-model="addForm.unit" class="form-select">
+              <option disabled value="">Select a unit</option>
+              <option v-for="unit in availableUnits" :key="unit" :value="unit">{{ unit }}</option>
+            </select>
           </div>
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
@@ -1276,7 +1364,6 @@ const confirmDelete = async () => {
 </template>
 
 <style scoped>
-
 .dashboard-overview {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.08) 100%);
   border: 1px solid rgba(16, 185, 129, 0.1);
