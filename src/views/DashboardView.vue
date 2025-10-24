@@ -124,14 +124,30 @@ const filteredSortedActivities = computed(() => {
   }
   // Sort by createdAt
   acts.sort((a, b) => {
-    const dateA = new Date(a.createdAt);
-    const dateB = new Date(b.createdAt);
+    const dateA = parseCreatedAt(a.createdAt);
+    const dateB = parseCreatedAt(b.createdAt);
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return activitySortDirection.value === 'desc' ? 1 : -1;
+    if (!dateB) return activitySortDirection.value === 'desc' ? -1 : 1;
     return activitySortDirection.value === 'desc'
       ? dateB - dateA
       : dateA - dateB;
   });
   return acts;
 });
+
+// Helper to parse createdAt values (ISO string, JS Date, or Firestore Timestamp)
+function parseCreatedAt(value) {
+  if (!value) return null;
+  try {
+    if (typeof value.toDate === 'function') return value.toDate();
+    if (value instanceof Date) return value;
+    const d = new Date(value);
+    return isNaN(d) ? null : d;
+  } catch (e) {
+    return null;
+  }
+}
 
 const auth = getAuth();
 const user = ref(auth.currentUser);
@@ -323,7 +339,7 @@ const formatDate = (dateObj) => {
 };
 
 const getRelativeTime = (dateString) => {
-  const date = new Date(dateString);
+  const date = parseCreatedAt(dateString) || new Date(dateString);
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
   if (diffInSeconds < 60) return 'Just now';
@@ -450,15 +466,20 @@ const analytics = computed(() => {
   
   // Total saved calculation  
   const totalSavedItems = usedActivities.length
-  const totalSavedMoney = totalSavedItems * 5 // Assume $5 average per saved item
-  
+  const totalSavedMoney =  usedActivities.reduce((total, activity) => {
+  // Multiply price by quantity (convert price to number since it's a string)
+  return total + (Number(activity.price) );
+}, 0);
   // Reduction percentage - items used before expiry vs total items
   const totalItemsHandled = totalWasteItems + totalSavedItems
   const reductionPercentage = totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
   
   // Current inventory
-  // const inventoryValue = items.reduce((sum, item) => sum + item.price, 0)
-  // const inventoryItems = items.length
+  const inventoryValue = foodItems.value.reduce((sum, item) => {
+    const price = Number(item.price) || 0;
+    return sum + price;
+  }, 0);
+  const inventoryItems = foodItems.value.length;
 
   // TODO Food Donated
   // const foodDonated = donatedActivities.length
@@ -466,14 +487,14 @@ const analytics = computed(() => {
   // foodScore algo = itemssaved - itemswasted + moneysaved 
   const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4);
   const moneyScore = Math.max(0,(totalSavedMoney*0.2) - (totalWasteMoney*0.2) )
-  const foodScore= itemsScore + moneyScore
+  const foodScore= Math.round(itemsScore + moneyScore)
 
   return {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
     reduction: reductionPercentage,
-    // inventory: { value: inventoryValue, items: inventoryItems }
-    foodScore:foodScore
+  inventory: { value: inventoryValue, items: inventoryItems },
+  foodScore: foodScore
   }
 })
 
@@ -890,6 +911,38 @@ const confirmDelete = async () => {
         </div>
         
       </div>
+      <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-piggy-bank text-success"></i>
+            <small class="text-muted">Total Saved</small>
+          </div>
+          <h3 class="h4 text-success mb-1">${{ analytics.totalSaved.money }}</h3>
+          <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
+        </div>
+      </div>
+      
+      <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-arrow-up text-primary"></i>
+            <small class="text-muted">Reduction</small>
+          </div>
+          <h3 class="h4 text-primary mb-1">{{ analytics.reduction }}%</h3>
+          <small class="text-muted">food used before expiry</small>
+        </div>
+      </div>
+      
+      <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-box text-info"></i>
+            <small class="text-muted">Inventory</small>
+          </div>
+          <h3 class="h4 text-info mb-1">${{ analytics.inventory.value.toFixed(2) }}</h3>
+          <small class="text-muted">{{ analytics.inventory.items }} items</small>
+        </div>
+      </div>
       </div>
       <!-- Charts Section -->
     <div class="row g-4 mb-3">
@@ -901,7 +954,7 @@ const confirmDelete = async () => {
             Waste vs Savings
           </h5>
           <div style="height: 300px;">
-            <Bar :data="wasteVsSavingsChart" :options="chartOptions" />
+            <Bar v-if="wasteVsSavingsChart && wasteVsSavingsChart.labels && wasteVsSavingsChart.labels.length" :data="wasteVsSavingsChart" :options="chartOptions" />
           </div>
         </div>
       </div>
@@ -914,7 +967,7 @@ const confirmDelete = async () => {
             Waste by Category
           </h5>
           <div style="height: 300px;">
-            <Pie :data="wasteByCategoryChart" :options="chartOptions" />
+            <Pie v-if="wasteByCategoryChart && wasteByCategoryChart.labels && wasteByCategoryChart.labels.length" :data="wasteByCategoryChart" :options="chartOptions" />
           </div>
         </div>
       </div>
@@ -927,7 +980,7 @@ const confirmDelete = async () => {
             Monthly Spending Trend
           </h5>
           <div style="height: 300px;">
-            <Line :data="monthlySpendingChart" :options="chartOptions" />
+            <Line v-if="monthlySpendingChart && monthlySpendingChart.labels && monthlySpendingChart.labels.length" :data="monthlySpendingChart" :options="chartOptions" />
           </div>
         </div>
       </div>
