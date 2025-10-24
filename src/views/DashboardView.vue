@@ -447,7 +447,9 @@ const analytics = computed(() => {
   // const foodDonated = donatedActivities.length
   
   // foodScore algo = itemssaved - itemswasted + moneysaved 
-  const foodScore= (totalSavedItems*0.4) - (totalWasteItems *0.4) + (totalSavedMoney*0.2) - (totalWasteMoney*0.2)
+  const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4);
+  const moneyScore = Math.max(0,(totalSavedMoney*0.2) - (totalWasteMoney*0.2) )
+  const foodScore= itemsScore + moneyScore
 
   return {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
