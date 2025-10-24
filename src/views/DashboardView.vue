@@ -4,6 +4,22 @@ import { db } from '../firebase.js';
 import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
+import { Bar, Pie, Line } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  ArcElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+} from 'chart.js';
+
+// Register Chart.js components so charts render
+ChartJS.register(Title, Tooltip, Legend, BarElement, ArcElement, CategoryScale, LinearScale, PointElement, LineElement);
 
 const router = useRouter();
 function goToRecipes(food) {
@@ -406,6 +422,7 @@ watchEffect(() => {
         activityType: 'expFood',
         createdAt: new Date().toISOString(),
         foodName: food.name || '',
+  category: food.category || 'Other',
         price: String(food.price || ''),
       quantity: String(food.quantity || ''),
       unit: String(food.unit || '')
@@ -419,8 +436,11 @@ const analytics = computed(() => {
   const wasteActivities = activities.value.filter(a => a.activityType === 'expFood')
   // fix: check activityType for consumed food activities
   const usedActivities = activities.value.filter(a => a.activityType === 'conFood')
+  const donatedActivities = activities.value.filter(a=> a.activityType === "donFood")
   console.log(wasteActivities)
   console.log(usedActivities)
+  console.log("mine"+donatedActivities)
+  console.log("end")
   // Total waste calculation
   const totalWasteItems = wasteActivities.length
   const totalWasteMoney = wasteActivities.reduce((total, activity) => {
@@ -439,14 +459,82 @@ const analytics = computed(() => {
   // Current inventory
   // const inventoryValue = items.reduce((sum, item) => sum + item.price, 0)
   // const inventoryItems = items.length
+
+  // TODO Food Donated
+  // const foodDonated = donatedActivities.length
   
+  // foodScore algo = itemssaved - itemswasted + moneysaved 
+  const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4);
+  const moneyScore = Math.max(0,(totalSavedMoney*0.2) - (totalWasteMoney*0.2) )
+  const foodScore= itemsScore + moneyScore
+
   return {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
-    reduction: reductionPercentage
+    reduction: reductionPercentage,
     // inventory: { value: inventoryValue, items: inventoryItems }
+    foodScore:foodScore
   }
 })
+
+// Chart options
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: true },
+    title: { display: false }
+  }
+};
+
+// Waste vs Savings bar chart data
+const wasteVsSavingsChart = computed(() => {
+  const waste = analytics.value.totalWaste.items || 0;
+  const saved = analytics.value.totalSaved.items || 0;
+  return {
+    labels: ['Waste', 'Saved'],
+    datasets: [
+      {
+        label: 'Items',
+        backgroundColor: ['#dc2626', '#16a34a'],
+        data: [waste, saved]
+      }
+    ]
+  };
+});
+
+// Waste by category pie chart (simple breakdown based on activities)
+const wasteByCategoryChart = computed(() => {
+  const wasteActs = activities.value.filter(a => a.activityType === 'expFood');
+  const counts = {};
+  wasteActs.forEach(a => {
+    const cat = a.category || 'Unknown';
+    counts[cat] = (counts[cat] || 0) + (Number(a.quantity) || 1);
+  });
+  const labels = Object.keys(counts);
+  const data = labels.map(l => counts[l]);
+  return {
+    labels,
+    datasets: [{ data, backgroundColor: ['#eab308', '#f43f5e', '#10b981', '#3b82f6', '#a78bfa']}]
+  };
+});
+
+// Monthly spending line chart (dummy aggregation by month from activities)
+const monthlySpendingChart = computed(() => {
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const moneyByMonth = months.map(() => 0);
+  activities.value.forEach(a => {
+    const d = new Date(a.createdAt);
+    if (!isNaN(d)) {
+      const m = d.getMonth();
+      moneyByMonth[m] += Number(a.price) || 0;
+    }
+  });
+  return {
+    labels: months.map(m => new Date(0, m - 1).toLocaleString('en-US', { month: 'short' })),
+    datasets: [{ label: 'Spending', data: moneyByMonth, borderColor: '#0ea5a4', tension: 0.3, fill: false }]
+  };
+});
 
 const potentialLoss = computed(() =>
   foodItems.value
@@ -509,6 +597,7 @@ const saveUse = async () => {
       activityType: 'conFood',
       createdAt: new Date().toISOString(),
       foodName: food.name,
+  category: food.category || '',
       price: String(food.price || 0),
       quantity: String(usedQty),
       unit: food.unit || ''
@@ -583,6 +672,7 @@ const saveAdd = async () => {
       activityType: 'addFood',
       createdAt: new Date().toISOString(), // or use Timestamp.now() if a Firestore Timestamp is wanted
       foodName: addForm.name || '',
+  category: addForm.category || '',
       price: String(addForm.price || ''),
       quantity: String(addForm.quantity || ''),
       unit: String(addForm.unit || '')
@@ -752,7 +842,7 @@ const confirmDelete = async () => {
               <i class="bi bi-graph-up-arrow text-success"></i>
               <small class="text-muted">Food Score</small>
             </div>
-            <h3 class="h4">placeholder</h3>
+            <h3 class="h4">{{analytics.foodScore}}</h3>
             <small class="text-muted">points</small>
           </div>
         </div>
@@ -801,6 +891,47 @@ const confirmDelete = async () => {
         
       </div>
       </div>
+      <!-- Charts Section -->
+    <div class="row g-4 mb-3">
+      <!-- Waste vs Savings Bar Chart -->
+      <div class="col-lg-4">
+        <div class="glass-card p-4">
+          <h5 class="mb-4">
+            <i class="bi bi-bar-chart me-2"></i>
+            Waste vs Savings
+          </h5>
+          <div style="height: 300px;">
+            <Bar :data="wasteVsSavingsChart" :options="chartOptions" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Waste by Category Pie Chart -->
+      <div class="col-lg-4">
+        <div class="glass-card p-4">
+          <h5 class="mb-4">
+            <i class="bi bi-pie-chart me-2"></i>
+            Waste by Category
+          </h5>
+          <div style="height: 300px;">
+            <Pie :data="wasteByCategoryChart" :options="chartOptions" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Monthly Spending Trend -->
+      <div class="col-lg-4">
+        <div class="glass-card p-4">
+          <h5 class="mb-4">
+            <i class="bi bi-graph-up me-2"></i>
+            Monthly Spending Trend
+          </h5>
+          <div style="height: 300px;">
+            <Line :data="monthlySpendingChart" :options="chartOptions" />
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
 
     <div class="row g-4">
