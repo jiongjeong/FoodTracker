@@ -509,7 +509,8 @@ const analytics = computed(() => {
   // Reduction percentage - items used before expiry vs total items
   const totalItemsHandled = totalWasteItems + totalSavedItems
   const reductionPercentage = totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
-
+  //test
+  
   // Current inventory
   const inventoryValue = foodItems.value.reduce((sum, item) => {
     const price = Number(item.price) || 0;
