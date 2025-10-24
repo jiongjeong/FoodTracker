@@ -1,16 +1,15 @@
 <script setup>
 import { useRouter } from 'vue-router';
-const router = useRouter();
-function goToRecipes(food) {
-  // Navigate to /recipes with a query param for search
-  router.push({ path: '/recipes', query: { search: food.name } });
-}
 import { db } from '../firebase.js';
 import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
 
-
+const router = useRouter();
+function goToRecipes(food) {
+  // Navigate to /recipes with a query param for search
+  router.push({ path: '/recipes', query: { search: food.name } });
+}
 const searchText = ref('');
 const selectedCategory = ref('All Categories');
 const sortBy = ref('expiration');
