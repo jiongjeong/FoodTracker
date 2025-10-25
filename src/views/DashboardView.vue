@@ -521,16 +521,58 @@ watchEffect(async () => {
   }
 })
 
+// Calculate consecutive activity days streak
+const calculateActivityStreak = () => {
+  if (!activitiesLoaded.value || activities.value.length === 0) return 0;
+
+  // Get unique activity dates, sorted from newest to oldest
+  const activityDates = [...new Set(
+    activities.value
+      .map(a => {
+        const date = new Date(a.createdAt);
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+      })
+      .filter(timestamp => !isNaN(timestamp))
+  )].sort((a, b) => b - a);
+
+  if (activityDates.length === 0) return 0;
+
+  const today = new Date();
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const oneDayMs = 24 * 60 * 60 * 1000;
+
+  let streak = 0;
+  let expectedDate = todayMidnight;
+
+  // Check if there's activity today or yesterday (grace period)
+  if (activityDates[0] < todayMidnight - oneDayMs) {
+    return 0; // Streak broken if no activity today or yesterday
+  }
+
+  // Count consecutive days
+  for (const activityDate of activityDates) {
+    if (activityDate === expectedDate || activityDate === expectedDate - oneDayMs) {
+      streak++;
+      expectedDate = activityDate - oneDayMs;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+};
+
 const analytics = computed(() => {
   // const items = activeFoodItems.value
   const wasteActivities = activities.value.filter(a => a.activityType === 'expFood')
   // fix: check activityType for consumed food activities
   const usedActivities = activities.value.filter(a => a.activityType === 'conFood')
   const donatedActivities = activities.value.filter(a => a.activityType === "donFood")
-  console.log(wasteActivities)
-  console.log(usedActivities)
-  console.log("mine" + donatedActivities)
-  console.log("end")
+  // console.log(wasteActivities)
+  // console.log(usedActivities)
+  // console.log("mine" + donatedActivities)
+  // console.log("end")
+
   // Total waste calculation
   const totalWasteItems = wasteActivities.length
   const totalWasteMoney = wasteActivities.reduce((total, activity) => {
@@ -560,20 +602,31 @@ const analytics = computed(() => {
   }, 0);
   const inventoryItems = foodItems.value.length;
 
+  // calculate streak
+  const streakDays = calculateActivityStreak();
+  
+
+
   // TODO Food Donated
   // const foodDonated = donatedActivities.length
 
   // foodScore algo = itemssaved - itemswasted + moneysaved
   const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4);
   const moneyScore = Math.max(0, (totalSavedMoney * 0.2) - (totalWasteMoney * 0.2))
-  const foodScore = Math.round(itemsScore + moneyScore)
+  const baseScore = Math.round(itemsScore + moneyScore)
+
+  // Apply streak multi
+  const streakMulti = streakDays > 0 ? 1 + streakDays / 7 : 0
+  const foodScore = Math.round(baseScore * Math.max(1, streakMulti));
+  
 
   return {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
     reduction: reductionPercentage,
     inventory: { value: inventoryValue, items: inventoryItems },
-    foodScore: foodScore
+    foodScore: foodScore,
+    streakDays:streakDays
   }
 })
 
@@ -1622,7 +1675,7 @@ const confirmDelete = async () => {
   opacity: 0;
   overflow: hidden;
   transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.3s ease;
+    opacity 0.3s ease;
 }
 
 .fab-add:hover {
