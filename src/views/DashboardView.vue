@@ -604,7 +604,7 @@ const analytics = computed(() => {
 
   // calculate streak
   const streakDays = calculateActivityStreak();
-  
+
 
 
   // TODO Food Donated
@@ -618,7 +618,7 @@ const analytics = computed(() => {
   // Apply streak multi
   const streakMulti = streakDays > 0 ? 1 + streakDays / 7 : 0
   const foodScore = Math.round(baseScore * Math.max(1, streakMulti));
-  
+
 
   return {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
@@ -626,7 +626,7 @@ const analytics = computed(() => {
     reduction: reductionPercentage,
     inventory: { value: inventoryValue, items: inventoryItems },
     foodScore: foodScore,
-    streakDays:streakDays
+    streakDays: streakDays
   }
 })
 
@@ -1027,6 +1027,40 @@ const confirmDelete = async () => {
             </div>
             <h3 class="h4">{{ analytics.foodScore }}</h3>
             <small class="text-muted">points</small>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3 position-relative overflow-hidden">
+            <!-- Streak fire animation background -->
+            <div v-if="analytics.streakDays > 0" class="streak-fire-bg"
+              :class="{ 'streak-hot': analytics.streakDays >= 7, 'streak-blazing': analytics.streakDays >= 14 }">
+            </div>
+
+            <div class="d-flex align-items-center gap-2 mb-2 position-relative">
+              <i class="bi bi-graph-up-arrow text-success"></i>
+              <small class="text-muted">Food Score</small>
+            </div>
+
+            <div class="position-relative">
+              <h3 class="h4 mb-1">{{ analytics.foodScore }}
+              
+
+              <!-- Streak display with fire emoji -->
+              <div v-if="analytics.streakDays > 0" class="streak-badge mt-2" style="position: relative; float: right;">
+                <span class="streak-fire" :class="{
+                  'fire-small': analytics.streakDays < 7,
+                  'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
+                  'fire-large': analytics.streakDays >= 14
+                }">🔥</span>
+                <span class="streak-text">
+                  {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
+                </span>
+              </div>
+
+              <small v-else class="text-muted d-block mt-1">Start a streak today!</small>
+              </h3>
+              <small class="text-muted"> points</small>
+            </div>
           </div>
         </div>
         <div class="col-6 col-lg-3">
@@ -1755,5 +1789,123 @@ const confirmDelete = async () => {
 
 .min-h-0 {
   min-height: 0;
+}
+
+/* Streak fire background animation */
+.streak-fire-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.08;
+  background: linear-gradient(135deg,
+      rgba(251, 191, 36, 0.3) 0%,
+      rgba(245, 158, 11, 0.2) 50%,
+      rgba(239, 68, 68, 0.1) 100%);
+  animation: fireGlow 3s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.streak-fire-bg.streak-hot {
+  opacity: 0.12;
+  animation-duration: 2s;
+}
+
+.streak-fire-bg.streak-blazing {
+  opacity: 0.18;
+  animation-duration: 1.5s;
+  background: linear-gradient(135deg,
+      rgba(239, 68, 68, 0.3) 0%,
+      rgba(251, 146, 60, 0.2) 50%,
+      rgba(251, 191, 36, 0.1) 100%);
+}
+
+@keyframes fireGlow {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.08;
+  }
+
+  50% {
+    transform: scale(1.05);
+    opacity: 0.15;
+  }
+}
+
+/* Streak badge styling */
+.streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.streak-fire {
+  display: inline-block;
+  font-size: 1rem;
+  line-height: 1;
+  animation: fireFlicker 1.5s ease-in-out infinite;
+}
+
+.streak-fire.fire-small {
+  font-size: 1rem;
+  animation-duration: 2s;
+}
+
+.streak-fire.fire-medium {
+  font-size: 1.2rem;
+  animation-duration: 1.2s;
+  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
+}
+
+.streak-fire.fire-large {
+  font-size: 1.4rem;
+  animation-duration: 0.8s;
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8));
+}
+
+@keyframes fireFlicker {
+
+  0%,
+  100% {
+    transform: scale(1) rotate(-2deg);
+  }
+
+  25% {
+    transform: scale(1.1) rotate(2deg);
+  }
+
+  50% {
+    transform: scale(0.95) rotate(-1deg);
+  }
+
+  75% {
+    transform: scale(1.05) rotate(1deg);
+  }
+}
+
+.streak-text {
+  color: #92400e;
+  font-weight: 600;
+}
+
+/* Make stat-card position relative for absolute positioning */
+.stat-card {
+  position: relative;
+}
+
+.stat-card>* {
+  position: relative;
+  z-index: 1;
 }
 </style>
