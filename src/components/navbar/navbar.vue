@@ -8,8 +8,8 @@
         exact-active-class="active"
         @click="closeNavbar"
       >
-        <img src="/bigbackicon.jpg" alt="Logo" class="me-2" style="height: 40px; border-radius: 50%;" />
-        BigBack
+        <img src="/bigbackicon.jpg" alt="Logo" class="me-2" style="height: 50px; border-radius: 50%;" />
+        BigBacks
       </RouterLink>
 
       <!-- Mobile hamburger button (auto-hidden on lg+) -->

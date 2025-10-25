@@ -191,7 +191,7 @@ onMounted(() => {
   loadFoodItems();
   loadActivities();
 
-  }
+}
 );
 
 // Also, watch for userId changes (like login)
@@ -206,51 +206,65 @@ const categories = [
   'Fruits & Vegetables',
   'Dairy & Eggs',
   'Meat & Poultry',
-  'Bakery',
+  'Seafood',
   'Snacks',
   'Beverages',
   'Condiments & Sauces',
+  'Canned & Jarred Goods',
   'Frozen Foods',
   'Grains & Pasta',
+  'Herbs & Spices',
+  'Breakfast & Cereal',
   'Other'
 ];
+
 
 const categoryUnits = {
   'All Categories': [
     'piece(s)', 'kg(s)', 'gram(s)', 'liter(s)', 'milliliter(s)',
-    'pack(s)', 'bag(s)', 'box(es)', 'bottle(s)'
+    'pack(s)', 'bag(s)', 'box(es)', 'bottle(s)', 'can(s)'
   ],
   'Fruits & Vegetables': [
-    'piece(s)', 'kg(s)', 'gram(s)', 'bag(s)', 'bunch(es)'
+    'piece(s)', 'kg(s)', 'gram(s)', 'bag(s)', 'bunch(es)', 'lb(s)'
   ],
   'Dairy & Eggs': [
-    'liter(s)', 'milliliter(s)', 'dozen(s)', 'piece(s)', 'carton(s)'
+    'liter(s)', 'milliliter(s)', 'dozen(s)', 'piece(s)', 'carton(s)', 'gram(s)'
   ],
   'Meat & Poultry': [
-    'kg(s)', 'gram(s)', 'pound(s)', 'ounce(s)', 'pack(s)', 'piece(s)'
+    'kg(s)', 'gram(s)', 'lb(s)', 'ounce(s)', 'pack(s)', 'piece(s)'
   ],
-  'Bakery': [
-    'piece(s)', 'slice(s)', 'loaf(s)', 'dozen(s)', 'gram(s)'
+  'Seafood': [
+    'kg(s)', 'gram(s)', 'lb(s)', 'ounce(s)', 'piece(s)', 'pack(s)'
   ],
   'Snacks': [
-    'piece(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)'
+    'piece(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)', 'lb(s)'
   ],
   'Beverages': [
-    'liter(s)', 'milliliter(s)', 'bottle(s)', 'can(s)', 'pack(s)'
+    'liter(s)', 'milliliter(s)', 'bottle(s)', 'can(s)', 'pack(s)', 'gallon(s)'
   ],
   'Condiments & Sauces': [
-    'milliliter(s)', 'liter(s)', 'jar(s)', 'bottle(s)'
+    'milliliter(s)', 'liter(s)', 'jar(s)', 'bottle(s)', 'gram(s)', 'ounce(s)'
+  ],
+  'Canned & Jarred Goods': [
+    'can(s)', 'jar(s)', 'gram(s)', 'ounce(s)', 'pack(s)'
   ],
   'Frozen Foods': [
-    'kg(s)', 'gram(s)', 'pack(s)', 'bag(s)'
+    'kg(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)', 'lb(s)'
   ],
   'Grains & Pasta': [
-    'kg(s)', 'gram(s)', 'bag(s)', 'box(es)'
+    'kg(s)', 'gram(s)', 'lb(s)', 'bag(s)', 'box(es)', 'pack(s)'
+  ],
+  'Herbs & Spices': [
+    'gram(s)', 'ounce(s)', 'jar(s)', 'bottle(s)', 'bunch(es)', 'piece(s)'
+  ],
+  'Breakfast & Cereal': [
+    'box(es)', 'bag(s)', 'pack(s)', 'kg(s)', 'gram(s)', 'bottle(s)'
   ],
   'Other': [
-    'piece(s)', 'unit(s)', 'pack(s)', 'box(es)'
+    'piece(s)', 'unit(s)', 'pack(s)', 'box(es)', 'kg(s)', 'gram(s)'
   ]
 };
+
 
 // Filtered food items (remove duplicates, search, filter, sort)
 const filteredFoodItems = computed(() => {
@@ -282,25 +296,25 @@ const filteredFoodItems = computed(() => {
   const direction = sortDirection.value === 'desc' ? -1 : 1
 
   switch (sortBy.value) {
-      case 'expiration':
-        items.sort((a, b) => {
-          function parseDate(val) {
-            if (!val) return null;
-            if (typeof val.toDate === 'function') return val.toDate();
-            if (val instanceof Date) return val;
-            const d = new Date(val);
-            return isNaN(d.getTime()) ? null : d;
-          }
-          const dateA = parseDate(a.expirationDate);
-          const dateB = parseDate(b.expirationDate);
+    case 'expiration':
+      items.sort((a, b) => {
+        function parseDate(val) {
+          if (!val) return null;
+          if (typeof val.toDate === 'function') return val.toDate();
+          if (val instanceof Date) return val;
+          const d = new Date(val);
+          return isNaN(d.getTime()) ? null : d;
+        }
+        const dateA = parseDate(a.expirationDate);
+        const dateB = parseDate(b.expirationDate);
 
-          if (!dateA && !dateB) return 0;
-          if (!dateA) return 1;
-          if (!dateB) return -1;
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
 
-          return (dateA.getTime() - dateB.getTime()) * direction;
-        });
-        break;
+        return (dateA.getTime() - dateB.getTime()) * direction;
+      });
+      break;
 
     case 'name':
       items.sort((a, b) => {
@@ -476,7 +490,7 @@ watchEffect(async () => {
   if (!activitiesLoaded.value) return;
   const expiredFoods = foodItems.value.filter(food => getDaysLeft(food) < 0)
   const uid = userId.value;
-  
+
   for (const food of expiredFoods) {
     // Prevent duplicate logs by checking both local and Firestore activities
     const alreadyLogged = activities.value.some(a => a.foodName === food.name && a.activityType === 'expFood');
@@ -520,20 +534,20 @@ const analytics = computed(() => {
   // Total waste calculation
   const totalWasteItems = wasteActivities.length
   const totalWasteMoney = wasteActivities.reduce((total, activity) => {
-  // Multiply price by quantity (convert price to number since it's a string)
-  return total + (Number(activity.price) );
-}, 0);
-  
+    // Multiply price by quantity (convert price to number since it's a string)
+    return total + (Number(activity.price));
+  }, 0);
+
   // Total saved calculation: count only fully consumed food
   // Only activities with note === 'fully consumed' are counted as saved items.
   // Partial consumption events are intentionally excluded from the saved count,
   // as per current business logic. If partial consumption should contribute,
   // update this filter accordingly.
   const totalSavedItems = activities.value.filter(a => a.activityType === 'conFood' && a.note === 'fully consumed').length
-  const totalSavedMoney =  usedActivities.reduce((total, activity) => {
-    return total + (Number(activity.price) );
-  }, 0);  
-  
+  const totalSavedMoney = usedActivities.reduce((total, activity) => {
+    return total + (Number(activity.price));
+  }, 0);
+
   // Reduction percentage - items used before expiry vs total items
   const totalItemsHandled = totalWasteItems + totalSavedItems
   const reductionPercentage = totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
@@ -551,15 +565,15 @@ const analytics = computed(() => {
 
   // foodScore algo = itemssaved - itemswasted + moneysaved
   const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4);
-  const moneyScore = Math.max(0,(totalSavedMoney*0.2) - (totalWasteMoney*0.2) )
-  const foodScore= Math.round(itemsScore + moneyScore)
+  const moneyScore = Math.max(0, (totalSavedMoney * 0.2) - (totalWasteMoney * 0.2))
+  const foodScore = Math.round(itemsScore + moneyScore)
 
   return {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
     reduction: reductionPercentage,
-  inventory: { value: inventoryValue, items: inventoryItems },
-  foodScore: foodScore
+    inventory: { value: inventoryValue, items: inventoryItems },
+    foodScore: foodScore
   }
 })
 
@@ -737,7 +751,6 @@ const openAdd = () => {
   addForm.name = '';
   addForm.category = '';
   addForm.expirationDate = '';
-  // auto-fill createdAt to today's date (YYYY-MM-DD) and keep it uneditable
   addForm.createdAt = toInputDateString(new Date());
   addForm.price = '';
   addForm.quantity = '';
@@ -784,10 +797,10 @@ const saveAdd = async () => {
     // Add food item to Firestore
     const newDocRef = await addDoc(colRef, foodPayload);
 
-    // Log the activity in 'activities'
+
     const activityPayload = {
       activityType: 'addFood',
-      createdAt: new Date().toISOString(), // or use Timestamp.now() if a Firestore Timestamp is wanted
+      createdAt: new Date().toISOString(),
       foodName: addForm.name || '',
       category: addForm.category || '',
       price: String(addForm.price || ''),
@@ -1008,82 +1021,84 @@ const confirmDelete = async () => {
 
         </div>
 
-      <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <i class="bi bi-piggy-bank text-success"></i>
-            <small class="text-muted">Total Saved</small>
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-piggy-bank text-success"></i>
+              <small class="text-muted">Total Saved</small>
+            </div>
+            <h3 class="h4 text-success mb-1">${{ analytics.totalSaved.money }}</h3>
+            <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
           </div>
-          <h3 class="h4 text-success mb-1">${{ analytics.totalSaved.money }}</h3>
-          <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
+        </div>
+
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-arrow-up text-primary"></i>
+              <small class="text-muted">Reduction</small>
+            </div>
+            <h3 class="h4 text-primary mb-1">{{ analytics.reduction }}%</h3>
+            <small class="text-muted">food used before expiry</small>
+          </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+          <div class="glass-card stat-card p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-box text-info"></i>
+              <small class="text-muted">Inventory</small>
+            </div>
+            <h3 class="h4 text-info mb-1">${{ analytics.inventory.value.toFixed(2) }}</h3>
+            <small class="text-muted">{{ analytics.inventory.items }} items</small>
+          </div>
         </div>
       </div>
 
-      <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <i class="bi bi-arrow-up text-primary"></i>
-            <small class="text-muted">Reduction</small>
-          </div>
-          <h3 class="h4 text-primary mb-1">{{ analytics.reduction }}%</h3>
-          <small class="text-muted">food used before expiry</small>
-        </div>
-      </div>
-
-      <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <i class="bi bi-box text-info"></i>
-            <small class="text-muted">Inventory</small>
-          </div>
-          <h3 class="h4 text-info mb-1">${{ analytics.inventory.value.toFixed(2) }}</h3>
-          <small class="text-muted">{{ analytics.inventory.items }} items</small>
-        </div>
-      </div>
-      </div>
       <!-- Charts Section -->
-    <div class="row g-4 mb-3">
-      <!-- Waste vs Savings Bar Chart -->
-      <div class="col-lg-4">
-        <div class="glass-card p-4">
-          <h5 class="mb-4">
-            <i class="bi bi-bar-chart me-2"></i>
-            Waste vs Savings
-          </h5>
-          <div style="height: 300px;">
-            <Bar :data="wasteVsSavingsChart" :options="chartOptions" />
+      <div class="row g-4 mb-3">
+        <!-- Waste vs Savings Bar Chart -->
+        <div class="col-lg-4">
+          <div class="glass-card p-4">
+            <h5 class="mb-4">
+              <i class="bi bi-bar-chart me-2"></i>
+              Waste vs Savings
+            </h5>
+            <div style="height: 300px;">
+              <Bar :data="wasteVsSavingsChart" :options="chartOptions" />
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Waste by Category Pie Chart -->
-      <div class="col-lg-4">
-        <div class="glass-card p-4">
-          <h5 class="mb-4">
-            <i class="bi bi-pie-chart me-2"></i>
-            Waste by Category
-          </h5>
-          <div style="height: 300px;">
-            <Pie :data="wasteByCategoryChart" :options="chartOptions" />
+        <!-- Waste by Category Pie Chart -->
+        <div class="col-lg-4">
+          <div class="glass-card p-4">
+            <h5 class="mb-4">
+              <i class="bi bi-pie-chart me-2"></i>
+              Waste by Category
+            </h5>
+            <div style="height: 300px;">
+              <Pie :data="wasteByCategoryChart" :options="chartOptions" />
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Monthly Spending Trend -->
-      <div class="col-lg-4">
-        <div class="glass-card p-4">
-          <h5 class="mb-4">
-            <i class="bi bi-graph-up me-2"></i>
-            Monthly Spending Trend
-          </h5>
-          <div style="height: 300px;">
-            <Line :data="monthlySpendingChart" :options="chartOptions" />
+        <!-- Monthly Spending Trend -->
+        <div class="col-lg-4">
+          <div class="glass-card p-4">
+            <h5 class="mb-4">
+              <i class="bi bi-graph-up me-2"></i>
+              Monthly Spending Trend
+            </h5>
+            <div style="height: 300px;">
+              <Line :data="monthlySpendingChart" :options="chartOptions" />
+            </div>
           </div>
         </div>
       </div>
     </div>
-    </div>
 
+    <!-- Food Inventory -->
     <div class="row g-4">
       <div class="col-lg-8">
         <div class="glass-card p-4">
@@ -1123,7 +1138,8 @@ const confirmDelete = async () => {
           </div>
           <div v-else class="food-scroll-container">
             <div class="food-scroll-section">
-              <div v-for="food in filteredFoodItems" :key="food.id" :class="['food-card', getFoodCardClass(food), 'd-flex', 'flex-column', 'justify-content-between']">
+              <div v-for="food in filteredFoodItems" :key="food.id"
+                :class="['food-card', getFoodCardClass(food), 'd-flex', 'flex-column', 'justify-content-between']">
                 <div>
                   <div class="food-header">
                     <div>
@@ -1145,11 +1161,13 @@ const confirmDelete = async () => {
                   </div>
                 </div>
                 <div class="d-flex align-items-end justify-content-between mt-auto w-100">
-                  <button class="food-btn food-btn-recipe px-2 py-1" style="font-size: 0.92em; min-width: 0;" @click.prevent="goToRecipes(food)"><i class="bi bi-book"></i> Recipes</button>
+                  <button class="food-btn food-btn-recipe px-2 py-1" style="font-size: 0.92em; min-width: 0;"
+                    @click.prevent="goToRecipes(food)"><i class="bi bi-book"></i> Recipes</button>
                   <div class="food-actions d-flex gap-2">
                     <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
                       Edit</button>
-                    <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i> Use</button>
+                    <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i>
+                      Use</button>
                     <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
                         class="bi bi-trash"></i></button>
                   </div>
@@ -1160,20 +1178,26 @@ const confirmDelete = async () => {
         </div>
       </div>
 
+      <!-- Activities -->
       <div class="col-lg-4 d-none d-lg-block d-flex flex-column h-100">
         <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0;">
           <h3 class="h5 mb-2">Recent Activity</h3>
           <div class="d-flex align-items-center justify-content-between mb-3">
             <div class="d-flex gap-2 w-100">
-              <select v-model="activityTypeFilter" class="form-select form-select-sm" style="width: auto; min-width: 110px;">
+              <select v-model="activityTypeFilter" class="form-select form-select-sm"
+                style="width: auto; min-width: 110px;">
                 <option disabled value="">Activity</option>
                 <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
-              <select v-model="activityTimeFrame" class="form-select form-select-sm" style="width: auto; min-width: 90px;">
+              <select v-model="activityTimeFrame" class="form-select form-select-sm"
+                style="width: auto; min-width: 90px;">
                 <option disabled value="">Time</option>
-                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">{{ opt.label }}
+                </option>
               </select>
-              <button class="btn btn-outline-secondary btn-sm" :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'" @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'">
+              <button class="btn btn-outline-secondary btn-sm"
+                :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'"
+                @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'">
                 <i :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"></i>
               </button>
             </div>
@@ -1222,7 +1246,7 @@ const confirmDelete = async () => {
 
     </div>
 
-    <!-- Edit Modal -->
+    <!-- Edit Food Modal -->
     <div v-if="showEditModal" class="modal-backdrop">
       <div class="modal-card">
         <h3 class="h5 mb-3">Edit Food Item</h3>
@@ -1272,31 +1296,34 @@ const confirmDelete = async () => {
         </div>
       </div>
     </div>
+
     <!-- Use Food Modal -->
-  <div v-if="showUseModal" class="modal-backdrop">
-    <div class="modal-card">
-      <h3 class="h5 mb-3">Use Food Item</h3>
-      <p>How much of <strong>{{ useForm.name }}</strong> did you use?</p>
-      <div class="row g-2 mt-2">
-        <div class="col-6">
-          <label class="form-label">Quantity</label>
-          <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" />
+    <div v-if="showUseModal" class="modal-backdrop">
+      <div class="modal-card">
+        <h3 class="h5 mb-3">Use Food Item</h3>
+        <p>How much of <strong>{{ useForm.name }}</strong> did you use?</p>
+        <div class="row g-2 mt-2">
+          <div class="col-6">
+            <label class="form-label">Quantity</label>
+            <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" />
+          </div>
+          <div class="col-6">
+            <label class="form-label">Unit</label>
+            <input v-model="useForm.unit" type="text" class="form-control" />
+          </div>
         </div>
-        <div class="col-6">
-          <label class="form-label">Unit</label>
-          <input v-model="useForm.unit" type="text" class="form-control" />
+        <div class="d-flex justify-content-end gap-2 mt-3">
+          <button class="btn btn-secondary" @click="closeUse">Cancel</button>
+          <button class="btn btn-primary" @click="saveUse">Use</button>
         </div>
-      </div>
-      <div class="d-flex justify-content-end gap-2 mt-3">
-        <button class="btn btn-secondary" @click="closeUse">Cancel</button>
-        <button class="btn btn-primary" @click="saveUse">Use</button>
       </div>
     </div>
-  </div>
+
 
     <!-- Floating Add Button -->
     <button class="fab-add" @click="openAdd" title="Add Food">
       <i class="bi bi-plus-lg"></i>
+      <span class="fab-text">Add Food</span>
     </button>
 
     <!-- Add Modal -->
@@ -1311,7 +1338,8 @@ const confirmDelete = async () => {
           <label class="form-label">Category</label>
           <select v-model="addForm.category" class="form-select">
             <option disabled value="">Select a category</option>
-            <option v-for="cat in categories.filter(c => c !== 'All Categories')" :key="cat" :value="cat">{{ cat }}</option>
+            <option v-for="cat in categories.filter(c => c !== 'All Categories')" :key="cat" :value="cat">{{ cat }}
+            </option>
           </select>
         </div>
         <div class="row g-2">
@@ -1465,7 +1493,8 @@ const confirmDelete = async () => {
 }
 
 .food-name {
-  font-size: 1.25rem; /* reduced slightly */
+  font-size: 1.25rem;
+  /* reduced slightly */
   font-weight: bold;
 }
 
@@ -1516,7 +1545,8 @@ const confirmDelete = async () => {
 }
 
 .food-price {
-  font-size: 1.1rem; /* reduced slightly */
+  font-size: 1.1rem;
+  /* reduced slightly */
   font-weight: bold;
   margin-left: 12px;
 }
@@ -1560,36 +1590,59 @@ const confirmDelete = async () => {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  width: 56px;
+  min-width: 56px;
   height: 56px;
-  border-radius: 50%;
+  border-radius: 28px;
   background: linear-gradient(180deg, #10b981, #059669);
   color: #fff;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
   font-size: 20px;
   box-shadow: 0 6px 18px rgba(5, 150, 105, 0.25);
   cursor: pointer;
   z-index: 2500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.fab-add i {
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.fab-text {
+  font-size: 16px;
+  font-weight: 600;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s ease;
 }
 
 .fab-add:hover {
   transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(5, 150, 105, 0.35);
+  padding-right: 20px;
 }
 
-.custom-toast {
-  position: fixed;
-  right: 24px;
-  bottom: 100px;
-  background: rgba(17, 24, 39, 0.95);
-  color: white;
-  padding: 10px 14px;
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
-  z-index: 6000;
-  font-weight: 600;
+.fab-add:hover .fab-text {
+  max-width: 100px;
+  opacity: 1;
+}
+
+.fab-add:hover i {
+  transform: rotate(90deg);
+}
+
+.fab-add:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
 }
 
 .modal-card h5 {
@@ -1638,6 +1691,7 @@ const confirmDelete = async () => {
     box-shadow: 0 8px 30px rgba(229, 57, 53, 0.06), 0 0 0 rgba(229, 57, 53, 0);
   }
 }
+
 /* Make activity card scrollable and match inventory height */
 .activity-scroll {
   min-height: 0;
@@ -1645,6 +1699,7 @@ const confirmDelete = async () => {
   overflow-y: auto;
   flex: 1 1 auto;
 }
+
 .min-h-0 {
   min-height: 0;
 }
