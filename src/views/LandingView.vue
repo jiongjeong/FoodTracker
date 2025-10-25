@@ -5,7 +5,7 @@
       <div class="hero-content">
         <div class="brand-logo">
           <img src="/bigbackicon.jpg" alt="BigBack FoodTracker" class="logo-img" />
-          <span class="brand-name">FoodTracker</span>
+          <span class="brand-name">BigBacks</span>
         </div>
         <h1 class="hero-title">
           Track Food. <span class="highlight">Save Money.</span><br />

@@ -1,39 +1,117 @@
 <template>
-  <div class="signup-container">
-    <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
-    <div v-if="successMessage" class="success">{{ successMessage }}</div>
-    <h2>Sign Up</h2>
-    <form @submit.prevent="submitForm">
-      <div class="form-group">
-        <label for="name">Name</label>
-        <input type="text" id="name" v-model="name" placeholder="Enter your name" required />
+  <div class="signup-wrapper">
+    <div class="signup-container">
+      <!-- Logo and Brand -->
+      <div class="brand-section">
+        <img src="/bigbackicon.jpg" alt="FoodTracker" class="brand-logo" />
+        <h2 class="brand-title">Create Account</h2>
+        <p class="brand-subtitle">Join FoodTracker and start reducing waste today</p>
       </div>
 
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" v-model="email" placeholder="Enter your email" required />
+      <!-- Signup Form -->
+      <form @submit.prevent="submitForm" class="signup-form">
+        <div class="form-group">
+          <label for="name">
+            <i class="bi bi-person-fill"></i>
+            Full Name
+          </label>
+          <input
+            type="text"
+            id="name"
+            v-model="name"
+            placeholder="Enter your full name"
+            required
+            autocomplete="name"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="email">
+            <i class="bi bi-envelope-fill"></i>
+            Email Address
+          </label>
+          <input
+            type="email"
+            id="email"
+            v-model="email"
+            placeholder="Enter your email"
+            required
+            autocomplete="email"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">
+            <i class="bi bi-lock-fill"></i>
+            Password
+          </label>
+          <div class="password-input-wrapper">
+            <input
+              :type="showPassword ? 'text' : 'password'"
+              id="password"
+              v-model="password"
+              placeholder="Create a password"
+              required
+              autocomplete="new-password"
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              @click="showPassword = !showPassword"
+              tabindex="-1"
+            >
+              <i :class="showPassword ? 'bi bi-eye-slash-fill' : 'bi bi-eye-fill'"></i>
+            </button>
+          </div>
+          <small class="password-hint">At least 6 characters</small>
+        </div>
+
+        <div class="form-group">
+          <label for="confirmPassword">
+            <i class="bi bi-lock-check-fill"></i>
+            Confirm Password
+          </label>
+          <div class="password-input-wrapper">
+            <input
+              :type="showConfirmPassword ? 'text' : 'password'"
+              id="confirmPassword"
+              v-model="confirmPassword"
+              placeholder="Confirm your password"
+              required
+              autocomplete="new-password"
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              @click="showConfirmPassword = !showConfirmPassword"
+              tabindex="-1"
+            >
+              <i :class="showConfirmPassword ? 'bi bi-eye-slash-fill' : 'bi bi-eye-fill'"></i>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="errorMessage" class="error-message">
+          <i class="bi bi-exclamation-circle-fill"></i>
+          {{ errorMessage }}
+        </div>
+
+        <div v-if="successMessage" class="success-message">
+          <i class="bi bi-check-circle-fill"></i>
+          {{ successMessage }}
+        </div>
+
+        <button type="submit" class="btn-signup" :disabled="isLoading">
+          <span v-if="!isLoading">Create Account</span>
+          <span v-else class="spinner-border spinner-border-sm" role="status"></span>
+        </button>
+      </form>
+
+      <!-- Login Link -->
+      <div class="login-section">
+        <p>Already have an account? <a @click="goToLogin" class="login-link">Sign In</a></p>
       </div>
-
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" v-model="password" placeholder="Enter your password" required />
-      </div>
-
-      <div class="form-group">
-        <label for="confirmPassword">Confirm Password</label>
-        <input type="password" id="confirmPassword" v-model="confirmPassword" placeholder="Confirm your password"
-          required />
-      </div>
-
-
-
-
-      <button type="submit">Sign Up</button>
-    </form>
-
-    <button @click="goToLogin" class="login-redirect-btn">
-      Already have an account? Log In
-    </button>
+    </div>
   </div>
 </template>
 
@@ -52,16 +130,28 @@ export default {
       confirmPassword: '',
       errorMessage: '',
       successMessage: '',
+      showPassword: false,
+      showConfirmPassword: false,
+      isLoading: false
     };
   },
   methods: {
     async submitForm() {
       this.errorMessage = "";
       this.successMessage = "";
+
       if (this.password !== this.confirmPassword) {
         this.errorMessage = "Passwords do not match.";
         return;
       }
+
+      if (this.password.length < 6) {
+        this.errorMessage = "Password must be at least 6 characters.";
+        return;
+      }
+
+      this.isLoading = true;
+
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, this.email, this.password);
         const user = userCredential.user;
@@ -71,13 +161,15 @@ export default {
         await setDoc(doc(db, "user", user.uid), {
           name: this.name,
           email: this.email,
+          contactNo: "",
+          handle: "",
           foodScore: 0,
-          createdAt: new Date()
+          createdAt: new Date().toISOString()
         });
 
         await this.initializeUserCollections(user.uid);
 
-        this.successMessage = "Registration successful! Redirecting to login...";
+        this.successMessage = "Account created successfully! Redirecting...";
 
         setTimeout(() => {
           this.$router.push('/login');
@@ -88,14 +180,16 @@ export default {
             this.errorMessage = "Email is already registered.";
             break;
           case 'auth/invalid-email':
-            this.errorMessage = "Invalid email.";
+            this.errorMessage = "Invalid email address.";
             break;
           case 'auth/weak-password':
-            this.errorMessage = "Password is too weak.";
+            this.errorMessage = "Password is too weak. Use at least 6 characters.";
             break;
           default:
-            this.errorMessage = "Signup failed: " + error.message;
+            this.errorMessage = "Signup failed. Please try again.";
         }
+      } finally {
+        this.isLoading = false;
       }
     },
 
@@ -129,8 +223,8 @@ export default {
         _placeholder: true,
         activityType: "",
         foodName: "",
-        quantity:"",
-        price:"",
+        quantity: "",
+        price: "",
         createdAt: ""
       });
     },
@@ -150,124 +244,294 @@ export default {
 }
 </script>
 
-
 <style scoped>
-.signup-container {
-  background: white;
-  max-width: 400px;
-  margin: 2rem auto;
-  padding: 2rem;
-  border-radius: 0.5rem;
-  color: black;
-  font-family: Arial, sans-serif;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+.signup-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 50%, #fef3c7 100%);
+  padding: 2rem 1rem;
 }
 
-h2 {
-  margin-bottom: 1.5rem;
-  color: #10b981;
+.signup-container {
+  max-width: 440px;
+  width: 100%;
+  background: white;
+  padding: 2.5rem 2rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Brand Section */
+.brand-section {
   text-align: center;
+  margin-bottom: 2rem;
+}
+
+.brand-logo {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+}
+
+.brand-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+}
+
+.brand-subtitle {
+  font-size: 0.95rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Form Styles */
+.signup-form {
+  margin-bottom: 1.5rem;
 }
 
 .form-group {
   margin-bottom: 1.25rem;
-  display: flex;
-  flex-direction: column;
 }
 
 label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin-bottom: 0.5rem;
   font-weight: 600;
-  color: black;
+  color: #374151;
+  font-size: 0.9rem;
 }
 
-input {
-  padding: 0.5rem 0.75rem;
-  font-size: 1rem;
-  border-radius: 0.25rem;
-  border: 1px solid #374151;
-  color: #000;
-  box-sizing: border-box;
+label i {
+  color: #059669;
+}
+
+input[type="email"],
+input[type="password"],
+input[type="text"] {
   width: 100%;
-  transition: border-color 0.3s ease;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  font-family: inherit;
 }
 
 input:focus {
-  border-color: #059669;
   outline: none;
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
 }
 
-button[type='submit'] {
-  background: #10b981;
-  border: none;
-  padding: 0.75rem;
-  font-weight: 700;
-  border-radius: 0.25rem;
-  color: white;
-  cursor: pointer;
-  width: 100%;
-  transition: background-color 0.3s ease;
+/* Password Input Wrapper */
+.password-input-wrapper {
+  position: relative;
 }
 
-button[type='submit']:hover {
-  background: #059669;
+.password-input-wrapper input {
+  padding-right: 3rem;
 }
 
-.login-redirect-btn {
-  width: 100%;
-  text-align: center;
-  margin-top: 1rem;
-  padding: 0.75rem;
+.toggle-password {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
   background: transparent;
-  border: 1px solid #10b981;
-  color: #10b981;
-  font-weight: 700;
-  border-radius: 0.375rem;
+  border: none;
+  color: #6b7280;
   cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.login-redirect-btn:hover {
-  background: #10b981;
-  color: #121212;
-}
-
-.error {
-  background: #dc2626;
   padding: 0.5rem;
-  border-radius: 0.25rem;
-  text-align: center;
-  margin-bottom: 1rem;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+  width: auto;
+  margin: 0;
 }
 
-.success {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background-color: #059669;
-  /* bright green */
-  color: white;
-  font-weight: 700;
-  padding: 1rem 1.5rem;
-  margin-bottom: 1rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0, 150, 70, 0.3);
-  text-align: center;
+.toggle-password:hover {
+  color: #059669;
+  background: transparent;
+}
+
+.toggle-password i {
   font-size: 1.1rem;
-  animation: slideDownFade 0.7s ease forwards;
 }
 
+.password-hint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-style: italic;
+}
 
-@keyframes slideDownFade {
+/* Error Message */
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  animation: shake 0.4s ease;
+}
+
+.error-message i {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Success Message */
+.success-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  color: #059669;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  animation: slideDown 0.4s ease;
+}
+
+.success-message i {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+@keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateY(-15px);
+    transform: translateY(-10px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Buttons */
+.btn-signup {
+  width: 100%;
+  padding: 0.875rem;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);
+  margin-top: 0;
+}
+
+.btn-signup:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.btn-signup:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-signup:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Login Section */
+.login-section {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.login-section p {
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.login-link {
+  color: #059669;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.login-link:hover {
+  color: #047857;
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .signup-wrapper {
+    padding: 1rem 0.5rem;
+  }
+
+  .signup-container {
+    padding: 2rem 1.5rem;
+    border-radius: 12px;
+  }
+
+  .brand-logo {
+    width: 64px;
+    height: 64px;
+  }
+
+  .brand-title {
+    font-size: 1.5rem;
+  }
+
+  .brand-subtitle {
+    font-size: 0.875rem;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
   }
 }
 </style>
