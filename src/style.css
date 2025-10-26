@@ -55,12 +55,31 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .stat-card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  position: relative;
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.1);
+  min-height: 150px;
 }
 
 .stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 40px rgba(31, 38, 135, 0.45);
+}
+
+/* Header collapse toggle button next to Dashboard title */
+.header-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 100%
+  
+}
+.header-collapse-btn:hover{
+  background-color: #059669;
 }
 
 /* Media queries for responsive design */
