@@ -70,6 +70,9 @@ const deleteTarget = ref(null);
 const showToast = ref(false);
 const toastMessage = ref('');
 
+// Collapse state for overview lower rows
+const overviewCollapsed = ref(false);
+
 function showToastFor(msg, ms = 2200) {
   toastMessage.value = msg;
   showToast.value = true;
@@ -1016,134 +1019,173 @@ const confirmDelete = async () => {
           <h1 class="h2 mb-2">Dashboard</h1>
           <p class="text-muted mb-0">Track your food inventory and reduce waste</p>
         </div>
+        <div class="ms-3">
+          <div style="transform: rotateY(9.20483deg);">
+          <button @click="overviewCollapsed = !overviewCollapsed" :aria-expanded="!overviewCollapsed" class="btn btn-sm btn-outline-secondary header-collapse-btn">
+            <i :class="overviewCollapsed ? 'bi bi-chevron-down' : 'bi bi-chevron-up'"></i>
+            <span class="visually-hidden">Toggle overview rows</span>
+          </button>
+        </div>
+        </div>
       </div>
 
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-graph-up-arrow text-success"></i>
-              <small class="text-muted">Food Score</small>
+        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
+          <!-- Left: Icon + label -->
+          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
+            <div class="icon-circle mb-2">
+              <i class="bi bi-graph-up-arrow"></i>
             </div>
-            <h3 class="h4">{{ analytics.foodScore }}</h3>
+            <small class="text-muted text-center">Food Score</small>
+          </div>
+
+          <!-- Right: Score + Streak -->
+          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+            <h3 class="fw-bold mb-0">{{ analytics.foodScore }}</h3>
             <small class="text-muted">points</small>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3 position-relative overflow-hidden">
-            <!-- Streak fire animation background -->
-            <div v-if="analytics.streakDays > 0" class="streak-fire-bg"
-              :class="{ 'streak-hot': analytics.streakDays >= 7, 'streak-blazing': analytics.streakDays >= 14 }">
-            </div>
 
-            <div class="d-flex align-items-center gap-2 mb-2 position-relative">
-              <i class="bi bi-graph-up-arrow text-success"></i>
-              <small class="text-muted">Food Score</small>
-            </div>
-
-            <div class="position-relative">
-              <h3 class="h4 mb-1">{{ analytics.foodScore }}
-              
-
-              <!-- Streak display with fire emoji -->
-              <div v-if="analytics.streakDays > 0" class="streak-badge mt-2" style="position: relative; float: right;">
-                <span class="streak-fire" :class="{
-                  'fire-small': analytics.streakDays < 7,
-                  'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
-                  'fire-large': analytics.streakDays >= 14
-                }">🔥</span>
-                <span class="streak-text">
-                  {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
-                </span>
-              </div>
-
-              <small v-else class="text-muted d-block mt-1">Start a streak today!</small>
-              </h3>
-              <small class="text-muted"> points</small>
+            <!-- Streak badge -->
+            <div v-if="analytics.streakDays > 0" class="streak-badge mt-2" style="display: flex; justify-content: flex-end; gap: 4px;">
+              <span class="streak-fire" :class="{
+                'fire-small': analytics.streakDays < 7,
+                'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
+                'fire-large': analytics.streakDays >= 14
+              }">🔥</span>
+              <span class="streak-text text-secondary">
+                {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
+              </span>
             </div>
           </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-exclamation-triangle text-warning"></i>
-              <small class="text-muted">Expiring Soon</small>
-            </div>
-            <h3 class="h4">{{ expiringSoon }}</h3>
-            <small class="text-muted">items</small>
           </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-currency-dollar text-success"></i>
-              <small class="text-muted">Potential Loss</small>
-            </div>
-            <h3 class="h4">${{ potentialLoss.toFixed(2) }}</h3>
-            <small class="text-muted">if expired</small>
           </div>
-        </div>
         <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-calendar-x text-danger"></i>
-              <small class="text-muted">Expired</small>
+        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
+          <!-- Left: Icon + label -->
+          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
+            <div class="icon-circle mb-2" style="background-color: #FFC107; box-shadow: 0 0 15px rgba(255, 193, 7, 0.6);">
+              <i class="bi bi-exclamation-triangle"></i>
             </div>
-            <h3 class="h4 text-danger">{{ expired }}</h3>
+            <small class="text-muted text-center">Expiring Soon</small>
+          </div>
+
+          <!-- Right: Count -->
+          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+            <h3 class="fw-bold mb-0">{{ expiringSoon }}</h3>
             <small class="text-muted">items</small>
           </div>
         </div>
       </div>
-
-      <div class="row g-3 mb-4">
-        <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-trash text-danger"></i>
-              <small class="text-muted">Total Waste</small>
+      <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
+          <!-- Left: Icon + label -->
+          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
+            <div class="icon-circle mb-2">
+              <i class="bi bi-currency-dollar"></i>
             </div>
-            <h3 class="h4 text-danger mb-1">${{ analytics.totalWaste.money }}</h3>
-            <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
+            <small class="text-muted text-center">Potential Loss</small>
           </div>
 
+          <!-- Right: Count -->
+          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+            <h3 class="fw-bold mb-0">${{ potentialLoss.toFixed(2) }}</h3>
+            <small class="text-muted">if expired</small>
+          </div>
         </div>
-
-        <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-piggy-bank text-success"></i>
-              <small class="text-muted">Total Saved</small>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
+          <!-- Left: Icon + label -->
+          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
+            <div class="icon-circle mb-2"  style="background-color: #EF4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);">
+              <i class="bi bi-calendar-x"></i>
             </div>
-            <h3 class="h4 text-success mb-1">${{ analytics.totalSaved.money }}</h3>
+            <small class="text-muted text-center">Expired</small>
+          </div>
+
+          <!-- Right: Count -->
+          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+            <h3 class="fw-bold mb-0">{{ expired }}</h3>
+            <small class="text-muted">items</small>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <div class="row g-3 mb-4" v-show="overviewCollapsed">
+        <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
+          <!-- Left: Icon + label -->
+          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
+            <div class="icon-circle mb-2"  style="background-color: #EF4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);">
+              <i class="bi bi-trash"></i>
+            </div>
+            <small class="text-muted text-center">Total Waste</small>
+          </div>
+
+          <!-- Right: Count -->
+          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+            <h3 class="fw-bold mb-0">${{ analytics.totalWaste.money }}</h3>
+            <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
+          <!-- Left: Icon + label -->
+          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
+            <div class="icon-circle mb-2" >
+              <i class="bi bi-piggy-bank"></i>
+            </div>
+            <small class="text-muted text-center">Total Saved</small>
+          </div>
+
+          <!-- Right: Count -->
+          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+            <h3 class="fw-bold mb-0">${{ analytics.totalSaved.money }}</h3>
             <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
           </div>
         </div>
-
-        <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-arrow-up text-primary"></i>
-              <small class="text-muted">Reduction</small>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
+          <!-- Left: Icon + label -->
+          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
+            <div class="icon-circle mb-2" style="background-color: #3B82F6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);" >
+              <i class="bi bi-calendar-x"></i>
             </div>
-            <h3 class="h4 text-primary mb-1">{{ analytics.reduction }}%</h3>
+            <small class="text-muted text-center">Reduction</small>
+          </div>
+
+          <!-- Right: Count -->
+          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+            <h3 class="fw-bold mb-0">{{ analytics.reduction }}%</h3>
             <small class="text-muted">food used before expiry</small>
           </div>
         </div>
-
-        <div class="col-6 col-lg-3">
-          <div class="glass-card stat-card p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-box text-info"></i>
-              <small class="text-muted">Inventory</small>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
+          <!-- Left: Icon + label -->
+          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
+            <div class="icon-circle mb-2"style="background-color: #5BC0EB; box-shadow: 0 0 15px rgba(91, 192, 235, 0.6);"
+>
+              <i class="bi bi-box"></i>
             </div>
-            <h3 class="h4 text-info mb-1">${{ analytics.inventory.value.toFixed(2) }}</h3>
+            <small class="text-muted text-center">Inventory</small>
+          </div>
+
+          <!-- Right: Count -->
+          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+            <h3 class="fw-bold mb-0">${{ analytics.inventory.value.toFixed(2) }}</h3>
             <small class="text-muted">{{ analytics.inventory.items }} items</small>
           </div>
         </div>
       </div>
+      </div>
 
       <!-- Charts Section -->
-      <div class="row g-4 mb-3">
+      <div class="row g-4 mb-3" v-show="overviewCollapsed">
         <!-- Waste vs Savings Bar Chart -->
         <div class="col-lg-4">
           <div class="glass-card p-4">
@@ -1491,18 +1533,6 @@ const confirmDelete = async () => {
   margin-bottom: 1.5rem;
 }
 
-
-.dashboard-overview::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #059669 0%, #10b981 50%, #34d399 100%);
-  border-radius: 1rem 1rem 0 0;
-}
-
 .food-scroll-container {
   max-width: 100%;
   margin: 0 auto;
@@ -1558,6 +1588,105 @@ const confirmDelete = async () => {
   background: #ede9e8;
   color: #333;
 }
+/* --- Stat Card Alignment Fix --- */
+.stat-card {
+  display: flex;
+  align-items: center;           /* vertically align icon + text */
+  justify-content: space-between;
+  min-height: 150px;
+  padding: 20px 24px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+}
+
+/* Icon + Label container (fixed width) */
+.left-section {
+  flex: 0 0 90px;                /* fixed width for all cards */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Icon Circle */
+.icon-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 24px;
+  background-color:#10B981; 
+  box-shadow:0 0 15px rgba(16, 185, 129, 0.6);
+}
+
+/* Label under icon */
+.left-section small {
+  margin-top: 6px;
+  margin-left: 0px;
+  font-size: 13px;
+  color: #6b7684;
+  text-align: center;
+  width: 86px;          /* consistent width */
+}
+
+
+/* Text section (dynamic width) */
+.content {
+  flex: 1;
+  text-align: right;
+}
+
+.content h3 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  color: #0f1b2d;
+}
+
+.content small {
+  font-size: 13px;
+  color: #6b7684;
+}
+
+/* Optional: Streak badge alignment */
+.streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff9ea;
+  border: 1px solid #f6e3b5;
+  font-size: 12px;
+  color: #7a6a3a;
+}
+
+/* --- Responsive tweak for mobile --- */
+@media (max-width: 575px) {
+  .stat-card {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .left-section {
+    flex: unset;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .content {
+    text-align: left;
+    width: 100%;
+  }
+}
+
 
 .food-header {
   display: flex;
@@ -1908,4 +2037,5 @@ const confirmDelete = async () => {
   position: relative;
   z-index: 1;
 }
+
 </style>
