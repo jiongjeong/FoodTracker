@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue';
 import { db, auth } from '../firebase.js';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, updateDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
 import LocationPicker from '@/components/LocationPicker.vue';
 import { loadGoogleMaps } from '@/composables/loadGoogleMap.js'
@@ -33,13 +33,10 @@ const shareForm = ref({
   notes: '',
   unit: '',
   location: null,
+  foodItemId: ''
 })
 
-const handleLocationSelected = (location) => {
-  shareForm.value.location = location 
-}
-
-const handleShareFood = () => {
+const handleShareFood = async () => {
   // DO NOT replace shareForm.value
   Object.assign(shareForm.value, {
     foodName: '',
@@ -52,6 +49,12 @@ const handleShareFood = () => {
     location: null
   })
   showShareModal.value = true
+  await nextTick() // Wait for foodItems to be loaded
+  if (foodItems.value.length === 1) {
+    const item = foodItems.value[0]
+    shareForm.value.foodName = item.name
+    onSelectFoodItem() // ← Force populate foodItemId
+  }
 }
 
 
@@ -92,6 +95,7 @@ function onSelectFoodItem() {
   const selected = foodItems.value.find(fi => fi.name === shareForm.value.foodName)
   if (selected) {
     shareForm.value.category = selected.category || ''
+    shareForm.value.foodItemId = selected.id
 
     if (selected.expirationDate) {
       if (typeof selected.expirationDate.toDate === 'function') {
@@ -125,6 +129,8 @@ async function loadMyListings() {
       id: doc.id,
       ...data,
       daysUntilExpiration: getDaysLeft(data.expirationDate),
+      pickupTime: data.pickupTime || 'Not specified',
+      notes: data.notes || ''
     }
   })
 }
@@ -134,7 +140,9 @@ async function loadAvailableListings() {
   const sharedItemsRef = collection(db, "communityListings")
   const sharedItemsSnapshot = await getDocs(sharedItemsRef)
   sharedItems.value = sharedItemsSnapshot.docs.map(doc => ({ 
-    id: doc.id, ...doc.data(), daysUntilExpiration: getDaysLeft(doc.data().expirationDate) 
+    id: doc.id, ...doc.data(), daysUntilExpiration: getDaysLeft(doc.data().expirationDate),
+    pickupTime: doc.data().pickupTime || 'Not specified',  // ← ADD
+    notes: doc.data().notes || ''
   }))
   .filter(item => item.ownerId !== currentUser.value?.uid);
   console.log("Available listings loaded:", sharedItems.value)
@@ -157,7 +165,8 @@ async function submitShare() {
       quantity: shareForm.value.quantity,
       unit: shareForm.value.unit,
       expirationDate: expDate,
-      distance: 0,
+      pickupTime: shareForm.value.pickupTime || 'Anytime',
+      notes: shareForm.value.notes || '',
       sharedBy: currentUser.value.displayName || (currentUser.value.email ? currentUser.value.email.split("@")[0] : 'User'),
       contact: {
         email: shareForm.value.contactEmail || currentUser.value.email,
@@ -173,6 +182,28 @@ async function submitShare() {
     }
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
+    const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', shareForm.value.foodItemId)
+    const currentQty = foodItems.value.find(f => f.id === shareForm.value.foodItemId)?.quantity || 0
+    const newQty = currentQty - shareForm.value.quantity
+
+    await updateDoc(foodItemRef, {
+      quantity: Math.max(0, newQty)
+    })
+    const remaining = getRemainingQuantity(shareForm.value.foodName)
+    if (shareForm.value.quantity > remaining) {
+    return alert(`You only have ${remaining} ${shareForm.value.unit} left to share.`)
+  }
+
+    await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
+      activityType: 'pendingDonFood',
+      createdAt: new Date().toISOString(),
+      category: data.category,
+      price: 0,
+      foodName: data.foodName,
+      quantity: data.quantity,
+      unit: data.unit,
+    })
+
 
     const savedDoc = await getDoc(docRef)
     console.log("Verified Firestore document:", savedDoc.data())
@@ -180,17 +211,81 @@ async function submitShare() {
     alert("Food shared successfully!")
     showShareModal.value = false
     await loadMyListings()
+    await loadFoodItems()
   } catch (err) {
     console.error("Error adding listing:", err)
   }
 }
 
+
+async function markAsDonated(item) {
+  if (!confirm(`Mark "${item.foodName}" as donated?`)) return
+
+  try {
+    // Update listing
+    await updateDoc(doc(db, 'communityListings', item.id), {
+      donated: true,
+      donatedAt: serverTimestamp()
+    })
+
+    // Log donation in user's activities
+    await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
+      activityType: 'donFood',
+      category: item.category,
+      createdAt: new Date().toISOString(),
+      foodName: item.foodName,
+      price: 0,
+      quantity: item.quantity,
+      unit: item.unit
+    })
+
+    alert('Marked as donated!')
+    await loadMyListings()
+    await loadFoodItems()
+  } catch (err) {
+    console.error(err)
+    alert('Failed to mark as donated')
+  }
+}
+
+// checking if items have alr been shared
+const donationActivities = ref([])
+const activitiesLoaded = ref(false)
+async function loadDonationActivities() {
+  if (!currentUser.value) return
+  const q = query(
+    collection(db, 'user', currentUser.value.uid, 'activities'),
+    where('activityType', 'in', ['pendingDonFood', 'donFood'])
+  )
+  const snap = await getDocs(q)
+  donationActivities.value = snap.docs.map(d => d.data())
+  activitiesLoaded.value = true
+}
+
+
+const isFoodShared = (foodName) => {
+  if (!activitiesLoaded.value) return false
+  return donationActivities.value.some(act => act.foodName === foodName)
+}
+
+const getRemainingQuantity = (foodName) => {
+  const item = foodItems.value.find(f => f.name === foodName)
+  if (!item) return 0
+
+  const total = Number(item.quantity) || 0
+  const shared = donationActivities.value
+    .filter(a => a.foodName === foodName && a.activityType === 'pendingDonFood')
+    .reduce((sum, a) => sum + Number(a.quantity || 0), 0)
+
+  return Math.max(0, total - shared)
+}
+
 onAuthStateChanged(auth, (user) => {
   if (user) {
     currentUser.value = user
-    loadMyListings()
     loadAvailableListings()
     loadFoodItems()
+    loadDonationActivities()
   } else {
     currentUser.value = null
   }
@@ -205,6 +300,7 @@ onMounted(async () => {
   await loadAvailableListings()
   await loadMyListings()
   await loadFoodItems()
+  loadDonationActivities()
 
   loadPreferredLocation()
   calculateDistances()
@@ -284,11 +380,9 @@ function calculateDistances() {
       return { ...item, distance: null }
     }
   })
-
-  console.log('Distances:', itemsWithDistance.value.map(i => i.distance))
 }
 
-/* Re‑calculate whenever sharedItems or preferredLocation changes */
+
 watch(
   [sharedItems, preferredLocation, geometry],
   () => {
@@ -299,37 +393,67 @@ watch(
   },
   { deep: true }
 )
-
-// Optional: Keep for debugging
 watch(preferredLocation, (newVal) => {
   console.log('preferredLocation changed:', newVal)
 })
 
+
+
 </script>
 
 
-<template>
+<template>       
   <div class="container-fluid p-4">
-    <div class="mb-4 d-flex justify-content-between align-items-start">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-4">
+      <!-- Title & subtitle -->
       <div>
         <h1 class="h2 mb-2">Community Food Sharing</h1>
         <p class="text-muted">Share expiring food with neighbors to reduce waste</p>
       </div>
 
-      <div v-if="!preferredLocation" class="mb-3">
-        <label class="form-label">Preferred Pickup Location</label>
-        <LocationPicker @place-selected="setPreferredLocation" />
-      </div>
+      <!-- Location picker (right side) -->
+      <div class="d-flex flex-column gap-2 align-self-md-start" style="min-width: 280px;">
+        <label class="form-label fw-medium">
+          <i class="bi bi-geo-alt-fill me-1"></i> Preferred Pickup Location
+        </label>
 
-      <div v-else class="mb-3">
-        <span>
-          <strong>{{ preferredLocation.address }}</strong>
-        </span>
-        <LocationPicker @place-selected="setPreferredLocation" class="d-inline-block" />
-        <button @click="clearPreferredLocation" class="btn btn-sm btn-outline-danger">Clear</button>
+        <!-- No location selected -->
+        <template v-if="!preferredLocation">
+          <LocationPicker @place-selected="setPreferredLocation" class="w-100" />
+        </template>
+
+        <!-- Location selected -->
+        <template v-else>
+          <!-- Picker (change) -->
+          <LocationPicker
+            @place-selected="setPreferredLocation"
+            class="w-100"
+            style="max-width: 300px;"
+          />
+
+          <!-- Address BELOW the picker -->
+          <div class="d-flex align-items-center gap-2 mt-1">
+            <div
+              class="bg-light rounded px-3 py-1 text-dark text-truncate flex-grow-1"
+              style="font-size: 0.9rem; max-width: 260px;"
+              :title="preferredLocation.address"
+            >
+              <strong>{{ preferredLocation.address }}</strong>
+            </div>
+
+            <button
+              @click="clearPreferredLocation"
+              class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1"
+              title="Clear location"
+            >
+              <i class="bi bi-x-circle"></i>
+              <span class="d-none d-sm-inline">Clear</span>
+            </button>
+          </div>
+        </template>
       </div>
     </div>
-
+  </div>
 
     <div class="glass-card p-4 mb-4">
       <div class="d-flex justify-content-between align-items-center mb-4">
@@ -350,9 +474,34 @@ watch(preferredLocation, (newVal) => {
             <div class="card-body">
               <h5 class="card-title mb-2">{{ item.foodName }}</h5>
               <p class="text-muted mb-0">{{ item.quantity }} {{ item.unit }}</p>
-              <span class="badge badge-warning-orange mt-2">
+              <p class="text-muted small mb-2">
+                <i class="bi bi-geo-alt me-1"></i>
+                {{ item.location?.address || 'No address' }}
+              </p>
+              <p class="text-muted small mb-2">
+                <i class="bi bi-clock me-1"></i>
+                Pickup Time: {{ item.pickupTime }}
+              </p>
+
+              <p v-if="item.notes" class="text-muted small mb-2">
+                <i class="bi bi-chat-text me-1"></i>
+                {{ item.notes }}
+              </p>
+              <span class="badge badge-warning-orange mt-2 text-black">
                 Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}
               </span>
+              <button
+                v-if="!item.donated"
+                @click="markAsDonated(item)"
+                class="btn btn-success btn-sm w-30"
+              >
+                <i class="bi bi-check-circle me-1"></i>
+                Mark as Donated
+              </button>
+              <div v-else class="badge bg-success w-30 text-center py-2">
+                <i class="bi bi-check-circle-fill me-1"></i>
+                Donated
+              </div>
             </div>
           </div>
         </div>
@@ -368,7 +517,19 @@ watch(preferredLocation, (newVal) => {
             <div class="card-body">
               <div class="mb-3">
                 <h5 class="card-title mb-2">{{ item.foodName }}</h5>
-                <p class="text-muted mb-0">{{ item.quantity }}</p>
+                <p class="text-muted mb-0">{{ item.quantity }} {{ item.unit }}</p>
+                <p class="text-muted small mb-2">
+                  <i class="bi bi-geo-alt me-1"></i>
+                  {{ item.location?.address || 'No address' }}
+                </p>
+                <p class="text-muted small mb-2">
+                  <i class="bi bi-clock me-1"></i>
+                  Pickup: {{ item.pickupTime }}
+                </p>
+                <p v-if="item.notes" class="text-muted small mb-2 text-truncate" :title="item.notes">
+                  <i class="bi bi-chat-text me-1"></i>
+                  {{ item.notes }}
+                </p>
               </div>
 
               <div class="mb-3">
@@ -390,9 +551,6 @@ watch(preferredLocation, (newVal) => {
               </div>
 
               <div class="d-flex align-items-center gap-2 mb-3">
-                <div class="avatar" style="width: 32px; height: 32px; font-size: 0.75rem;">
-                  {{ item.avatar }}
-                </div>
                 <small class="text-muted">Shared by {{ item.sharedBy }}</small>
               </div>
 
@@ -488,14 +646,29 @@ watch(preferredLocation, (newVal) => {
             <button type="button" class="btn-close" @click="showShareModal = false"></button>
           </div>
 
-          <div class="modal-body">
+          <div class="modal-body" style="max-height:70vh; overflow-y:auto">
             <form @submit.prevent="submitShare">
               <div class="mb-3">
                 <label class="form-label">Food Name *</label>
-                <select v-model="shareForm.foodName" class="form-select" @change="onSelectFoodItem" required>
+                <select v-model="shareForm.foodName" class="form-select" @change="onSelectFoodItem" required
+                :key="foodItems.map(i => i.id + ':' + i.quantity).join('|') + '|' + donationActivities.length">
                   <option value="" disabled>Select a food item...</option>
-                  <option v-for="item in foodItems" :key="item.id" :value="item.name">
+                  <option
+                    v-for="item in foodItems"
+                    :key="item.id"
+                    :value="item.name"
+                    :disabled="getRemainingQuantity(item.name) <= 0"
+                    :title="
+                    getRemainingQuantity(item.name) <= 0
+                     ? 'No quantity left to share' 
+                     : `Remaining: ${getRemainingQuantity(item.name)} ${item.unit}`
+                    "
+                  >
                     {{ item.name }}
+                    <small v-if="getRemainingQuantity(item.name) > 0" class="text-success ms-1">
+                      ({{ getRemainingQuantity(item.name) }} left)
+                    </small>
+                    <small v-else class="text-muted ms-1">(none left)</small>
                   </option>
                 </select>
               </div>
@@ -527,7 +700,10 @@ watch(preferredLocation, (newVal) => {
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
                   <label class="form-label">Quantity</label>
-                  <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="0.01" />
+                  <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="1" required />
+                  <small class="text-muted">
+                    Max: {{ getRemainingQuantity(shareForm.foodName) }} {{ shareForm.unit }}
+                  </small>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Unit</label>
@@ -585,10 +761,17 @@ watch(preferredLocation, (newVal) => {
         </div>
       </div>
     </div>
-  </div>
 </template>
 
 <style scoped>
+
+.card .small i { vertical-align: middle; }
+.card .small { 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap; 
+}
+
 /* Modal backdrop and positioning fixes */
 .modal {
   position: fixed !important;
