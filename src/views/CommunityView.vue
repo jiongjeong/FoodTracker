@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue';
 import { db, auth } from '../firebase.js';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, updateDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
 import LocationPicker from '@/components/LocationPicker.vue';
 import { loadGoogleMaps } from '@/composables/loadGoogleMap.js'
@@ -33,13 +33,14 @@ const shareForm = ref({
   notes: '',
   unit: '',
   location: null,
+  foodItemId: ''
 })
 
 const handleLocationSelected = (location) => {
   shareForm.value.location = location 
 }
 
-const handleShareFood = () => {
+const handleShareFood = async () => {
   // DO NOT replace shareForm.value
   Object.assign(shareForm.value, {
     foodName: '',
@@ -52,6 +53,12 @@ const handleShareFood = () => {
     location: null
   })
   showShareModal.value = true
+  await nextTick() // Wait for foodItems to be loaded
+  if (foodItems.value.length === 1) {
+    const item = foodItems.value[0]
+    shareForm.value.foodName = item.name
+    onSelectFoodItem() // ← Force populate foodItemId
+  }
 }
 
 
@@ -92,6 +99,7 @@ function onSelectFoodItem() {
   const selected = foodItems.value.find(fi => fi.name === shareForm.value.foodName)
   if (selected) {
     shareForm.value.category = selected.category || ''
+    shareForm.value.foodItemId = selected.id
 
     if (selected.expirationDate) {
       if (typeof selected.expirationDate.toDate === 'function') {
@@ -173,6 +181,25 @@ async function submitShare() {
     }
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
+    const listingId = docRef.id
+
+    await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
+      activityType: 'pendingDonFood',
+      createdAt: new Date().toISOString(),
+      category: data.category,
+      price: 0,
+      foodName: data.foodName,
+      quantity: data.quantity,
+      unit: data.unit,
+    })
+
+    await updateDoc(doc(db, 'user', currentUser.value.uid, 'foodItems', shareForm.value.foodItemId), {
+      sharedId: listingId
+    })
+
+    await updateDoc(docRef, {
+      foodItemId: shareForm.value.foodItemId  // ← ADD
+    })
 
     const savedDoc = await getDoc(docRef)
     console.log("Verified Firestore document:", savedDoc.data())
@@ -185,10 +212,43 @@ async function submitShare() {
   }
 }
 
+
+async function markAsDonated(item) {
+  if (!confirm(`Mark "${item.foodName}" as donated?`)) return
+
+  try {
+    // Update listing
+    await updateDoc(doc(db, 'communityListings', item.id), {
+      donated: true,
+      donatedAt: serverTimestamp()
+    })
+
+    await updateDoc(doc(db, 'user', currentUser.value.uid, 'foodItems', item.foodItemId), {
+      sharedId: null  // or deleteField()
+    })
+
+    // Log donation in user's activities
+    await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
+      activityType: 'donFood',
+      category: item.category,
+      createdAt: new Date().toISOString(),
+      foodName: item.foodName,
+      price: 0,
+      quantity: item.quantity,
+      unit: item.unit
+    })
+
+    alert('Marked as donated!')
+    await loadMyListings()
+  } catch (err) {
+    console.error(err)
+    alert('Failed to mark as donated')
+  }
+}
+
 onAuthStateChanged(auth, (user) => {
   if (user) {
     currentUser.value = user
-    loadMyListings()
     loadAvailableListings()
     loadFoodItems()
   } else {
@@ -284,11 +344,9 @@ function calculateDistances() {
       return { ...item, distance: null }
     }
   })
-
-  console.log('Distances:', itemsWithDistance.value.map(i => i.distance))
 }
 
-/* Re‑calculate whenever sharedItems or preferredLocation changes */
+
 watch(
   [sharedItems, preferredLocation, geometry],
   () => {
@@ -299,8 +357,6 @@ watch(
   },
   { deep: true }
 )
-
-// Optional: Keep for debugging
 watch(preferredLocation, (newVal) => {
   console.log('preferredLocation changed:', newVal)
 })
@@ -308,28 +364,58 @@ watch(preferredLocation, (newVal) => {
 </script>
 
 
-<template>
-  <div class="container-fluid p-4">
-    <div class="mb-4 d-flex justify-content-between align-items-start">
-      <div>
-        <h1 class="h2 mb-2">Community Food Sharing</h1>
-        <p class="text-muted">Share expiring food with neighbors to reduce waste</p>
-      </div>
+<template>       
+        <div class="container-fluid p-4">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-4">
+            <!-- Title & subtitle -->
+            <div>
+              <h1 class="h2 mb-2">Community Food Sharing</h1>
+              <p class="text-muted">Share expiring food with neighbors to reduce waste</p>
+            </div>
 
-      <div v-if="!preferredLocation" class="mb-3">
-        <label class="form-label">Preferred Pickup Location</label>
-        <LocationPicker @place-selected="setPreferredLocation" />
-      </div>
+            <!-- Location picker (right side) -->
+            <div class="d-flex flex-column gap-2 align-self-md-start" style="min-width: 280px;">
+              <label class="form-label fw-medium">
+                <i class="bi bi-geo-alt-fill me-1"></i> Preferred Pickup Location
+              </label>
 
-      <div v-else class="mb-3">
-        <span>
-          <strong>{{ preferredLocation.address }}</strong>
-        </span>
-        <LocationPicker @place-selected="setPreferredLocation" class="d-inline-block" />
-        <button @click="clearPreferredLocation" class="btn btn-sm btn-outline-danger">Clear</button>
-      </div>
-    </div>
+              <!-- No location selected -->
+              <template v-if="!preferredLocation">
+                <LocationPicker @place-selected="setPreferredLocation" class="w-100" />
+              </template>
 
+              <!-- Location selected -->
+              <template v-else>
+                <!-- Picker (change) -->
+                <LocationPicker
+                  @place-selected="setPreferredLocation"
+                  class="w-100"
+                  style="max-width: 300px;"
+                />
+
+                <!-- Address BELOW the picker -->
+                <div class="d-flex align-items-center gap-2 mt-1">
+                  <div
+                    class="bg-light rounded px-3 py-1 text-dark text-truncate flex-grow-1"
+                    style="font-size: 0.9rem; max-width: 260px;"
+                    :title="preferredLocation.address"
+                  >
+                    <strong>{{ preferredLocation.address }}</strong>
+                  </div>
+
+                  <button
+                    @click="clearPreferredLocation"
+                    class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1"
+                    title="Clear location"
+                  >
+                    <i class="bi bi-x-circle"></i>
+                    <span class="d-none d-sm-inline">Clear</span>
+                  </button>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
 
     <div class="glass-card p-4 mb-4">
       <div class="d-flex justify-content-between align-items-center mb-4">
@@ -350,9 +436,25 @@ watch(preferredLocation, (newVal) => {
             <div class="card-body">
               <h5 class="card-title mb-2">{{ item.foodName }}</h5>
               <p class="text-muted mb-0">{{ item.quantity }} {{ item.unit }}</p>
-              <span class="badge badge-warning-orange mt-2">
+              <p class="text-muted small mb-2">
+                <i class="bi bi-geo-alt me-1"></i>
+                {{ item.location?.address || 'No address' }}
+              </p>
+              <span class="badge badge-warning-orange mt-2 text-black">
                 Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}
               </span>
+              <button
+                v-if="!item.donated"
+                @click="markAsDonated(item)"
+                class="btn btn-success btn-sm w-30"
+              >
+                <i class="bi bi-check-circle me-1"></i>
+                Mark as Donated
+              </button>
+              <div v-else class="badge bg-success w-30 text-center py-2">
+                <i class="bi bi-check-circle-fill me-1"></i>
+                Donated
+              </div>
             </div>
           </div>
         </div>
@@ -368,7 +470,11 @@ watch(preferredLocation, (newVal) => {
             <div class="card-body">
               <div class="mb-3">
                 <h5 class="card-title mb-2">{{ item.foodName }}</h5>
-                <p class="text-muted mb-0">{{ item.quantity }}</p>
+                <p class="text-muted mb-0">{{ item.quantity }} {{ item.unit }}</p>
+                <p class="text-muted small mb-2">
+                  <i class="bi bi-geo-alt me-1"></i>
+                  {{ item.location?.address || 'No address' }}
+                </p>
               </div>
 
               <div class="mb-3">
@@ -390,9 +496,6 @@ watch(preferredLocation, (newVal) => {
               </div>
 
               <div class="d-flex align-items-center gap-2 mb-3">
-                <div class="avatar" style="width: 32px; height: 32px; font-size: 0.75rem;">
-                  {{ item.avatar }}
-                </div>
                 <small class="text-muted">Shared by {{ item.sharedBy }}</small>
               </div>
 
@@ -488,7 +591,7 @@ watch(preferredLocation, (newVal) => {
             <button type="button" class="btn-close" @click="showShareModal = false"></button>
           </div>
 
-          <div class="modal-body">
+          <div class="modal-body" style="max-height:70vh; overflow-y:auto">
             <form @submit.prevent="submitShare">
               <div class="mb-3">
                 <label class="form-label">Food Name *</label>
@@ -585,10 +688,17 @@ watch(preferredLocation, (newVal) => {
         </div>
       </div>
     </div>
-  </div>
 </template>
 
 <style scoped>
+
+.card .small i { vertical-align: middle; }
+.card .small { 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap; 
+}
+
 /* Modal backdrop and positioning fixes */
 .modal {
   position: fixed !important;

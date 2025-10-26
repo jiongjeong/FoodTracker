@@ -1009,6 +1009,29 @@ const confirmDelete = async () => {
   if (ok) showToastFor('Item deleted');
   else showToastFor('Failed to delete');
 };
+
+
+// link to communitylistings
+const communityListings = ref({})
+async function getListingStatus(foodItemId) {
+  if (!foodItemId) return null
+  if (communityListings.value[foodItemId]) {
+    return communityListings.value[foodItemId]
+  }
+
+  try {
+    const listingSnap = await getDoc(doc(db, 'communityListings', foodItemId))
+    if (listingSnap.exists()) {
+      const data = listingSnap.data()
+      communityListings.value[foodItemId] = data
+      return data
+    }
+  } catch (err) {
+    console.warn('Failed to fetch listing:', err)
+  }
+  return null
+}
+
 </script>
 
 <template>
@@ -1278,6 +1301,19 @@ const confirmDelete = async () => {
                           <span v-if="getDaysLeft(food) < 0">Expired</span>
                           <span v-else-if="getDaysLeft(food) == 0">Today</span>
                           <span v-else>{{ getDaysLeft(food) }} days</span>
+                          <span
+                            v-if="item?.sharedId && !communityListings[item.sharedId]?.donated"
+                            class="badge bg-warning text-dark"
+                          >
+                            Pending Donation
+                          </span>
+
+                          <span
+                            v-else-if="item?.sharedId && communityListings[item.sharedId]?.donated"
+                            class="badge bg-success"
+                          >
+                            Donated
+                          </span>
                         </span>
                       </div>
                       <div class="food-category">{{ food.category }}</div>
