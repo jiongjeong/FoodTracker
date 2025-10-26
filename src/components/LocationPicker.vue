@@ -12,38 +12,23 @@ const emit = defineEmits(['place-selected'])
 
 async function initializeAutocomplete() {
   try {
-    console.log('🔧 Starting initialization...')
+    // console.log('🔧 Starting initialization...')
 
     // Load Google Maps
     const google = await loadGoogleMaps()
-    console.log('✅ Google Maps loaded:', !!google)
-    console.log('✅ Google Places available:', !!google?.maps?.places)
-
-    // Wait for next tick to ensure DOM is ready
     await nextTick()
-
-    // Additional wait to ensure ref is bound
     await new Promise(resolve => setTimeout(resolve, 200))
-
-    console.log('Input ref value:', inputRef.value)
-    console.log('Input ref element:', inputRef.value instanceof HTMLElement)
 
     if (!inputRef.value) {
       throw new Error('Input element not found after waiting')
     }
 
-    // Initialize Autocomplete
     autocomplete = new google.maps.places.Autocomplete(inputRef.value, {
       fields: ['place_id', 'geometry', 'name', 'formatted_address', 'address_components']
     })
 
-    console.log('✅ Autocomplete initialized:', !!autocomplete)
-
-    // Add listener for place selection
     autocomplete.addListener('place_changed', () => {
-      console.log('📍 Place changed event fired')
       const place = autocomplete.getPlace()
-      console.log('Selected place:', place)
 
       if (!place || !place.geometry || !place.geometry.location) {
         console.warn('⚠️ No valid location found')
@@ -95,7 +80,7 @@ onUnmounted(() => {
 
 <template>
   <div class="location-picker">
-    <label class="label" for="location-input">Search Location</label>
+    <!-- <label class="label" for="location-input">Search Location</label> -->
 
     <!-- Always render input, just disable during loading -->
     <input
@@ -103,7 +88,7 @@ onUnmounted(() => {
       ref="inputRef"
       type="text"
       class="location-input"
-      :placeholder="isLoading ? 'Loading...' : 'Start typing a location (e.g., New York, 123 Main St)...'"
+      :placeholder="isLoading ? 'Loading...' : 'Start typing a location (e.g., Dhoby Ghaut MRT Station)...'"
       :disabled="isLoading"
       autocomplete="off"
     />
@@ -131,7 +116,7 @@ onUnmounted(() => {
     </div>
 
     <p v-else-if="!isLoading && !error" class="placeholder-text">
-      💡 Type an address or place name and select from the dropdown
+      Type an address and select from the dropdown
     </p>
   </div>
 </template>

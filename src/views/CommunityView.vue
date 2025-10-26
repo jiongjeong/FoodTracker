@@ -1,11 +1,10 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { db, auth } from '../firebase.js';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
 import LocationPicker from '@/components/LocationPicker.vue';
 import { loadGoogleMaps } from '@/composables/loadGoogleMap.js'
-import { onMounted } from 'vue';
 
 
 const mySharedItems = ref([])
@@ -14,7 +13,10 @@ const showContactModal = ref(false)
 const showShareModal = ref(false)
 const selectedContact = ref(null)
 const currentUser = ref(null)
-
+const itemsWithDistance = ref([])
+const preferredLocation = ref(null)
+const geometry = ref(null)
+const PREFERRED_LOC_KEY = 'foodshare_preferred_location'
 
 const handleContact = (item) => {
   selectedContact.value = item
@@ -34,19 +36,21 @@ const shareForm = ref({
 })
 
 const handleLocationSelected = (location) => {
-  shareForm.value.location = location
+  shareForm.value.location = location 
 }
 
 const handleShareFood = () => {
-  shareForm.value = {
+  // DO NOT replace shareForm.value
+  Object.assign(shareForm.value, {
     foodName: '',
     category: '',
     quantity: 0,
     unit: '',
     expirationDate: '',
     pickupTime: '',
-    notes: ''
-  }
+    notes: '',
+    location: null
+  })
   showShareModal.value = true
 }
 
@@ -129,7 +133,9 @@ async function loadMyListings() {
 async function loadAvailableListings() {
   const sharedItemsRef = collection(db, "communityListings")
   const sharedItemsSnapshot = await getDocs(sharedItemsRef)
-  sharedItems.value = sharedItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+  sharedItems.value = sharedItemsSnapshot.docs.map(doc => ({ 
+    id: doc.id, ...doc.data(), daysUntilExpiration: getDaysLeft(doc.data().expirationDate) 
+  }))
   .filter(item => item.ownerId !== currentUser.value?.uid);
   console.log("Available listings loaded:", sharedItems.value)
 }
@@ -138,7 +144,9 @@ async function loadAvailableListings() {
 
 async function submitShare() {
   if (!currentUser.value) return alert("Please log in first")
-
+  if (!shareForm.value.location?.lat || !shareForm.value.location?.lng) {
+  return alert('Please select a pickup location')
+}
   try {
     const expDate = new Date(shareForm.value.expirationDate)
 
@@ -157,7 +165,11 @@ async function submitShare() {
         address: shareForm.value.contactAddress || "",
       },
       createdAt: serverTimestamp(),
-      location: shareForm.value.location,
+      location: {
+        lat: shareForm.value.location.lat,
+        lng: shareForm.value.location.lng,
+        address: shareForm.value.location.address || ''
+      }
     }
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
@@ -184,11 +196,114 @@ onAuthStateChanged(auth, (user) => {
   }
 })
 
+
+// google maps and distance
 onMounted(async () => {
-  const googleMaps = await loadGoogleMaps()
-  console.log("Google Maps loaded:", googleMaps)
+  const google = await loadGoogleMaps()
+  geometry.value = google.maps.geometry
+
+  await loadAvailableListings()
+  await loadMyListings()
+  await loadFoodItems()
+
+  loadPreferredLocation()
+  calculateDistances()
+  
 })
 
+function setPreferredLocation(place) {
+  // ENSURE plain object
+  preferredLocation.value = {
+    lat: Number(place.lat),
+    lng: Number(place.lng),
+    address: place.address || ''
+  }
+  savePreferredLocation()
+}
+function clearPreferredLocation() {
+  preferredLocation.value = null
+  savePreferredLocation()
+}
+
+function loadPreferredLocation() {
+  const raw = localStorage.getItem(PREFERRED_LOC_KEY)
+  console.log('Raw from localStorage:', raw)
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw)
+      // ENSURE plain object
+      preferredLocation.value = {
+        lat: Number(parsed.lat),
+        lng: Number(parsed.lng),
+        address: parsed.address || ''
+      }
+      console.log('Loaded preferred location:', preferredLocation.value)
+    } catch (e) {
+      console.warn('Invalid stored location', e)
+    }
+  }
+}
+
+function savePreferredLocation() {
+  if (preferredLocation.value) {
+    localStorage.setItem(PREFERRED_LOC_KEY, JSON.stringify(preferredLocation.value))
+  } else {
+    localStorage.removeItem(PREFERRED_LOC_KEY)
+  }
+}
+
+function calculateDistances() {
+  console.log('calculateDistances() called', {
+    hasPreferred: !!preferredLocation.value,
+    hasGeometry: !!geometry.value,
+    itemCount: sharedItems.value.length
+  })
+
+  if (!preferredLocation.value || !geometry.value || sharedItems.value.length === 0) {
+    itemsWithDistance.value = sharedItems.value.map(i => ({ ...i, distance: null }))
+    return
+  }
+
+  const userLat = Number(preferredLocation.value.lat)
+  const userLng = Number(preferredLocation.value.lng)
+
+  itemsWithDistance.value = sharedItems.value.map(item => {
+    if (!item.location?.lat || !item.location?.lng) return { ...item, distance: null }
+
+    const itemLat = Number(item.location.lat)
+    const itemLng = Number(item.location.lng)
+
+    try {
+      const p1 = new google.maps.LatLng(userLat, userLng)
+      const p2 = new google.maps.LatLng(itemLat, itemLng)
+      const meters = geometry.value.spherical.computeDistanceBetween(p1, p2)
+      const km = (meters / 1000).toFixed(1)
+      return { ...item, distance: `${km} km` }
+    } catch (e) {
+      console.warn('Distance calc failed:', e)
+      return { ...item, distance: null }
+    }
+  })
+
+  console.log('Distances:', itemsWithDistance.value.map(i => i.distance))
+}
+
+/* Re‑calculate whenever sharedItems or preferredLocation changes */
+watch(
+  [sharedItems, preferredLocation, geometry],
+  () => {
+    if (sharedItems.value.length && preferredLocation.value && geometry.value) {
+      console.log('Watcher triggered → calculating distances')
+      calculateDistances()
+    }
+  },
+  { deep: true }
+)
+
+// Optional: Keep for debugging
+watch(preferredLocation, (newVal) => {
+  console.log('preferredLocation changed:', newVal)
+})
 
 </script>
 
@@ -200,8 +315,21 @@ onMounted(async () => {
         <h1 class="h2 mb-2">Community Food Sharing</h1>
         <p class="text-muted">Share expiring food with neighbors to reduce waste</p>
       </div>
-      <LocationPicker @location-selected="handleLocationSelected" />
+
+      <div v-if="!preferredLocation" class="mb-3">
+        <label class="form-label">Preferred Pickup Location</label>
+        <LocationPicker @place-selected="setPreferredLocation" />
+      </div>
+
+      <div v-else class="mb-3">
+        <span>
+          <strong>{{ preferredLocation.address }}</strong>
+        </span>
+        <LocationPicker @place-selected="setPreferredLocation" class="d-inline-block" />
+        <button @click="clearPreferredLocation" class="btn btn-sm btn-outline-danger">Clear</button>
+      </div>
     </div>
+
 
     <div class="glass-card p-4 mb-4">
       <div class="d-flex justify-content-between align-items-center mb-4">
@@ -235,7 +363,7 @@ onMounted(async () => {
       <h3 class="h5 mb-4">Available Near You</h3>
 
       <div class="row g-4">
-        <div v-for="item in sharedItems" :key="item.id" class="col-12 col-md-6 col-lg-4">
+        <div v-for="item in itemsWithDistance" :key="item.id" class="col-12 col-md-6 col-lg-4">
           <div class="card h-100">
             <div class="card-body">
               <div class="mb-3">
@@ -244,11 +372,20 @@ onMounted(async () => {
               </div>
 
               <div class="mb-3">
-                <span class="badge badge-warning-orange">
+                <span class="badge badge-warning-orange text-black">
                   Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}
                 </span>
-                <span class="badge bg-light text-dark ms-2">
-                  <i class="bi bi-geo-alt"></i> {{ item.distance }} km away
+
+                <span v-if="preferredLocation && item.distance" class="badge bg-light text-dark ms-2">
+                  <i class="bi bi-geo-alt"></i> {{ item.distance }} away
+                </span>
+
+                <span v-else-if="preferredLocation" class="badge bg-warning text-dark">
+                  Calculating...
+                </span>
+
+                <span v-else class="badge bg-light text-dark ms-2">
+                  Input preferred location to see distance
                 </span>
               </div>
 
@@ -281,6 +418,7 @@ onMounted(async () => {
             </h5>
             <button type="button" class="btn-close" @click="showContactModal = false"></button>
           </div>
+
           <div class="modal-body">
             <div class="mb-4">
               <h6 class="fw-semibold">About this item:</h6>
@@ -320,19 +458,21 @@ onMounted(async () => {
               </div>
             </div>
           </div>
+
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" @click="showContactModal = false">
               Close
             </button>
-            <a :href="`mailto:${selectedContact?.contact.email}?subject=Food Request - ${selectedContact?.foodName}&body=Hi ${selectedContact?.sharedBy}, I'm interested in your ${selectedContact?.foodName}. Could we arrange a pickup?`"
-              class="btn btn-primary">
+            <a
+              :href="`mailto:${selectedContact?.contact.email}?subject=Food Request - ${selectedContact?.foodName}&body=Hi ${selectedContact?.sharedBy}, I'm interested in your ${selectedContact?.foodName}. Could we arrange a pickup?`"
+              class="btn btn-primary"
+            >
               <i class="bi bi-envelope me-2"></i>
               Send Email
             </a>
           </div>
         </div>
       </div>
-      <div class="modal-backdrop fade show"></div>
     </div>
 
     <!-- Share Food Modal -->
@@ -347,6 +487,7 @@ onMounted(async () => {
             </h5>
             <button type="button" class="btn-close" @click="showShareModal = false"></button>
           </div>
+
           <div class="modal-body">
             <form @submit.prevent="submitShare">
               <div class="mb-3">
@@ -362,57 +503,89 @@ onMounted(async () => {
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
                   <label class="form-label">Category</label>
-                    <input v-model="shareForm.category" type="text" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label">Expiration Date *</label>
-                    <input v-model="shareForm.expirationDate" type="date" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
-                  </div>
-                  </div>
-
-                  <div class="row g-3 mb-3">
-                  <div class="col-md-6">
-                    <label class="form-label">Quantity</label>
-                    <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="0.01">
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label">Unit</label>
-                    <input v-model="shareForm.unit" type="text" class="form-control" readonly style="background-color: #e9ecef; cursor: not-allowed;">
-                  </div>
-                  </div>
-
-                  <div class="mb-3">
-                  <label class="form-label">Preferred Pickup Time</label>
-                  <input v-model="shareForm.pickupTime" type="text" class="form-control"
-                    placeholder="e.g., Weekdays after 6pm, Weekends anytime">
-                  </div>
-
-                  <div class="mb-3">
-                  <LocationPicker @location-selected="handleLocationSelected" />
-                  </div>
-
-
-
-                  <div class="mb-3">
-                  <label class="form-label">Additional Notes</label>
-                  <textarea v-model="shareForm.notes" class="form-control" rows="3"
-                    placeholder="Any special instructions or notes about the food item..."></textarea>
-                  </div>
-                </form>
+                  <input
+                    v-model="shareForm.category"
+                    type="text"
+                    class="form-control"
+                    readonly
+                    style="background-color: #e9ecef; cursor: not-allowed;"
+                  />
                 </div>
-                <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" @click="showShareModal = false">
-                  Cancel
-                </button>
-                <button type="button" class="btn btn-primary" @click="submitShare">
-                  <i class="bi bi-share me-2"></i>
-                  Share Food
-                </button>
+
+                <div class="col-md-6">
+                  <label class="form-label">Expiration Date *</label>
+                  <input
+                    v-model="shareForm.expirationDate"
+                    type="date"
+                    class="form-control"
+                    readonly
+                    style="background-color: #e9ecef; cursor: not-allowed;"
+                  />
                 </div>
               </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label">Quantity</label>
+                  <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="0.01" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Unit</label>
+                  <input
+                    v-model="shareForm.unit"
+                    type="text"
+                    class="form-control"
+                    readonly
+                    style="background-color: #e9ecef; cursor: not-allowed;"
+                  />
+                </div>
               </div>
-            </div>
-            </div>
+
+              <div class="mb-3">
+                <label class="form-label">Preferred Pickup Time</label>
+                <input
+                  v-model="shareForm.pickupTime"
+                  type="text"
+                  class="form-control"
+                  placeholder="e.g., Weekdays after 6pm, Weekends anytime"
+                />
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Preferred Pickup Location</label>
+                <LocationPicker @place-selected="shareForm.location = $event" />
+                <small v-if="shareForm.location" class="text-success d-block mt-1">
+                  Selected: {{ shareForm.location.address }}
+                </small>
+
+                <small v-else class="text-danger d-block mt-1">Please select location</small>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Additional Notes</label>
+                <textarea
+                  v-model="shareForm.notes"
+                  class="form-control"
+                  rows="3"
+                  placeholder="Any special instructions or notes about the food item..."
+                ></textarea>
+              </div>
+            </form>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="showShareModal = false">
+              Cancel
+            </button>
+            <button type="button" class="btn btn-primary" @click="submitShare">
+              <i class="bi bi-share me-2"></i>
+              Share Food
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
