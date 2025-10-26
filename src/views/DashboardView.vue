@@ -93,6 +93,8 @@ const activityTypeOptions = [
   { label: 'Added', value: 'addFood' },
   { label: 'Used', value: 'conFood' },
   { label: 'Expired', value: 'expFood' },
+  { label: 'Donated', value: 'donFood' },
+  { label: "Pending Donation", value: "pendingDonFood" }
 ];
 
 // Time frame filter
@@ -1011,26 +1013,27 @@ const confirmDelete = async () => {
 };
 
 
-// link to communitylistings
-const communityListings = ref({})
-async function getListingStatus(foodItemId) {
-  if (!foodItemId) return null
-  if (communityListings.value[foodItemId]) {
-    return communityListings.value[foodItemId]
-  }
+// food donation status
+const foodDonationStatus = computed(() => {
+  const status = {}
+  const donationActs = activities.value.filter(a =>
+    ['pendingDonFood', 'donFood'].includes(a.activityType)
+  )
 
-  try {
-    const listingSnap = await getDoc(doc(db, 'communityListings', foodItemId))
-    if (listingSnap.exists()) {
-      const data = listingSnap.data()
-      communityListings.value[foodItemId] = data
-      return data
+  for (const act of donationActs) {
+    const name = act.foodName
+    if (!status[name] || new Date(act.createdAt) > new Date(status[name].createdAt)) {
+      status[name] = {
+        type: act.activityType,
+        date: act.createdAt
+      }
     }
-  } catch (err) {
-    console.warn('Failed to fetch listing:', err)
   }
-  return null
-}
+  return status
+})
+
+
+
 
 </script>
 
@@ -1297,24 +1300,27 @@ async function getListingStatus(foodItemId) {
                     <div>
                       <div class="food-title-group align-items-center d-flex gap-2">
                         <span class="food-name">{{ food.name }}</span>
+
+                        <!-- expired badge -->
                         <span class="expired-badge" :class="getBadgeClass(food)">
                           <span v-if="getDaysLeft(food) < 0">Expired</span>
                           <span v-else-if="getDaysLeft(food) == 0">Today</span>
                           <span v-else>{{ getDaysLeft(food) }} days</span>
+                        </span>
+
+                        <!-- donated badge -->
                           <span
-                            v-if="item?.sharedId && !communityListings[item.sharedId]?.donated"
+                            v-if="foodDonationStatus[food.name]?.type === 'pendingDonFood'"
                             class="badge bg-warning text-dark"
                           >
                             Pending Donation
                           </span>
-
                           <span
-                            v-else-if="item?.sharedId && communityListings[item.sharedId]?.donated"
+                            v-else-if="foodDonationStatus[food.name]?.type === 'donFood'"
                             class="badge bg-success"
                           >
                             Donated
                           </span>
-                        </span>
                       </div>
                       <div class="food-category">{{ food.category }}</div>
                       <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
