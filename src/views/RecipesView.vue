@@ -6,13 +6,16 @@ import axios from 'axios'
 import { auth } from '../firebase.js'
 import { onAuthStateChanged } from 'firebase/auth'
 import { useRecipesStore } from '../stores/recipes.js'
+import { db } from '../firebase.js'
+import { collection, getDocs, query, where } from 'firebase/firestore'
 
 
 // Configuration constants
 const API_BASE_URL = 'https://www.themealdb.com/api/json/v1/1'
-const MAX_INGREDIENTS = 20
+const MAX_INGREDIENTS = 40
 const REQUEST_TIMEOUT = 10000 // 10 seconds
-const POPULAR_CATEGORIES = ['Chicken', 'Beef', 'Pasta', 'Seafood', 'Dessert']
+const MAX_SUGGESTED_RECIPES = 10
+const EXPIRING_SOON_DAYS = 7
 
 
 // Reactive state
@@ -21,7 +24,7 @@ const searchQuery = ref('')
 const route = useRoute()
 const isLoading = ref(false)
 const searchResults = ref([])
-const popularRecipes = ref([])
+const suggestedRecipes = ref([])
 const selectedRecipe = ref(null)
 const showRecipeModal = ref(false)
 const errorMessage = ref('')
@@ -42,14 +45,34 @@ const displayedRecipes = computed(() => {
   switch (activeTab.value) {
     case 'search':
       return searchResults.value
-    case 'popular':
-      return popularRecipes.value
+    case 'suggested':
+      return suggestedRecipes.value
     case 'bookmarked':
       return bookmarkedRecipeObjects.value
     default:
       return []
   }
 })
+
+// Helper function to calculate days left until expiration
+const getDaysLeft = (food) => {
+  const now = new Date()
+  let expDate
+
+  if (food.expirationDate) {
+    if (food.expirationDate.toDate) {
+      expDate = food.expirationDate.toDate()
+    } else {
+      expDate = new Date(food.expirationDate)
+    }
+  } else {
+    return Infinity // no expiration date
+  }
+
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate())
+  return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
+}
 
 // Fetch full recipe objects for bookmarked IDs
 const fetchBookmarkedRecipes = async () => {
@@ -149,44 +172,106 @@ const searchRecipes = async (query) => {
   }
 }
 
-// Get popular recipes using parallel requests
-const getPopularRecipes = async () => {
+// Get suggested recipes based on expiring ingredients
+const getSuggestedRecipes = async () => {
+  if (!userId.value) return
+
   isLoading.value = true
   errorMessage.value = ''
   
   try {
-    // Create parallel requests for all categories
-    const requests = POPULAR_CATEGORIES.map(category => 
-      axios.get(`${API_BASE_URL}/search.php`, {
-        params: { s: category },
-        timeout: REQUEST_TIMEOUT
-      })
-    )
-    
-    // Execute all requests in parallel
-    const responses = await Promise.all(requests)
-    
-    // Process responses and extract first recipe from each category
-    const recipes = responses
-      .map(response => response.data.meals?.[0])
-      .filter(meal => meal !== null && meal !== undefined)
-
-    popularRecipes.value = recipes.map(meal => ({
-      id: meal.idMeal,
-      name: meal.strMeal,
-      image: meal.strMealThumb,
-      category: meal.strCategory,
-      area: meal.strArea,
-      instructions: meal.strInstructions,
-      ingredients: getIngredientsList(meal),
-      video: meal.strYoutube,
-      source: meal.strSource
+    // Fetch food items from Firestore
+    const q = query(collection(db, 'user', userId.value, 'foodItems'))
+    const querySnapshot = await getDocs(q)
+    const foodItems = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
     }))
-    
+
+    // Get expiring soon food items (similar to dashboard logic)
+    const expiringFoods = foodItems.filter(food => {
+      const daysLeft = getDaysLeft(food)
+      return daysLeft >= 0 && daysLeft <= EXPIRING_SOON_DAYS
+    })
+
+    console.log('Expiring food items:', expiringFoods)
+
+    if (expiringFoods.length === 0) {
+      suggestedRecipes.value = []
+      return
+    }
+
+    // Get unique ingredients from expiring foods (use last word as main ingredient)
+    const ingredients = [...new Set(expiringFoods.map(food => {
+      const words = food.name.toLowerCase().split(' ');
+      return words[words.length - 1]; // take last word, e.g., "fresh tiger prawn" -> "prawn"
+    }))]
+
+    // Search recipes for each ingredient
+    const recipePromises = ingredients.map(async (ingredient) => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/filter.php`, {
+          params: { i: ingredient },
+          timeout: REQUEST_TIMEOUT
+        })
+        return response.data.meals || []
+      } catch (error) {
+        console.error(`Error searching recipes for ${ingredient}:`, error)
+        return []
+      }
+    })
+
+    const recipeResults = await Promise.all(recipePromises)
+    const allMeals = recipeResults.flat()
+
+    // Remove duplicates and limit
+    const uniqueMeals = allMeals.filter((meal, index, self) => 
+      index === self.findIndex(m => m.idMeal === meal.idMeal)
+    ).slice(0, MAX_SUGGESTED_RECIPES)
+
+    // Fetch full details for each meal
+    const fullRecipePromises = uniqueMeals.map(async (meal) => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/lookup.php`, {
+          params: { i: meal.idMeal },
+          timeout: REQUEST_TIMEOUT
+        })
+        if (response.data.meals && response.data.meals[0]) {
+          const fullMeal = response.data.meals[0]
+          // Find which foods suggested this recipe (by matching ingredient)
+          const mealIngredients = getIngredientsList(fullMeal).map(ing => ing.toLowerCase())
+          const suggestingFoods = expiringFoods.filter(food => {
+            const words = food.name.toLowerCase().split(' ');
+            const ingredient = words[words.length - 1];
+            return mealIngredients.some(ing => ing.includes(ingredient))
+          }).map(food => food.name)
+          
+          return {
+            id: fullMeal.idMeal,
+            name: fullMeal.strMeal,
+            image: fullMeal.strMealThumb,
+            category: fullMeal.strCategory,
+            area: fullMeal.strArea,
+            instructions: fullMeal.strInstructions,
+            ingredients: getIngredientsList(fullMeal),
+            video: fullMeal.strYoutube,
+            source: fullMeal.strSource,
+            suggestedBy: [...new Set(suggestingFoods)] // unique food names
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching full recipe for ${meal.idMeal}:`, error)
+      }
+      return null
+    })
+
+    const fullRecipes = (await Promise.all(fullRecipePromises)).filter(recipe => recipe !== null)
+    suggestedRecipes.value = fullRecipes
+
   } catch (error) {
-    console.error('Error getting popular recipes:', error)
+    console.error('Error getting suggested recipes:', error)
     errorMessage.value = handleApiError(error)
-    popularRecipes.value = []
+    suggestedRecipes.value = []
   } finally {
     isLoading.value = false
   }
@@ -203,6 +288,57 @@ const getIngredientsList = (meal) => {
     }
   }
   return ingredients
+}
+
+// User pantry foods (simplified keywords) - loaded from Firestore
+const userFoods = ref([]) // full food objects
+const userFoodKeywords = computed(() => {
+  // return a set of keywords derived from user food names (last word)
+  const set = new Set()
+  userFoods.value.forEach(f => {
+    if (!f || !f.name) return
+    const words = f.name.toLowerCase().split(/\s+/)
+    const kw = words[words.length - 1].replace(/[^a-z]/g, '')
+    if (kw) set.add(kw)
+    // also add full name for substring matches
+    set.add(f.name.toLowerCase())
+  })
+  return set
+})
+
+const loadUserFoods = async () => {
+  if (!userId.value) {
+    userFoods.value = []
+    return
+  }
+  try {
+    const q = query(collection(db, 'user', userId.value, 'foodItems'))
+    const snapshot = await getDocs(q)
+    userFoods.value = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+  } catch (e) {
+    console.error('Error loading user foods:', e)
+    userFoods.value = []
+  }
+}
+
+// Count how many ingredients from a recipe the user has in their pantry
+const countUserIngredients = (recipe) => {
+  if (!recipe || !recipe.ingredients || !userFoodKeywords.value) return 0
+  let count = 0
+  recipe.ingredients.forEach(ing => {
+    if (!ing) return
+    // get last word of ingredient (e.g., "fresh tiger prawn" or "2 tbs olive oil" -> "oil" or "prawn")
+    const words = ing.toLowerCase().split(/\s+/)
+    const last = words[words.length - 1].replace(/[^a-z]/g, '')
+    // match against keywords: exact or substring
+    if (last && (userFoodKeywords.value.has(last) || [...userFoodKeywords.value].some(k => k.includes(last) || last.includes(k)))) {
+      count++
+    } else {
+      // also check if any pantry full-name contains the ingredient word
+      if ([...userFoodKeywords.value].some(k => k.includes(last))) count++
+    }
+  })
+  return count
 }
 
 // Handle search
@@ -223,10 +359,11 @@ const viewRecipe = (recipe) => {
 // Remove local loadBookmarkedRecipes; use store's loadBookmarks
 
 
-// Initialize popular recipes and load bookmarks
+// Initialize suggested recipes and load bookmarks
 const initializeRecipes = async () => {
   await recipesStore.loadBookmarks()
-  await getPopularRecipes()
+  await loadUserFoods()
+  await getSuggestedRecipes()
 }
 
 // Watch for route query changes to auto-search
@@ -250,7 +387,11 @@ onMounted(() => {
 // Auth state change listener
 onAuthStateChanged(auth, async (u) => {
   user.value = u
-  await recipesStore.loadBookmarks()
+  if (u) {
+    await recipesStore.loadBookmarks()
+    await loadUserFoods()
+    await getSuggestedRecipes()
+  }
 })
 </script>
 
@@ -307,12 +448,12 @@ onAuthStateChanged(auth, async (u) => {
         <li class="nav-item">
           <button
             class="nav-link"
-            :class="{ active: activeTab === 'popular' }"
-            @click="activeTab = 'popular'"
+            :class="{ active: activeTab === 'suggested' }"
+            @click="activeTab = 'suggested'"
           >
-            <i class="bi bi-star me-2"></i>
-            Popular Recipes
-            <span v-if="popularRecipes.length" class="badge bg-success ms-2">{{ popularRecipes.length }}</span>
+            <i class="bi bi-lightbulb me-2"></i>
+            Suggested Recipes
+            <span v-if="suggestedRecipes.length" class="badge bg-success ms-2">{{ suggestedRecipes.length }}</span>
           </button>
         </li>
         <li class="nav-item">
@@ -349,10 +490,10 @@ onAuthStateChanged(auth, async (u) => {
             <p class="text-muted">Enter a recipe name, ingredient, or cuisine type to get started</p>
           </template>
         </div>
-        <div v-else-if="activeTab === 'popular'">
-          <i class="bi bi-star display-1 text-muted mb-3"></i>
-          <h5>Loading popular recipes...</h5>
-          <p class="text-muted">Discovering the most loved recipes</p>
+        <div v-else-if="activeTab === 'suggested'">
+          <i class="bi bi-lightbulb display-1 text-muted mb-3"></i>
+          <h5>No suggested recipes</h5>
+          <p class="text-muted">No food items expiring soon, or no recipes found for your ingredients</p>
         </div>
         <div v-else-if="activeTab === 'bookmarked'">
           <i class="bi bi-bookmark display-1 text-muted mb-3"></i>
@@ -364,35 +505,38 @@ onAuthStateChanged(auth, async (u) => {
       <!-- Recipe Grid -->
       <div v-else class="row g-4">
         <div v-for="recipe in displayedRecipes" :key="recipe.id" class="col-md-6 col-lg-4">
-          <div class="recipe-card">
-            <div class="recipe-image-container">
-              <img :src="recipe.image" :alt="recipe.name" class="recipe-image" />
+          <div class="card h-100 shadow-sm recipe-card">
+            <div class="position-relative" style="height: 200px; overflow: hidden;">
+              <img :src="recipe.image" :alt="recipe.name" class="card-img-top recipe-image" style="object-fit: cover; height: 100%;" />
               <button 
                 @click="toggleBookmark(recipe)"
-                class="bookmark-btn"
+                class="btn btn-light position-absolute top-0 end-0 m-2 rounded-circle bookmark-btn"
                 :class="{ bookmarked: isRecipeBookmarked(recipe.id) }"
+                style="width: 40px; height: 40px;"
               >
                 <i :class="isRecipeBookmarked(recipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'"></i>
               </button>
             </div>
-            
-            <div class="recipe-content">
-              <h6 class="recipe-title mb-2">{{ recipe.name }}</h6>
-              
-              <div class="recipe-meta mb-3">
+            <div class="card-body d-flex flex-column recipe-content">
+              <h6 class="card-title recipe-title mb-2">{{ recipe.name }}</h6>
+              <div class="mb-3 recipe-meta">
                 <span class="badge bg-light text-dark me-2">{{ recipe.category }}</span>
                 <span class="badge bg-secondary">{{ recipe.area }}</span>
               </div>
-              
-              <div class="recipe-ingredients">
+              <div class="mb-2 recipe-ingredients">
                 <small class="text-muted">
-                  <strong>Ingredients:</strong> 
-                  {{ recipe.ingredients.slice(0, 3).join(', ') }}
-                  <span v-if="recipe.ingredients.length > 3">...</span>
+                  <strong>Ingredients: </strong>
+                  <span v-if="recipe.ingredients && recipe.ingredients.length">You have {{ countUserIngredients(recipe) }} of {{ recipe.ingredients.length }} ingredients</span>
+                  <span v-else>—</span>
                 </small>
               </div>
-              
-              <div class="recipe-button-container">
+              <div v-if="recipe.suggestedBy && recipe.suggestedBy.length" class="mb-2 recipe-suggestion">
+                <small class="text-danger">
+                  <i class="bi bi-lightbulb me-1"></i>
+                  Expiring Soon: {{ recipe.suggestedBy.join(', ') }}
+                </small>
+              </div>
+              <div class="mt-auto recipe-button-container">
                 <button @click="viewRecipe(recipe)" class="btn btn-primary btn-sm w-100">
                   <i class="bi bi-eye me-2"></i>
                   View Recipe
@@ -414,72 +558,72 @@ onAuthStateChanged(auth, async (u) => {
               <i class="bi bi-x-lg"></i>
             </button>
             <div class="row g-0 flex-column flex-md-row">
-              <div class="col-md-5 order-1 order-md-0">
-                <div class="modal-image-section p-4">
+              <div class="col-md-5 order-1 order-md-0 d-flex flex-grow">
+                <div class="modal-image-section p-4 d-flex flex-column">
                   <img :src="selectedRecipe.image" :alt="selectedRecipe.name" class="img-fluid rounded-3 mb-4 w-100" style="aspect-ratio: 1; object-fit: cover;" />
                   
-                  <div class="info-card mb-4">
-                    <h6 class="mb-3"><i class="bi bi-info-circle me-2"></i>Recipe Info</h6>
-                    <div class="row g-2">
-                      <div class="col-6">
-                        <small class="text-muted d-block">Category</small>
-                        <span class="badge bg-primary">{{ selectedRecipe.category }}</span>
-                      </div>
-                      <div class="col-6">
-                        <small class="text-muted d-block">Origin</small>
-                        <span class="badge bg-success">{{ selectedRecipe.area }}</span>
+                  <div class="card mb-4">
+                    <div class="card-body">
+                      <h6 class="card-title mb-3"><i class="bi bi-info-circle me-2"></i>Recipe Info</h6>
+                      <div class="row g-2">
+                        <div class="col-6">
+                          <small class="text-muted d-block">Category</small>
+                          <span class="badge bg-primary">{{ selectedRecipe.category }}</span>
+                        </div>
+                        <div class="col-6">
+                          <small class="text-muted d-block">Origin</small>
+                          <span class="badge bg-success">{{ selectedRecipe.area }}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div class="info-card">
-                    <h6 class="mb-3"><i class="bi bi-list-ul me-2"></i>Ingredients</h6>
-                    <div class="ingredients-list">
-                      <div v-for="ingredient in selectedRecipe.ingredients" :key="ingredient" class="ingredient-item">
-                        <i class="bi bi-dot text-primary"></i>
-                        <span>{{ ingredient }}</span>
+                  <div class="card flex-grow-1">
+                    <div class="card-body">
+                      <h6 class="card-title mb-3 "><i class="bi bi-list-ul me-2"></i>Ingredients</h6>
+                      <div class="ingredients-list flex-grow-1 overflow-y-auto" style="max-height:250px; ">
+                        <div v-for="ingredient in selectedRecipe.ingredients" :key="ingredient" class="d-flex align-items-center mb-2">
+                            <i class="bi bi-dot text-primary me-2"></i>
+                            <span>{{ ingredient }}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              
-              <div class="col-md-7 order-0 order-md-1">
-                <div class="modal-content-section p-4 d-flex flex-column">
-                  <div class="recipe-name-section mb-4">
-                    <h3 class="recipe-name">{{ selectedRecipe.name }}</h3>
-                    <p class="text-muted mb-0">Follow these step-by-step instructions</p>
-                  </div>
-                  
-                  <div class="instructions-section">
-                    <h6 class="mb-3"><i class="bi bi-clipboard-check me-2"></i>Instructions</h6>
-                    <div class="instructions-content">
-                      <div class="instructions-text">
-                        <p class="formatted-instructions">{{ selectedRecipe.instructions }}</p>
+                <div class="col-md-7 order-0 order-md-1 d-flex flex-column">
+                  <div class="modal-content-section p-4 d-flex flex-column flex-grow-1">
+                    <div class="recipe-name-section mb-4">
+                      <h3 class="recipe-name">{{ selectedRecipe.name }}</h3>
+                      <p class="text-muted mb-0">Follow these step-by-step instructions</p>
+                    </div>
+                    <div class="instructions-section mb-4 flex-grow-1 d-flex flex-column">
+                      <h6 class="mb-3"><i class="bi bi-clipboard-check me-2"></i>Instructions</h6>
+                      <div class="instructions-content flex-grow-1">
+                        <div class="instructions-text">
+                          <p class="formatted-instructions">{{ selectedRecipe.instructions }}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div class="action-buttons-section mt-auto">
-                    <div class="d-flex gap-2 justify-content-center">
-                      <button 
-                        @click="toggleBookmark(selectedRecipe)"
-                        class="btn btn-sm flex-fill"
-                        :class="isRecipeBookmarked(selectedRecipe.id) ? 'btn-warning' : 'btn-outline-warning'"
-                      >
-                        <i :class="isRecipeBookmarked(selectedRecipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'" class="me-1"></i>
-                        {{ isRecipeBookmarked(selectedRecipe.id) ? 'Saved' : 'Save' }}
-                      </button>
-                      
-                      <a v-if="selectedRecipe.video" :href="selectedRecipe.video" target="_blank" class="btn btn-outline-danger btn-sm flex-fill">
-                        <i class="bi bi-play-circle me-1"></i>
-                        Video
-                      </a>
-                      
-                      <a v-if="selectedRecipe.source" :href="selectedRecipe.source" target="_blank" class="btn btn-outline-primary btn-sm flex-fill">
-                        <i class="bi bi-link-45deg me-1"></i>
-                        Source
-                      </a>
+                    <div class="action-buttons-section mt-auto">
+                      <div class="d-flex gap-2 justify-content-center">
+                        <button 
+                          @click="toggleBookmark(selectedRecipe)"
+                          class="btn btn-sm flex-fill"
+                          :class="isRecipeBookmarked(selectedRecipe.id) ? 'btn-warning' : 'btn-outline-warning'"
+                        >
+                          <i :class="isRecipeBookmarked(selectedRecipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'" class="me-1"></i>
+                          {{ isRecipeBookmarked(selectedRecipe.id) ? 'Saved' : 'Save' }}
+                        </button>
+                        <a v-if="selectedRecipe.video" :href="selectedRecipe.video" target="_blank" class="btn btn-outline-danger btn-sm flex-fill">
+                          <i class="bi bi-play-circle me-1"></i>
+                          Video
+                        </a>
+                        <a v-if="selectedRecipe.source" :href="selectedRecipe.source" target="_blank" class="btn btn-outline-primary btn-sm flex-fill">
+                          <i class="bi bi-link-45deg me-1"></i>
+                          Source
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -488,7 +632,6 @@ onAuthStateChanged(auth, async (u) => {
           </div>
         </div>
       </div>
-    </div>
   </div>
 </template>
 
@@ -543,44 +686,13 @@ onAuthStateChanged(auth, async (u) => {
   color: #dc3545;
 }
 
-.recipe-content {
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  flex-grow: 1;
-}
-
-.recipe-title {
-  font-weight: 600;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.recipe-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-}
-
-.recipe-ingredients {
-  font-size: 0.875rem;
-  line-height: 1.4;
-  flex-grow: 1;
-  margin-bottom: 1rem;
-}
-
-.recipe-button-container {
-  margin-top: auto;
-  padding-bottom: 0.5rem;
-}
 
 .instructions-text {
-  max-height: 300px;
+  flex-grow: 1;
+  min-height: 0;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .nav-tabs .nav-link {
@@ -693,6 +805,16 @@ onAuthStateChanged(auth, async (u) => {
 
 .recipe-name {
   color: var(--primary-green, #059669);
+  .instructions-section {
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    border: 1px solid #e9ecef;
+    flex-grow: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
   font-weight: 700;
   margin-bottom: 0.5rem;
   line-height: 1.2;
@@ -704,11 +826,6 @@ onAuthStateChanged(auth, async (u) => {
   padding: 1rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   border: 1px solid #e9ecef;
-}
-
-.ingredients-list {
-  max-height: 200px;
-  overflow-y: auto;
 }
 
 .ingredient-item {
@@ -732,7 +849,7 @@ onAuthStateChanged(auth, async (u) => {
 }
 
 .instructions-content {
-  max-height: 350px;
+  max-height: 500px;
   overflow-y: auto;
 }
 
