@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue';
 import { db, auth } from '../firebase.js';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
 import LocationPicker from '@/components/LocationPicker.vue';
 import { loadGoogleMaps } from '@/composables/loadGoogleMap.js'
@@ -11,12 +11,24 @@ const mySharedItems = ref([])
 const sharedItems = ref([])
 const showContactModal = ref(false)
 const showShareModal = ref(false)
+const showEditModal = ref(false) // ← New modal for editing
 const selectedContact = ref(null)
 const currentUser = ref(null)
 const itemsWithDistance = ref([])
 const preferredLocation = ref(null)
 const geometry = ref(null)
 const PREFERRED_LOC_KEY = 'foodshare_preferred_location'
+
+// Computed property to sort shared items
+const sortedMySharedItems = computed(() => {
+  return [...mySharedItems.value].sort((a, b) => {
+    // Non-donated items first (donated = false or undefined)
+    if (!a.donated && b.donated) return -1
+    if (a.donated && !b.donated) return 1
+    // If both have same donated status, maintain original order
+    return 0
+  })
+})
 
 const handleContact = (item) => {
   selectedContact.value = item
@@ -32,6 +44,20 @@ const shareForm = ref({
   pickupTime: '',
   notes: '',
   unit: '',
+  location: null,
+  foodItemId: ''
+})
+
+// New edit form ref
+const editForm = ref({
+  id: '',
+  foodName: '',
+  category: '',
+  quantity: '',
+  unit: '',
+  expirationDate: '',
+  pickupTime: '',
+  notes: '',
   location: null,
   foodItemId: ''
 })
@@ -86,9 +112,18 @@ async function loadFoodItems() {
   if (!currentUser.value) return;
   const foodItemsRef = collection(db, "user", currentUser.value.uid, "foodItems");
   const snapshot = await getDocs(foodItemsRef);
-  foodItems.value = snapshot.docs
-    .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter(item => item.quantity > 0);
+
+  // Get all items for name mapping (including 0 quantity)
+  const allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+
+  // Build name map from ALL items
+  foodNameMap.value = {}
+  allItems.forEach(item => {
+    foodNameMap.value[item.id] = item.name
+  })
+
+  // Only show items with quantity > 0 in the dropdown
+  foodItems.value = allItems.filter(item => item.quantity > 0);
 }
 
 function onSelectFoodItem() {
@@ -146,7 +181,7 @@ async function loadAvailableListings() {
   sharedItems.value = sharedItemsSnapshot.docs.map(doc => {
     const data = doc.data()
     const foodName = foodNameMap.value[data.foodId] || 'Unknown Item'
-    return { 
+    return {
       id: doc.id,
       foodId: data.foodId,
       foodName,  // ← Use resolved name
@@ -187,9 +222,6 @@ async function submitShare() {
     }
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
-    // const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', shareForm.value.foodItemId)
-    // const currentQty = foodItems.value.find(f => f.id === shareForm.value.foodItemId)?.quantity || 0
-    // const newQty = currentQty - shareForm.value.quantity
     const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', shareForm.value.foodItemId)
     const currentItem = foodItems.value.find(f => f.id === shareForm.value.foodItemId)
     const currentQty = Number(currentItem?.quantity || 0)
@@ -294,12 +326,13 @@ const getRemainingQuantity = (foodName) => {
   return Math.max(0, total - shared)
 }
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser.value = user
-    loadAvailableListings()
-    loadFoodItems()
-    loadDonationActivities()
+    await loadFoodItems()
+    await buildFoodNameMap() // Add this
+    await loadAvailableListings()
+    await loadDonationActivities()
   } else {
     currentUser.value = null
   }
@@ -318,7 +351,7 @@ onMounted(async () => {
 
   loadPreferredLocation()
   calculateDistances()
-  
+
 })
 
 function setPreferredLocation(place) {
@@ -399,14 +432,21 @@ function calculateDistances() {
 // getting food name from id
 const foodNameMap = ref({})
 async function buildFoodNameMap() {
+  if (!currentUser.value) return
+
   foodNameMap.value = {}
-  foodItems.value.forEach(item => {
-    foodNameMap.value[item.id] = item.name
+
+  const foodItemsRef = collection(db, "user", currentUser.value.uid, "foodItems");
+  const snapshot = await getDocs(foodItemsRef);
+
+  snapshot.docs.forEach(doc => {
+    const data = doc.data()
+    foodNameMap.value[doc.id] = data.name
   })
 }
 
-watch(foodItems, () => {
-  buildFoodNameMap()
+watch(foodItems, async () => {
+  await buildFoodNameMap()
 }, { immediate: true })
 
 
@@ -425,11 +465,228 @@ watch(preferredLocation, (newVal) => {
 })
 
 
+// Edit donated item function
+async function editDonated(item) {
+  // Populate form with existing data
+  editForm.value = {
+    id: item.id,
+    foodName: item.foodName,
+    category: item.category,
+    quantity: item.quantity,
+    unit: item.unit,
+    expirationDate: item.expirationDate instanceof Date
+      ? item.expirationDate.toISOString().slice(0, 10)
+      : typeof item.expirationDate?.toDate === 'function'
+      ? item.expirationDate.toDate().toISOString().slice(0, 10)
+      : item.expirationDate?.slice(0, 10) || '',
+    pickupTime: item.pickupTime || '',
+    notes: item.notes || '',
+    location: item.location || null,
+    foodItemId: item.foodId
+  }
 
+  showEditModal.value = true
+}
+
+// Submit edit function - with proper error handling and rollback
+async function submitEdit() {
+  if (!currentUser.value) return alert("Please log in first")
+  if (!editForm.value.location?.lat || !editForm.value.location?.lng) {
+    return alert('Please select a pickup location')
+  }
+
+  try {
+    const expDate = new Date(editForm.value.expirationDate)
+
+    // Get the original listing to compare quantities
+    const listingRef = doc(db, 'communityListings', editForm.value.id)
+    const listingSnap = await getDoc(listingRef)
+
+    if (!listingSnap.exists()) {
+      return alert("Listing not found")
+    }
+
+    const originalListing = listingSnap.data()
+    const originalQty = Number(originalListing.quantity || 0)
+    const newQty = Number(editForm.value.quantity)
+    const qtyDifference = newQty - originalQty
+
+    // Validate quantity if increasing
+    if (qtyDifference > 0) {
+      const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', editForm.value.foodItemId)
+      const foodItemSnap = await getDoc(foodItemRef)
+
+      if (foodItemSnap.exists()) {
+        const currentFoodQty = Number(foodItemSnap.data().quantity || 0)
+
+        if (currentFoodQty < qtyDifference) {
+          return alert(`Insufficient quantity. You only have ${currentFoodQty} ${editForm.value.unit} available.`)
+        }
+      } else {
+        return alert('Food item not found')
+      }
+    }
+
+    // Prepare update data
+    const updateData = {
+      category: editForm.value.category,
+      quantity: newQty,
+      unit: editForm.value.unit,
+      expirationDate: expDate,
+      pickupTime: editForm.value.pickupTime || 'Anytime',
+      notes: editForm.value.notes || '',
+      location: {
+        lat: editForm.value.location.lat,
+        lng: editForm.value.location.lng,
+        address: editForm.value.location.address || ''
+      }
+    }
+
+    // Update the community listing first
+    await updateDoc(listingRef, updateData)
+
+    // Update the food item quantity if quantity changed
+    if (qtyDifference !== 0) {
+      try {
+        const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', editForm.value.foodItemId)
+        const foodItemSnap = await getDoc(foodItemRef)
+
+        if (foodItemSnap.exists()) {
+          const currentFoodQty = Number(foodItemSnap.data().quantity || 0)
+          const updatedFoodQty = currentFoodQty - qtyDifference
+
+          await updateDoc(foodItemRef, {
+            quantity: updatedFoodQty
+          })
+        }
+      } catch (foodItemError) {
+        // Rollback listing update
+        await updateDoc(listingRef, {
+          quantity: originalQty
+        })
+        throw new Error('Failed to update food item quantity. Changes rolled back.')
+      }
+    }
+
+    // Update the pending donation activity quantity
+    try {
+      const activitiesQuery = query(
+        collection(db, 'user', currentUser.value.uid, 'activities'),
+        where('activityType', '==', 'pendingDonFood'),
+        where('foodId', '==', editForm.value.foodItemId)
+      )
+
+      const activitiesSnap = await getDocs(activitiesQuery)
+
+      if (!activitiesSnap.empty) {
+        const activityDoc = activitiesSnap.docs[0]
+        await updateDoc(activityDoc.ref, {
+          quantity: newQty,
+          unit: editForm.value.unit
+        })
+      }
+    } catch (activityError) {
+      console.warn('Failed to update activity, but listing and food item were updated:', activityError)
+      // Don't rollback for activity errors as they're not critical
+    }
+
+    alert("Listing updated successfully!")
+    showEditModal.value = false
+    await loadMyListings()
+    await loadFoodItems()
+    await loadDonationActivities()
+  } catch (err) {
+    console.error("Error updating listing:", err)
+    alert("Failed to update listing: " + err.message)
+  }
+}
+
+// Cancel donated function - with proper error handling and rollback
+async function canDonated(item) {
+  if (!confirm(`Are you sure you want to cancel "${item.foodName}"? This will remove it from community listings.`)) {
+    return
+  }
+
+  // Store original data for potential rollback
+  let deletedListing = null
+  let originalFoodQty = null
+
+  try {
+    // Get the original listing quantity before deletion
+    const listingRef = doc(db, 'communityListings', item.id)
+    const listingSnap = await getDoc(listingRef)
+
+    if (!listingSnap.exists()) {
+      return alert("Listing not found")
+    }
+
+    deletedListing = { id: item.id, ...listingSnap.data() }
+    const returnQty = Number(deletedListing.quantity || 0)
+
+    // Get original food item quantity
+    const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', item.foodId)
+    const foodItemSnap = await getDoc(foodItemRef)
+
+    if (!foodItemSnap.exists()) {
+      return alert('Food item not found. Cannot cancel donation.')
+    }
+
+    originalFoodQty = Number(foodItemSnap.data().quantity || 0)
+    const newQty = originalFoodQty + returnQty
+
+    // Delete the listing first
+    await deleteDoc(listingRef)
+
+    // Return quantity back to food items
+    try {
+      await updateDoc(foodItemRef, {
+        quantity: newQty
+      })
+    } catch (foodItemError) {
+      // Rollback: Recreate the listing
+      await addDoc(collection(db, 'communityListings'), deletedListing)
+      throw new Error('Failed to update food item quantity. Listing restored.')
+    }
+
+    // Remove pending donation activity
+    try {
+      const activitiesQuery = query(
+        collection(db, 'user', currentUser.value.uid, 'activities'),
+        where('activityType', '==', 'pendingDonFood'),
+        where('foodId', '==', item.foodId)
+      )
+
+      const activitiesSnap = await getDocs(activitiesQuery)
+
+      if (!activitiesSnap.empty) {
+        const deletePromises = activitiesSnap.docs.map(doc => deleteDoc(doc.ref))
+        await Promise.all(deletePromises)
+      }
+    } catch (activityError) {
+      console.warn('Failed to delete activities, but listing was cancelled:', activityError)
+      // Don't rollback for activity errors as they're not critical
+    }
+
+    alert('Donation cancelled successfully!')
+
+    // Reload all data to reflect changes
+    await loadMyListings()
+    await loadFoodItems()
+    await loadDonationActivities()
+  } catch (err) {
+    console.error('Error canceling donation:', err)
+    alert('Failed to cancel donation: ' + err.message)
+
+    // Reload to show current state
+    await loadMyListings()
+    await loadFoodItems()
+    await loadDonationActivities()
+  }
+}
 </script>
 
 
-<template>       
+<template>
   <div class="container-fluid p-4">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-4">
       <!-- Title & subtitle -->
@@ -496,36 +753,62 @@ watch(preferredLocation, (newVal) => {
       </div>
 
       <div v-else class="row g-3">
-        <div v-for="item in mySharedItems" :key="item.id" class="col-12 col-md-6 col-lg-4">
-          <div class="card h-100">
-            <div class="card-body">
-              <h5 class="card-title mb-2">{{ item.foodName }}</h5>
-              <p class="text-muted mb-0">{{ item.quantity }} {{ item.unit }}</p>
-              <p class="text-muted small mb-2">
-                <i class="bi bi-geo-alt me-1"></i>
-                {{ item.location?.address || 'No address' }}
-              </p>
-              <p class="text-muted small mb-2">
-                <i class="bi bi-clock me-1"></i>
-                Pickup Time: {{ item.pickupTime }}
-              </p>
+        <!-- Changed from mySharedItems to sortedMySharedItems -->
+        <div v-for="item in sortedMySharedItems" :key="item.id" class="col-12 col-md-6 col-lg-4">
+          <div class="card h-100" :class="{ 'card-donated': item.donated }">
+            <div class="card-body position-relative d-flex flex-column">
+              <!-- Edit and Cancel buttons at top right -->
+              <div v-if="!item.donated" class="action-buttons">
+                <button
+                  @click="editDonated(item)"
+                  class="btn btn-sm btn-secondary"
+                  title="Edit"
+                >
+                  <i class="bi bi-pencil-square"></i>
+                </button>
 
-              <p v-if="item.notes" class="text-muted small mb-2">
-                <i class="bi bi-chat-text me-1"></i>
-                {{ item.notes }}
-              </p>
-              <span class="badge badge-warning-orange mt-2 text-black">
-                Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}
-              </span>
+                <button
+                  @click="canDonated(item)"
+                  class="btn btn-sm btn-danger"
+                  title="Cancel"
+                >
+                  <i class="bi bi-x-circle"></i>
+                </button>
+              </div>
+
+              <!-- Content section -->
+              <div class="flex-grow-1">
+                <h5 class="card-title mb-2">{{ item.foodName }}</h5>
+                <p class="text-muted mb-0">{{ item.quantity }} {{ item.unit }}</p>
+                <p class="text-muted small mb-2">
+                  <i class="bi bi-geo-alt me-1"></i>
+                  {{ item.location?.address || 'No address' }}
+                </p>
+                <p class="text-muted small mb-2">
+                  <i class="bi bi-clock me-1"></i>
+                  Pickup Time: {{ item.pickupTime }}
+                </p>
+
+                <p v-if="item.notes" class="text-muted small mb-2">
+                  <i class="bi bi-chat-text me-1"></i>
+                  {{ item.notes }}
+                </p>
+                <span class="badge badge-warning-orange mt-2 text-black">
+                  Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}
+                </span>
+              </div>
+
+              <!-- Mark as Donated button - always at bottom -->
               <button
                 v-if="!item.donated"
                 @click="markAsDonated(item)"
-                class="btn btn-success btn-sm w-30"
+                class="btn btn-success btn-sm w-100 mt-3"
               >
-                <i class="bi bi-check-circle me-1"></i>
+                <i class="bi bi-check-circle-fill me-1"></i>
                 Mark as Donated
               </button>
-              <div v-else class="badge bg-success w-30 text-center py-2">
+
+              <div v-else class="donated-badge w-100 text-center py-2 mt-3">
                 <i class="bi bi-check-circle-fill me-1"></i>
                 Donated
               </div>
@@ -687,7 +970,7 @@ watch(preferredLocation, (newVal) => {
                     :disabled="getRemainingQuantity(item.name) <= 0"
                     :title="
                     getRemainingQuantity(item.name) <= 0
-                     ? 'No quantity left to share' 
+                     ? 'No quantity left to share'
                      : `Remaining: ${getRemainingQuantity(item.name)} ${item.unit}`
                     "
                   >
@@ -788,15 +1071,136 @@ watch(preferredLocation, (newVal) => {
         </div>
       </div>
     </div>
+
+    <!-- Edit Donation Modal -->
+    <div v-if="showEditModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
+      <div class="modal-backdrop fade show" @click="showEditModal = false" style="z-index: 1050;"></div>
+      <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="bi bi-pencil-square me-2"></i>
+              Edit Donation
+            </h5>
+            <button type="button" class="btn-close" @click="showEditModal = false"></button>
+          </div>
+
+          <div class="modal-body" style="max-height:70vh; overflow-y:auto">
+            <form @submit.prevent="submitEdit">
+              <div class="mb-3">
+                <label class="form-label">Food Name</label>
+                <input
+                  v-model="editForm.foodName"
+                  type="text"
+                  class="form-control"
+                  readonly
+                  style="background-color: #e9ecef; cursor: not-allowed;"
+                />
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label">Category</label>
+                  <input
+                    v-model="editForm.category"
+                    type="text"
+                    class="form-control"
+                    readonly
+                    style="background-color: #e9ecef; cursor: not-allowed;"
+                  />
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Expiration Date</label>
+                  <input
+                    v-model="editForm.expirationDate"
+                    type="date"
+                    class="form-control"
+                    readonly
+                    style="background-color: #e9ecef; cursor: not-allowed;"
+                  />
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label">Quantity *</label>
+                  <input
+                    v-model.number="editForm.quantity"
+                    type="number"
+                    class="form-control"
+                    min="1"
+                    step="1"
+                    required
+                  />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Unit</label>
+                  <input
+                    v-model="editForm.unit"
+                    type="text"
+                    class="form-control"
+                    readonly
+                    style="background-color: #e9ecef; cursor: not-allowed;"
+                  />
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Preferred Pickup Time</label>
+                <input
+                  v-model="editForm.pickupTime"
+                  type="text"
+                  class="form-control"
+                  placeholder="e.g., Weekdays after 6pm, Weekends anytime"
+                />
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Preferred Pickup Location *</label>
+                <LocationPicker
+                  @place-selected="editForm.location = $event"
+                  :initial-address="editForm.location?.address"
+                />
+                <small v-if="editForm.location" class="text-success d-block mt-1">
+                  Selected: {{ editForm.location.address }}
+                </small>
+                <small v-else class="text-danger d-block mt-1">Please select location</small>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Additional Notes</label>
+                <textarea
+                  v-model="editForm.notes"
+                  class="form-control"
+                  rows="3"
+                  placeholder="Any special instructions or notes about the food item..."
+                ></textarea>
+              </div>
+            </form>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="showEditModal = false">
+              Cancel
+            </button>
+            <button type="button" class="btn btn-primary" @click="submitEdit">
+              <i class="bi bi-check-circle me-2"></i>
+              Update Listing
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 </template>
 
 <style scoped>
 
 .card .small i { vertical-align: middle; }
-.card .small { 
-  overflow: hidden; 
-  text-overflow: ellipsis; 
-  white-space: nowrap; 
+.card .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Modal backdrop and positioning fixes */
@@ -840,5 +1244,283 @@ watch(preferredLocation, (newVal) => {
   display: flex !important;
   align-items: center;
   justify-content: center;
+}
+
+/* Card body with flexbox */
+.card-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding-top: 3rem; /* Space for buttons */
+}
+
+/* Content grows to push button to bottom */
+.flex-grow-1 {
+  flex-grow: 1;
+}
+
+/* Action buttons container at top right */
+.action-buttons {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  z-index: 10;
+}
+
+/* Remove the extra padding from card title */
+.card-title {
+  padding-right: 0;
+  margin-right: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Style for action buttons */
+.action-buttons .btn {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  border: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-width: 36px;
+  min-height: 36px;
+}
+
+.action-buttons .btn i {
+  font-size: 1rem;
+}
+
+/* Secondary button (Edit) */
+.action-buttons .btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.action-buttons .btn-secondary:hover {
+  background-color: #5a6268;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+}
+
+.action-buttons .btn-secondary:active {
+  transform: translateY(0);
+}
+
+/* Danger button (Cancel) */
+.action-buttons .btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.action-buttons .btn-danger:hover {
+  background-color: #c82333;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.action-buttons .btn-danger:active {
+  transform: translateY(0);
+}
+
+/* Mark as Donated button - matches donated badge style */
+.btn-success.w-100 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #198754;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.625rem 1rem;
+  transition: all 0.2s ease;
+  margin-top: auto;
+  box-shadow: 0 2px 4px rgba(25, 135, 84, 0.2);
+}
+
+.btn-success.w-100:hover {
+  background-color: #157347;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(25, 135, 84, 0.3);
+}
+
+.btn-success.w-100:active {
+  transform: translateY(0);
+}
+
+/* Donated badge - matches button style */
+.donated-badge {
+  background-color: #198754;
+  color: white;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 1rem;
+  margin-top: auto;
+  box-shadow: 0 2px 4px rgba(25, 135, 84, 0.2);
+}
+
+/* Icon consistency */
+.btn-success i,
+.donated-badge i {
+  font-size: 1rem;
+}
+
+/* Primary button (Share Food, Contact) */
+.btn-primary {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(13, 110, 253, 0.2);
+}
+
+.btn-primary:hover {
+  background-color: #0b5ed7;
+  border-color: #0a58ca;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Modal buttons */
+.modal-footer .btn {
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.modal-footer .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.modal-footer .btn:active {
+  transform: translateY(0);
+}
+
+.modal-footer .btn-secondary {
+  background-color: #6c757d;
+  border-color: #6c757d;
+}
+
+.modal-footer .btn-secondary:hover {
+  background-color: #5a6268;
+  border-color: #545b62;
+}
+
+/* Close button in modal header */
+.btn-close {
+  transition: all 0.2s ease;
+}
+
+.btn-close:hover {
+  transform: rotate(90deg);
+  opacity: 0.75;
+}
+
+/* Badges */
+.badge-warning-orange {
+  background-color: #ff8c42;
+  color: #000;
+  font-weight: 600;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+}
+
+.badge {
+  font-size: 0.85rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+}
+
+/* Donated card styling */
+.card-donated {
+  opacity: 0.6;
+  background-color: #f8f9fa;
+  filter: grayscale(40%);
+  position: relative;
+}
+
+.card-donated::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(0, 0, 0, 0.02) 10px,
+    rgba(0, 0, 0, 0.02) 20px
+  );
+  pointer-events: none;
+  border-radius: 0.375rem;
+  z-index: 1;
+}
+
+.card-donated .card-body {
+  position: relative;
+  z-index: 2;
+}
+
+.card-donated .card-title,
+.card-donated .text-muted {
+  color: #868e96 !important;
+}
+
+.card-donated .badge-warning-orange {
+  opacity: 0.7;
+  filter: grayscale(30%);
+}
+
+/* Prevent hover effects on donated cards */
+.card-donated:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .card-body {
+    padding-top: 3.5rem; /* More space on mobile */
+  }
+
+  .action-buttons {
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+
+  .action-buttons .btn {
+    padding: 0.5rem 0.65rem;
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  .action-buttons .btn i {
+    font-size: 0.9rem;
+  }
+}
+
+/* Ensure buttons are clickable on mobile */
+@media (hover: none) and (pointer: coarse) {
+  .action-buttons .btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
 }
 </style>
