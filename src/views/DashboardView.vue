@@ -1105,7 +1105,7 @@ watch(() => analytics.value.foodScore, async (score) => {
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
           <div
-            class="position-relative p-3 rounded-4 bg-success bg-gradient text-white shadow d-flex flex-column justify-content-between"
+            class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
             style="
               background: linear-gradient(
                 135deg,
