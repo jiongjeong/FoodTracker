@@ -108,7 +108,7 @@ const activitySortDirection = ref('desc') // 'desc' = newest first, 'asc' = olde
 const activityTypeOptions = [
   { label: 'All', value: 'All' },
   { label: 'Added', value: 'addFood' },
-  { label: 'Used', value: 'conFood' },
+  { label: 'Consumed', value: 'conFood' },
   { label: 'Expired', value: 'expFood' },
   { label: 'Donated', value: 'donFood' },
   { label: 'Pending Donation', value: 'pendingDonFood' },
@@ -956,7 +956,25 @@ const saveEdit = async () => {
   closeEdit()
 }
 
-import { query, where } from 'firebase/firestore'
+import { query, where } from 'firebase/firestore';
+
+
+// Watch foodScore and update Firebase when it changes
+watchEffect(async () => {
+  const score = analytics.value.foodScore;
+  const uid = userId.value;
+  
+  if (uid && activitiesLoaded.value && foodItems.value.length >= 0) {
+    try {
+      const userDocRef = doc(db, 'user', uid);
+      await updateDoc(userDocRef, {
+        foodScore: score
+      });
+    } catch (err) {
+      console.error('Failed to update foodScore:', err);
+    }
+  }
+});
 
 const deleteFood = async (food) => {
   if (!food || food.id == null) return
@@ -1039,6 +1057,35 @@ const foodDonationStatus = computed(() => {
   }
   return status
 })
+
+//monkey gamification
+async function checkAndUnlockAccessories(uid, newScore) {
+  const accSnap = await getDocs(
+    query(collection(db, "accessories"), where("requiredScore", "<=", newScore))
+  );
+
+  const unlockedIds = accSnap.docs.map(d => d.id);
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+  const current = userSnap.data().monkey.accessories || [];
+
+  const toAdd = unlockedIds.filter(id => !current.includes(id));
+  if (toAdd.length) {
+    await updateDoc(userRef, {
+      "monkey.accessories": arrayUnion(...toAdd)
+    });
+  }
+}
+
+watch(() => analytics.value.foodScore, async (score) => {
+  if (currentUser.value) {
+    await checkAndUnlockAccessories(currentUser.value.uid, score);
+    await loadUserMonkey();   // refresh UI
+  }
+});
+
+
+
 </script>
 
 <template>
@@ -1429,20 +1476,6 @@ const foodDonationStatus = computed(() => {
                           <span v-else-if="getDaysLeft(food) == 0">Today</span>
                           <span v-else>{{ getDaysLeft(food) }} days</span>
                         </span>
-
-                        <!-- donated badge -->
-                        <span
-                          v-if="foodDonationStatus[food.name]?.type === 'pendingDonFood'"
-                          class="badge bg-warning text-dark"
-                        >
-                          Pending Donation
-                        </span>
-                        <span
-                          v-else-if="foodDonationStatus[food.name]?.type === 'donFood'"
-                          class="badge bg-success"
-                        >
-                          Donated
-                        </span>
                       </div>
                       <div class="food-category">{{ food.category }}</div>
                       <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
@@ -1462,15 +1495,12 @@ const foodDonationStatus = computed(() => {
                     <i class="bi bi-book"></i> Recipes
                   </button>
                   <div class="food-actions d-flex gap-2">
-                    <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)">
-                      <i class="bi bi-pencil"></i> Edit
-                    </button>
-                    <button class="food-btn food-btn-use" @click.prevent="openUse(food)">
-                      <i class="bi bi-check2"></i> Use
-                    </button>
-                    <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)">
-                      <i class="bi bi-trash"></i>
-                    </button>
+                    <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
+                      Edit</button>
+                    <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i>
+                      Consume</button>
+                    <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
+                        class="bi bi-trash"></i></button>
                   </div>
                 </div>
               </div>
@@ -1540,7 +1570,7 @@ const foodDonationStatus = computed(() => {
                       All of {{ activity.foodName }} fully consumed
                     </strong>
                     <strong v-else>
-                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} used
+                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} consumed
                     </strong>
                   </p>
                 </div>
@@ -1631,11 +1661,11 @@ const foodDonationStatus = computed(() => {
         <div class="row g-2 mt-2">
           <div class="col-6">
             <label class="form-label">Quantity</label>
-            <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" />
+            <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" style="height: 45px"/>
           </div>
           <div class="col-6">
             <label class="form-label">Unit</label>
-            <input v-model="useForm.unit" type="text" class="form-control" />
+            <input v-model="useForm.unit" type="text" class="form-control" disabled style="height: 45px;"/>
           </div>
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
