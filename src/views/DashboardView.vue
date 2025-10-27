@@ -1,7 +1,7 @@
 <script setup>
 import { useRouter } from 'vue-router';
 import { db } from '../firebase.js';
-import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp, query, where } from 'firebase/firestore';
 import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
 import { Bar, Pie, Line } from 'vue-chartjs'
@@ -635,6 +635,25 @@ const analytics = computed(() => {
   }
 })
 
+// Watch foodScore and update Firebase when it changes
+watchEffect(async () => {
+  const score = analytics.value.foodScore;
+  const uid = userId.value;
+  
+  
+  if (uid && activitiesLoaded.value && foodItems.value.length >= 0) {
+    try {
+      const userDocRef = doc(db, 'user', uid);
+      await updateDoc(userDocRef, {
+        foodScore: score,
+        streak : analytics.value.streakDays
+      });
+    } catch (err) {
+      console.error('Failed to update foodScore:', err);
+    }
+  }
+});
+
 // Chart options
 const chartOptions = {
   responsive: true,
@@ -946,25 +965,6 @@ const saveEdit = async () => {
   closeEdit();
 };
 
-import { query, where } from 'firebase/firestore';
-
-
-// Watch foodScore and update Firebase when it changes
-watchEffect(async () => {
-  const score = analytics.value.foodScore;
-  const uid = userId.value;
-  
-  if (uid && activitiesLoaded.value && foodItems.value.length >= 0) {
-    try {
-      const userDocRef = doc(db, 'user', uid);
-      await updateDoc(userDocRef, {
-        foodScore: score
-      });
-    } catch (err) {
-      console.error('Failed to update foodScore:', err);
-    }
-  }
-});
 
 const deleteFood = async (food) => {
   if (!food || food.id == null) return;
