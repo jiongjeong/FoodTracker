@@ -120,13 +120,17 @@ async function loadMyListings() {
   if (!currentUser.value) return;
   const q = query(
     collection(db, "communityListings"),
-    where("ownerId", "==", currentUser.value.uid))
+    where("ownerId", "==", currentUser.value.uid)
+  )
 
   const snapshot = await getDocs(q)
   mySharedItems.value = snapshot.docs.map((doc) => {
     const data = doc.data()
+    const foodName = foodNameMap.value[data.foodId] || 'Unknown Item'
     return {
       id: doc.id,
+      foodId: data.foodId,
+      foodName,  // ← Use resolved name
       ...data,
       daysUntilExpiration: getDaysLeft(data.expirationDate),
       pickupTime: data.pickupTime || 'Not specified',
@@ -139,13 +143,19 @@ async function loadMyListings() {
 async function loadAvailableListings() {
   const sharedItemsRef = collection(db, "communityListings")
   const sharedItemsSnapshot = await getDocs(sharedItemsRef)
-  sharedItems.value = sharedItemsSnapshot.docs.map(doc => ({ 
-    id: doc.id, ...doc.data(), daysUntilExpiration: getDaysLeft(doc.data().expirationDate),
-    pickupTime: doc.data().pickupTime || 'Not specified',  // ← ADD
-    notes: doc.data().notes || ''
-  }))
-  .filter(item => item.ownerId !== currentUser.value?.uid);
-  console.log("Available listings loaded:", sharedItems.value)
+  sharedItems.value = sharedItemsSnapshot.docs.map(doc => {
+    const data = doc.data()
+    const foodName = foodNameMap.value[data.foodId] || 'Unknown Item'
+    return { 
+      id: doc.id,
+      foodId: data.foodId,
+      foodName,  // ← Use resolved name
+      ...data,
+      daysUntilExpiration: getDaysLeft(data.expirationDate),
+      pickupTime: data.pickupTime || 'Not specified',
+      notes: data.notes || ''
+    }
+  }).filter(item => item.ownerId !== currentUser.value?.uid)
 }
 
 
@@ -160,19 +170,14 @@ async function submitShare() {
 
     const data = {
       ownerId: currentUser.value.uid,
-      foodName: shareForm.value.foodName,
+      // foodName: shareForm.value.foodName,
+      foodId: shareForm.value.foodItemId,
       category: shareForm.value.category,
       quantity: shareForm.value.quantity,
       unit: shareForm.value.unit,
       expirationDate: expDate,
       pickupTime: shareForm.value.pickupTime || 'Anytime',
       notes: shareForm.value.notes || '',
-      sharedBy: currentUser.value.displayName || (currentUser.value.email ? currentUser.value.email.split("@")[0] : 'User'),
-      contact: {
-        email: shareForm.value.contactEmail || currentUser.value.email,
-        phone: shareForm.value.contactPhone || "",
-        address: shareForm.value.contactAddress || "",
-      },
       createdAt: serverTimestamp(),
       location: {
         lat: shareForm.value.location.lat,
@@ -182,9 +187,23 @@ async function submitShare() {
     }
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
+    // const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', shareForm.value.foodItemId)
+    // const currentQty = foodItems.value.find(f => f.id === shareForm.value.foodItemId)?.quantity || 0
+    // const newQty = currentQty - shareForm.value.quantity
     const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', shareForm.value.foodItemId)
-    const currentQty = foodItems.value.find(f => f.id === shareForm.value.foodItemId)?.quantity || 0
-    const newQty = currentQty - shareForm.value.quantity
+    const currentItem = foodItems.value.find(f => f.id === shareForm.value.foodItemId)
+    const currentQty = Number(currentItem?.quantity || 0)
+    const newQty = currentQty - Number(shareForm.value.quantity)
+
+    if (newQty < 0) {
+      return alert('Insufficient quantity')
+    }
+
+    await updateDoc(foodItemRef, {
+      quantity: newQty
+    })
+
+    await loadFoodItems()
 
     await updateDoc(foodItemRef, {
       quantity: Math.max(0, newQty)
@@ -199,7 +218,8 @@ async function submitShare() {
       createdAt: new Date().toISOString(),
       category: data.category,
       price: 0,
-      foodName: data.foodName,
+      // foodName: data.foodName,
+      foodId: data.foodId,
       quantity: data.quantity,
       unit: data.unit,
     })
@@ -260,12 +280,6 @@ async function loadDonationActivities() {
   const snap = await getDocs(q)
   donationActivities.value = snap.docs.map(d => d.data())
   activitiesLoaded.value = true
-}
-
-
-const isFoodShared = (foodName) => {
-  if (!activitiesLoaded.value) return false
-  return donationActivities.value.some(act => act.foodName === foodName)
 }
 
 const getRemainingQuantity = (foodName) => {
@@ -381,6 +395,19 @@ function calculateDistances() {
     }
   })
 }
+
+// getting food name from id
+const foodNameMap = ref({})
+async function buildFoodNameMap() {
+  foodNameMap.value = {}
+  foodItems.value.forEach(item => {
+    foodNameMap.value[item.id] = item.name
+  })
+}
+
+watch(foodItems, () => {
+  buildFoodNameMap()
+}, { immediate: true })
 
 
 watch(
