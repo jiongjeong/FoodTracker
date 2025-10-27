@@ -91,7 +91,7 @@ const activitySortDirection = ref('desc'); // 'desc' = newest first, 'asc' = old
 const activityTypeOptions = [
   { label: 'All', value: 'All' },
   { label: 'Added', value: 'addFood' },
-  { label: 'Used', value: 'conFood' },
+  { label: 'Consumed', value: 'conFood' },
   { label: 'Expired', value: 'expFood' },
   { label: 'Donated', value: 'donFood' },
   { label: "Pending Donation", value: "pendingDonFood" }
@@ -1338,7 +1338,7 @@ const foodDonationStatus = computed(() => {
                     <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
                       Edit</button>
                     <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i>
-                      Use</button>
+                      Consume</button>
                     <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
                         class="bi bi-trash"></i></button>
                   </div>
@@ -1390,7 +1390,7 @@ const foodDonationStatus = computed(() => {
                       All of {{ activity.foodName }} fully consumed
                     </strong>
                     <strong v-else>
-                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} used
+                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} consumed
                     </strong>
                   </p>
                 </div>
@@ -1476,11 +1476,11 @@ const foodDonationStatus = computed(() => {
         <div class="row g-2 mt-2">
           <div class="col-6">
             <label class="form-label">Quantity</label>
-            <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" />
+            <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" style="height: 45px"/>
           </div>
           <div class="col-6">
             <label class="form-label">Unit</label>
-            <input v-model="useForm.unit" type="text" class="form-control" />
+            <input v-model="useForm.unit" type="text" class="form-control" disabled style="height: 45px;"/>
           </div>
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
