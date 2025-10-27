@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { doc, getDoc, getDocs, updateDoc, deleteDoc, collection, setDoc } from "firebase/firestore";
 import { getAuth, updateProfile, updatePassword, deleteUser } from "firebase/auth";
 import { db } from "@/firebase";
+import MonkeyAvatar from '@/composables/monkeyAvatar.vue'
 
 const router = useRouter()
 const auth = getAuth()
@@ -208,6 +209,33 @@ async function deleteAccount() {
 onMounted(() => {
   loadUser()
 })
+
+const allAccessories = ref([])
+const unlockedCount = ref(0)
+const totalAccessories = ref(0)
+
+// Load accessories + count unlocked
+async function loadAccessories() {
+  const snap = await getDocs(collection(db, 'accessories'))
+  allAccessories.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  totalAccessories.value = allAccessories.value.length
+
+  // Count unlocked from current user
+  const userSnap = await getDoc(doc(db, 'users', currentUser.value.uid))
+  const monkey = userSnap.data()?.monkey || { accessories: [] }
+  unlockedCount.value = monkey.accessories.length
+}
+
+onMounted(() => {
+  if (currentUser.value) loadAccessories()
+})
+
+function isUnlocked(acc) {
+  const userSnap = /* get from your existing user data or use a ref */
+  const monkey = userData.value?.monkey || { accessories: [] }
+  return monkey.accessories.includes(acc.id)
+}
+
 </script>
 
 <template>
@@ -221,6 +249,41 @@ onMounted(() => {
           </div>
           <h2 class="profile-title">{{ editableUser.name || 'User Profile' }}</h2>
           <p class="profile-subtitle">Manage your account settings</p>
+        </div>
+      </div>
+
+      <!-- monkey avatar -->
+      <div class="monkey-section text-center mb-4">
+        <MonkeyAvatar size="150px" class="mx-auto shadow-lg rounded-circle" />
+        <h4 class="mt-3 mb-1">Your Food Monkey</h4>
+        <p class="text-muted small">Earn points to dress it up!</p>
+      </div>
+
+      <div class="form-section monkey-shop">
+        <h3 class="section-title">
+          <i class="bi bi-stars"></i>
+          Monkey Wardrobe
+          <span class="badge bg-success ms-2">{{ unlockedCount }} / {{ totalAccessories }}</span>
+        </h3>
+
+        <div class="accessory-grid">
+          <div
+            v-for="acc in allAccessories"
+            :key="acc.id"
+            class="accessory-item"
+            :class="{ locked: !isUnlocked(acc) }"
+          >
+            <div class="accessory-image-wrapper">
+              <img :src="acc.image" :alt="acc.name" />
+              <div v-if="!isUnlocked(acc)" class="lock-overlay">
+                <i class="bi bi-lock-fill"></i>
+              </div>
+            </div>
+            <p class="accessory-name">{{ acc.name }}</p>
+            <small v-if="!isUnlocked(acc)" class="text-muted">
+              Need {{ acc.requiredScore }} pts
+            </small>
+          </div>
         </div>
       </div>
 
@@ -418,4 +481,533 @@ onMounted(() => {
   </div>
 </template>
 
+<style scoped>
+/* Profile Page Specific Styles */
+.profile-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--auth-gradient);
+  padding: 2rem 1rem;
+}
 
+.profile-container {
+  max-width: 700px;
+  width: 100%;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.profile-header {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  padding: 2.5rem 2rem;
+  text-align: center;
+  color: white;
+}
+
+.avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.avatar {
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+}
+
+.avatar i {
+  font-size: 3rem;
+  color: white;
+}
+
+.profile-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0 0 0.5rem 0;
+  color: white;
+}
+
+.profile-subtitle {
+  font-size: 0.95rem;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  gap: 1rem;
+  color: #6b7280;
+}
+
+.spinner-border-lg {
+  width: 3rem;
+  height: 3rem;
+  border-width: 0.3rem;
+  color: #059669;
+}
+
+.profile-form {
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-section {
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.form-section:last-of-type {
+  border-bottom: none;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 1.5rem;
+}
+
+.section-title i {
+  color: #059669;
+  font-size: 1.4rem;
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+label i {
+  color: #059669;
+}
+
+input[type="email"],
+input[type="password"],
+input[type="text"],
+input[type="tel"] {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+input:focus {
+  outline: none;
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+input:disabled,
+input:readonly {
+  background: #f9fafb;
+  cursor: not-allowed;
+  opacity: 0.7;
+  color: #6b7280;
+}
+
+.password-input-wrapper {
+  position: relative;
+}
+
+.password-input-wrapper input {
+  padding-right: 3rem;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+  width: auto;
+  margin: 0;
+}
+
+.toggle-password:hover {
+  color: #059669;
+  background: transparent;
+}
+
+.toggle-password i {
+  font-size: 1.1rem;
+}
+
+.password-hint,
+.email-hint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  animation: shake 0.4s ease;
+}
+
+.error-message i {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.success-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  color: #059669;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  animation: slideDown 0.4s ease;
+}
+
+.success-message i {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.btn-save,
+.btn-delete {
+  flex: 1;
+  padding: 0.875rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-save {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);
+}
+
+.btn-save:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.btn-save:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-save:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-delete {
+  background: white;
+  color: #dc2626;
+  border: 2px solid #dc2626;
+}
+
+.btn-delete:hover {
+  background: #dc2626;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.3);
+}
+
+/* Modal Styles */
+.modal {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  overflow-y: auto;
+}
+
+.modal-backdrop {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9998;
+}
+
+.modal-dialog {
+  position: relative;
+  max-width: 500px;
+  width: 90%;
+  margin: 1rem auto;
+  z-index: 10000;
+  pointer-events: auto;
+}
+
+.modal-content {
+  position: relative;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+}
+
+.modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-close {
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.btn-close:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-body ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.modal-body p {
+  margin-bottom: 0.75rem;
+}
+
+.text-muted {
+  color: #6b7280;
+}
+
+.text-danger {
+  color: #dc2626;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.btn {
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .profile-wrapper {
+    padding: 1rem 0.5rem;
+  }
+
+  .profile-container {
+    padding: 2rem 1.5rem;
+    border-radius: 12px;
+  }
+
+  .profile-header {
+    padding: 2rem 1.5rem;
+  }
+
+  .profile-form {
+    padding: 1.5rem;
+  }
+
+  .avatar {
+    width: 80px;
+    height: 80px;
+  }
+
+  .avatar i {
+    font-size: 2.5rem;
+  }
+
+  .profile-title {
+    font-size: 1.5rem;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .btn-save,
+  .btn-delete {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+  }
+
+  .modal-dialog {
+    margin: 0.5rem;
+    width: calc(100% - 1rem);
+  }
+
+  .modal-footer {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+</style>
