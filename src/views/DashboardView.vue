@@ -1,9 +1,17 @@
 <script setup>
-import { useRouter } from 'vue-router';
-import { db } from '../firebase.js';
-import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue';
-import { getAuth } from 'firebase/auth';
+import { useRouter } from 'vue-router'
+import { db } from '../firebase.js'
+import {
+  collection,
+  getDocs,
+  doc,
+  updateDoc,
+  addDoc,
+  deleteDoc,
+  Timestamp,
+} from 'firebase/firestore'
+import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue'
+import { getAuth } from 'firebase/auth'
 import { Bar, Pie, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -16,26 +24,35 @@ import {
   LinearScale,
   PointElement,
   LineElement,
-} from 'chart.js';
+} from 'chart.js'
 
 // Register Chart.js components so charts render
-ChartJS.register(Title, Tooltip, Legend, BarElement, ArcElement, CategoryScale, LinearScale, PointElement, LineElement);
+ChartJS.register(
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  ArcElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+)
 
-const router = useRouter();
+const router = useRouter()
 function goToRecipes(food) {
   // Navigate to /recipes with a query param for search
-  router.push({ path: '/recipes', query: { search: food.name } });
+  router.push({ path: '/recipes', query: { search: food.name } })
 }
-const searchText = ref('');
-const selectedCategory = ref('All Categories');
-const sortBy = ref('expiration');
-const sortDirection = ref('asc');
+const searchText = ref('')
+const selectedCategory = ref('All Categories')
+const sortBy = ref('expiration')
+const sortDirection = ref('asc')
 
-const showEditModal = ref(false);
-const showAddModal = ref(false);
-const showDeleteModal = ref(false);
-const showUseModal = ref(false);
-
+const showEditModal = ref(false)
+const showAddModal = ref(false)
+const showDeleteModal = ref(false)
+const showUseModal = ref(false)
 
 const editForm = reactive({
   id: null,
@@ -45,10 +62,10 @@ const editForm = reactive({
   createdAt: '',
   price: '',
   quantity: '',
-  unit: ''
-});
+  unit: '',
+})
 
-const editFormOriginal = ref(null);
+const editFormOriginal = ref(null)
 
 const addForm = reactive({
   name: '',
@@ -57,36 +74,36 @@ const addForm = reactive({
   createdAt: '',
   price: '',
   quantity: '',
-  unit: ''
-});
+  unit: '',
+})
 const useForm = reactive({
   id: null,
   name: '',
   quantity: 0,
-  unit: ''
-});
+  unit: '',
+})
 
-const deleteTarget = ref(null);
-const showToast = ref(false);
-const toastMessage = ref('');
+const deleteTarget = ref(null)
+const showToast = ref(false)
+const toastMessage = ref('')
 
 // Collapse state for overview lower rows
-const overviewCollapsed = ref(false);
+const overviewCollapsed = ref(false)
 
 function showToastFor(msg, ms = 2200) {
-  toastMessage.value = msg;
-  showToast.value = true;
-  setTimeout(() => (showToast.value = false), ms);
+  toastMessage.value = msg
+  showToast.value = true
+  setTimeout(() => (showToast.value = false), ms)
 }
 
-const foodItems = ref([]);
-const recipes = ref([]);
-const activities = ref([]);
-const activitiesLoaded = ref(false);
+const foodItems = ref([])
+const recipes = ref([])
+const activities = ref([])
+const activitiesLoaded = ref(false)
 
 // Activity filter and sort controls
-const activityTypeFilter = ref(''); // default to placeholder
-const activitySortDirection = ref('desc'); // 'desc' = newest first, 'asc' = oldest first
+const activityTypeFilter = ref('') // default to placeholder
+const activitySortDirection = ref('desc') // 'desc' = newest first, 'asc' = oldest first
 
 const activityTypeOptions = [
   { label: 'All', value: 'All' },
@@ -94,116 +111,112 @@ const activityTypeOptions = [
   { label: 'Consumed', value: 'conFood' },
   { label: 'Expired', value: 'expFood' },
   { label: 'Donated', value: 'donFood' },
-  { label: "Pending Donation", value: "pendingDonFood" }
-];
+  { label: 'Pending Donation', value: 'pendingDonFood' },
+]
 
 // Time frame filter
-const activityTimeFrame = ref(''); // default to placeholder
+const activityTimeFrame = ref('') // default to placeholder
 const activityTimeFrameOptions = [
   { label: 'All', value: 'all' },
   { label: '24h', value: '24h' },
   { label: '7d', value: '7d' },
   { label: '30d', value: '30d' },
-];
+]
 
 const filteredSortedActivities = computed(() => {
-  let acts = [...activities.value];
+  let acts = [...activities.value]
   // Filter by type
   if (activityTypeFilter.value && activityTypeFilter.value !== 'All') {
-    acts = acts.filter(a => a.activityType === activityTypeFilter.value);
+    acts = acts.filter((a) => a.activityType === activityTypeFilter.value)
   }
   // Filter by time frame
   if (activityTimeFrame.value && activityTimeFrame.value !== 'all') {
-    const now = new Date();
-    let cutoff;
+    const now = new Date()
+    let cutoff
     if (activityTimeFrame.value === '24h') {
-      cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000)
     } else if (activityTimeFrame.value === '7d') {
-      cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     } else if (activityTimeFrame.value === '30d') {
-      cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     }
-    acts = acts.filter(a => {
-      const d = new Date(a.createdAt);
-      return d >= cutoff;
-    });
+    acts = acts.filter((a) => {
+      const d = new Date(a.createdAt)
+      return d >= cutoff
+    })
   }
   // Sort by createdAt
   acts.sort((a, b) => {
-    const dateA = new Date(a.createdAt);
-    const dateB = new Date(b.createdAt);
-    if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
-    if (isNaN(dateA.getTime())) return activitySortDirection.value === 'desc' ? 1 : -1;
-    if (isNaN(dateB.getTime())) return activitySortDirection.value === 'desc' ? -1 : 1;
-    return activitySortDirection.value === 'desc'
-      ? dateB - dateA
-      : dateA - dateB;
-  });
-  return acts;
-});
+    const dateA = new Date(a.createdAt)
+    const dateB = new Date(b.createdAt)
+    if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0
+    if (isNaN(dateA.getTime())) return activitySortDirection.value === 'desc' ? 1 : -1
+    if (isNaN(dateB.getTime())) return activitySortDirection.value === 'desc' ? -1 : 1
+    return activitySortDirection.value === 'desc' ? dateB - dateA : dateA - dateB
+  })
+  return acts
+})
 
-const auth = getAuth();
-const user = ref(auth.currentUser);
-const userId = computed(() => user.value?.uid || null);
+const auth = getAuth()
+const user = ref(auth.currentUser)
+const userId = computed(() => user.value?.uid || null)
 
-auth.onAuthStateChanged(u => {
-  user.value = u;
-});
+auth.onAuthStateChanged((u) => {
+  user.value = u
+})
 
 watch(userId, async (val) => {
   if (val) {
     // Load all user collections live after userId is available
-    const foodItemsRef = collection(db, 'user', val, 'foodItems');
-    const foodItemsSnapshot = await getDocs(foodItemsRef);
-    foodItems.value = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const foodItemsRef = collection(db, 'user', val, 'foodItems')
+    const foodItemsSnapshot = await getDocs(foodItemsRef)
+    foodItems.value = foodItemsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
 
-    const recipesRef = collection(db, 'user', val, 'recipes');
-    const recipesSnapshot = await getDocs(recipesRef);
-    recipes.value = recipesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const recipesRef = collection(db, 'user', val, 'recipes')
+    const recipesSnapshot = await getDocs(recipesRef)
+    recipes.value = recipesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
 
-    const activityRef = collection(db, 'user', val, 'activities');
-    const activitySnapshot = await getDocs(activityRef);
-    activities.value = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const activityRef = collection(db, 'user', val, 'activities')
+    const activitySnapshot = await getDocs(activityRef)
+    activities.value = activitySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
   } else {
     // Clear data if user logs out
-    foodItems.value = [];
-    recipes.value = [];
-    activities.value = [];
+    foodItems.value = []
+    recipes.value = []
+    activities.value = []
   }
-});
+})
 
 // Fetch food items function
 async function loadFoodItems() {
   if (userId.value) {
-    const foodItemsRef = collection(db, 'user', userId.value, 'foodItems');
-    const foodItemsSnapshot = await getDocs(foodItemsRef);
-    foodItems.value = foodItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const foodItemsRef = collection(db, 'user', userId.value, 'foodItems')
+    const foodItemsSnapshot = await getDocs(foodItemsRef)
+    foodItems.value = foodItemsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
   }
 }
 
 // Fetch activities function
 async function loadActivities() {
   if (userId.value) {
-    const activityRef = collection(db, 'user', userId.value, 'activities');
-    const activitySnapshot = await getDocs(activityRef);
-    activities.value = activitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    activitiesLoaded.value = true;
+    const activityRef = collection(db, 'user', userId.value, 'activities')
+    const activitySnapshot = await getDocs(activityRef)
+    activities.value = activitySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    activitiesLoaded.value = true
   }
 }
 
 // Call loadFoodItems and loadActivities on load
 onMounted(() => {
-  loadFoodItems();
-  loadActivities();
-
-}
-);
+  loadFoodItems()
+  loadActivities()
+})
 
 // Also, watch for userId changes (like login)
 watch(userId, () => {
-  loadFoodItems();
-  loadActivities();
-});
+  loadFoodItems()
+  loadActivities()
+})
 
 // Categories for select input
 const categories = [
@@ -220,80 +233,64 @@ const categories = [
   'Grains & Pasta',
   'Herbs & Spices',
   'Breakfast & Cereal',
-  'Other'
-];
-
+  'Other',
+]
 
 const categoryUnits = {
   'All Categories': [
-    'piece(s)', 'kg(s)', 'gram(s)', 'liter(s)', 'milliliter(s)',
-    'pack(s)', 'bag(s)', 'box(es)', 'bottle(s)', 'can(s)'
+    'piece(s)',
+    'kg(s)',
+    'gram(s)',
+    'liter(s)',
+    'milliliter(s)',
+    'pack(s)',
+    'bag(s)',
+    'box(es)',
+    'bottle(s)',
+    'can(s)',
   ],
-  'Fruits & Vegetables': [
-    'piece(s)', 'kg(s)', 'gram(s)', 'bag(s)', 'bunch(es)', 'lb(s)'
-  ],
-  'Dairy & Eggs': [
-    'liter(s)', 'milliliter(s)', 'dozen(s)', 'piece(s)', 'carton(s)', 'gram(s)'
-  ],
-  'Meat & Poultry': [
-    'kg(s)', 'gram(s)', 'lb(s)', 'ounce(s)', 'pack(s)', 'piece(s)'
-  ],
-  'Seafood': [
-    'kg(s)', 'gram(s)', 'lb(s)', 'ounce(s)', 'piece(s)', 'pack(s)'
-  ],
-  'Snacks': [
-    'piece(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)', 'lb(s)'
-  ],
-  'Beverages': [
-    'liter(s)', 'milliliter(s)', 'bottle(s)', 'can(s)', 'pack(s)', 'gallon(s)'
-  ],
+  'Fruits & Vegetables': ['piece(s)', 'kg(s)', 'gram(s)', 'bag(s)', 'bunch(es)', 'lb(s)'],
+  'Dairy & Eggs': ['liter(s)', 'milliliter(s)', 'dozen(s)', 'piece(s)', 'carton(s)', 'gram(s)'],
+  'Meat & Poultry': ['kg(s)', 'gram(s)', 'lb(s)', 'ounce(s)', 'pack(s)', 'piece(s)'],
+  Seafood: ['kg(s)', 'gram(s)', 'lb(s)', 'ounce(s)', 'piece(s)', 'pack(s)'],
+  Snacks: ['piece(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)', 'lb(s)'],
+  Beverages: ['liter(s)', 'milliliter(s)', 'bottle(s)', 'can(s)', 'pack(s)', 'gallon(s)'],
   'Condiments & Sauces': [
-    'milliliter(s)', 'liter(s)', 'jar(s)', 'bottle(s)', 'gram(s)', 'ounce(s)'
+    'milliliter(s)',
+    'liter(s)',
+    'jar(s)',
+    'bottle(s)',
+    'gram(s)',
+    'ounce(s)',
   ],
-  'Canned & Jarred Goods': [
-    'can(s)', 'jar(s)', 'gram(s)', 'ounce(s)', 'pack(s)'
-  ],
-  'Frozen Foods': [
-    'kg(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)', 'lb(s)'
-  ],
-  'Grains & Pasta': [
-    'kg(s)', 'gram(s)', 'lb(s)', 'bag(s)', 'box(es)', 'pack(s)'
-  ],
-  'Herbs & Spices': [
-    'gram(s)', 'ounce(s)', 'jar(s)', 'bottle(s)', 'bunch(es)', 'piece(s)'
-  ],
-  'Breakfast & Cereal': [
-    'box(es)', 'bag(s)', 'pack(s)', 'kg(s)', 'gram(s)', 'bottle(s)'
-  ],
-  'Other': [
-    'piece(s)', 'unit(s)', 'pack(s)', 'box(es)', 'kg(s)', 'gram(s)'
-  ]
-};
-
+  'Canned & Jarred Goods': ['can(s)', 'jar(s)', 'gram(s)', 'ounce(s)', 'pack(s)'],
+  'Frozen Foods': ['kg(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)', 'lb(s)'],
+  'Grains & Pasta': ['kg(s)', 'gram(s)', 'lb(s)', 'bag(s)', 'box(es)', 'pack(s)'],
+  'Herbs & Spices': ['gram(s)', 'ounce(s)', 'jar(s)', 'bottle(s)', 'bunch(es)', 'piece(s)'],
+  'Breakfast & Cereal': ['box(es)', 'bag(s)', 'pack(s)', 'kg(s)', 'gram(s)', 'bottle(s)'],
+  Other: ['piece(s)', 'unit(s)', 'pack(s)', 'box(es)', 'kg(s)', 'gram(s)'],
+}
 
 // Filtered food items (remove duplicates, search, filter, sort)
 const filteredFoodItems = computed(() => {
   const uniqueItems = foodItems.value.filter(
-    (item, index, self) =>
-      index === self.findIndex(i => i.id === item.id)
-  );
+    (item, index, self) => index === self.findIndex((i) => i.id === item.id),
+  )
 
-  let items = [...uniqueItems];
+  let items = [...uniqueItems]
 
   // Exclude items with empty or whitespace-only names
-  items = items.filter(item => item.name && item.name.trim().length > 0);
+  items = items.filter((item) => item.name && item.name.trim().length > 0)
 
   // Search
   if (searchText.value && searchText.value.trim()) {
-    const searchTerm = searchText.value.toLowerCase().trim();
-    items = items.filter(item =>
-      item.name.toLowerCase().includes(searchTerm)
-    );
+    const searchTerm = searchText.value.toLowerCase().trim()
+    items = items.filter((item) => item.name.toLowerCase().includes(searchTerm))
   }
 
   // Category filter
   if (selectedCategory.value && selectedCategory.value !== 'All Categories') {
-    items = items.filter(item => item.category === selectedCategory.value);
+    items = items.filter((item) => item.category === selectedCategory.value)
   }
 
   // ... rest of your sorting logic
@@ -304,22 +301,22 @@ const filteredFoodItems = computed(() => {
     case 'expiration':
       items.sort((a, b) => {
         function parseDate(val) {
-          if (!val) return null;
-          if (typeof val.toDate === 'function') return val.toDate();
-          if (val instanceof Date) return val;
-          const d = new Date(val);
-          return isNaN(d.getTime()) ? null : d;
+          if (!val) return null
+          if (typeof val.toDate === 'function') return val.toDate()
+          if (val instanceof Date) return val
+          const d = new Date(val)
+          return isNaN(d.getTime()) ? null : d
         }
-        const dateA = parseDate(a.expirationDate);
-        const dateB = parseDate(b.expirationDate);
+        const dateA = parseDate(a.expirationDate)
+        const dateB = parseDate(b.expirationDate)
 
-        if (!dateA && !dateB) return 0;
-        if (!dateA) return 1;
-        if (!dateB) return -1;
+        if (!dateA && !dateB) return 0
+        if (!dateA) return 1
+        if (!dateB) return -1
 
-        return (dateA.getTime() - dateB.getTime()) * direction;
-      });
-      break;
+        return (dateA.getTime() - dateB.getTime()) * direction
+      })
+      break
 
     case 'name':
       items.sort((a, b) => {
@@ -360,150 +357,156 @@ const filteredFoodItems = computed(() => {
       break
   }
 
-
-  return items;
-});
+  return items
+})
 
 const toggleSortDirection = () => {
-  sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
-};
+  sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+}
 
 const getSortButtonIcon = computed(() => {
-  return sortDirection.value === 'asc' ? 'bi bi-sort-up' : 'bi bi-sort-down';
-});
+  return sortDirection.value === 'asc' ? 'bi bi-sort-up' : 'bi bi-sort-down'
+})
 
 const getSortButtonTitle = computed(() => {
-  const direction = sortDirection.value === 'asc' ? 'Ascending' : 'Descending';
-  return `Sort ${direction}`;
-});
+  const direction = sortDirection.value === 'asc' ? 'Ascending' : 'Descending'
+  return `Sort ${direction}`
+})
 
 const formatDate = (dateObj) => {
-  let date;
+  let date
   if (dateObj) {
-    if (typeof dateObj.toDate === "function") {
-      date = dateObj.toDate(); // Firestore Timestamp
+    if (typeof dateObj.toDate === 'function') {
+      date = dateObj.toDate() // Firestore Timestamp
     } else if (dateObj instanceof Date) {
-      date = dateObj; // JS Date
+      date = dateObj // JS Date
     } else {
-      date = new Date(dateObj); // try parsing string or other formats
+      date = new Date(dateObj) // try parsing string or other formats
     }
   } else {
-    return ''; // or some default string for missing date
+    return '' // or some default string for missing date
   }
 
   if (isNaN(date)) {
-    return ''; // Handle invalid date
+    return '' // Handle invalid date
   }
 
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = date.toLocaleString('en-US', { month: 'short' });
-  const year = date.getFullYear();
-  return `${day} ${month} ${year}`;
-};
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = date.toLocaleString('en-US', { month: 'short' })
+  const year = date.getFullYear()
+  return `${day} ${month} ${year}`
+}
 
 const getRelativeTime = (dateString) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-  if (diffInSeconds < 60) return 'Just now';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-  return `${Math.floor(diffInSeconds / 86400)}d ago`;
-};
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+  if (diffInSeconds < 60) return 'Just now'
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+  return `${Math.floor(diffInSeconds / 86400)}d ago`
+}
 
 const getDaysLeft = (food) => {
-  const now = new Date();
-  let expDate;
+  const now = new Date()
+  let expDate
 
   if (food.expirationDate) {
     if (typeof food.expirationDate.toDate === 'function') {
       // Firestore Timestamp
-      expDate = food.expirationDate.toDate();
+      expDate = food.expirationDate.toDate()
     } else if (food.expirationDate instanceof Date) {
       // Plain JS Date
-      expDate = food.expirationDate;
+      expDate = food.expirationDate
     } else {
       // Try to parse a string
-      expDate = new Date(food.expirationDate);
+      expDate = new Date(food.expirationDate)
     }
   } else {
     // No expiration date, assume far future or zero days left
-    return 0;
+    return 0
   }
 
-  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate());
-  return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24));
-};
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate())
+  return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
+}
 
 const getFoodCardClass = (food) => {
-  const now = new Date();
-  let expDate;
+  const now = new Date()
+  let expDate
 
   if (food.expirationDate) {
     if (typeof food.expirationDate.toDate === 'function') {
-      expDate = food.expirationDate.toDate();
+      expDate = food.expirationDate.toDate()
     } else if (food.expirationDate instanceof Date) {
-      expDate = food.expirationDate;
+      expDate = food.expirationDate
     } else {
-      expDate = new Date(food.expirationDate);
+      expDate = new Date(food.expirationDate)
     }
   } else {
-    return 'normal-card'; // fallback class if no expirationDate
+    return 'normal-card' // fallback class if no expirationDate
   }
 
-  if (isNaN(expDate)) return 'normal-card'; // protect against invalid date
+  if (isNaN(expDate)) return 'normal-card' // protect against invalid date
 
-  const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+  const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24))
 
   if (expDate < now) {
-    return 'expired-card';
+    return 'expired-card'
   } else if (daysLeft >= 1 && daysLeft <= 7) {
-    return 'warning-card';
+    return 'warning-card'
   } else {
-    return 'normal-card';
+    return 'normal-card'
   }
-};
-
+}
 
 const getBadgeClass = (food) => {
-  const daysLeft = getDaysLeft(food);
+  const daysLeft = getDaysLeft(food)
   if (daysLeft <= 1) {
-    return 'badge-expired';
+    return 'badge-expired'
   } else if (daysLeft <= 7) {
-    return 'badge-warning';
+    return 'badge-warning'
   } else {
-    return 'badge-transparent';
+    return 'badge-transparent'
   }
-};
+}
 
-const expiringSoon = computed(() =>
-  foodItems.value.filter(food => {
-    const daysLeft = getDaysLeft(food);
-    return daysLeft >= 0 && daysLeft <= 5;
-  }).length
-);
+const expiringSoon = computed(
+  () =>
+    foodItems.value.filter((food) => {
+      const daysLeft = getDaysLeft(food)
+      return daysLeft >= 0 && daysLeft <= 5
+    }).length,
+)
 
-const expired = computed(() =>
-  foodItems.value.filter(food => {
-    const daysLeft = getDaysLeft(food);
-    return daysLeft < 0;
-  }).length
-);
+const expired = computed(
+  () =>
+    foodItems.value.filter((food) => {
+      const daysLeft = getDaysLeft(food)
+      return daysLeft < 0
+    }).length,
+)
 
 watchEffect(async () => {
-  if (!activitiesLoaded.value) return;
-  const expiredFoods = foodItems.value.filter(food => getDaysLeft(food) < 0)
-  const uid = userId.value;
+  if (!activitiesLoaded.value) return
+  const expiredFoods = foodItems.value.filter((food) => getDaysLeft(food) < 0)
+  const uid = userId.value
 
   for (const food of expiredFoods) {
     // Prevent duplicate logs by checking both local and Firestore activities
-    const alreadyLogged = activities.value.some(a => a.foodName === food.name && a.activityType === 'expFood');
+    const alreadyLogged = activities.value.some(
+      (a) => a.foodName === food.name && a.activityType === 'expFood',
+    )
     if (!alreadyLogged && uid) {
       // Check Firestore for existing expFood activity for this food
-      const actRef = collection(db, 'user', uid, 'activities');
-      const q = query(actRef, where('foodName', '==', food.name), where('activityType', '==', 'expFood'));
-      const snapshot = await getDocs(q);
+      const actRef = collection(db, 'user', uid, 'activities')
+      const q = query(
+        actRef,
+        where('foodName', '==', food.name),
+        where('activityType', '==', 'expFood'),
+      )
+      const snapshot = await getDocs(q)
       if (snapshot.empty) {
         // Add to Firestore
         const payload = {
@@ -514,13 +517,13 @@ watchEffect(async () => {
           price: String(food.price || ''),
           quantity: String(food.quantity || ''),
           unit: String(food.unit || ''),
-          note: 'expired'
-        };
-        const docRef = await addDoc(actRef, payload);
+          note: 'expired',
+        }
+        const docRef = await addDoc(actRef, payload)
         activities.value.unshift({
           id: docRef.id,
-          ...payload
-        });
+          ...payload,
+        })
       }
     }
   }
@@ -528,51 +531,53 @@ watchEffect(async () => {
 
 // Calculate consecutive activity days streak
 const calculateActivityStreak = () => {
-  if (!activitiesLoaded.value || activities.value.length === 0) return 0;
+  if (!activitiesLoaded.value || activities.value.length === 0) return 0
 
   // Get unique activity dates, sorted from newest to oldest
-  const activityDates = [...new Set(
-    activities.value
-      .map(a => {
-        const date = new Date(a.createdAt);
-        return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-      })
-      .filter(timestamp => !isNaN(timestamp))
-  )].sort((a, b) => b - a);
+  const activityDates = [
+    ...new Set(
+      activities.value
+        .map((a) => {
+          const date = new Date(a.createdAt)
+          return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+        })
+        .filter((timestamp) => !isNaN(timestamp)),
+    ),
+  ].sort((a, b) => b - a)
 
-  if (activityDates.length === 0) return 0;
+  if (activityDates.length === 0) return 0
 
-  const today = new Date();
-  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  const oneDayMs = 24 * 60 * 60 * 1000;
+  const today = new Date()
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  const oneDayMs = 24 * 60 * 60 * 1000
 
-  let streak = 0;
-  let expectedDate = todayMidnight;
+  let streak = 0
+  let expectedDate = todayMidnight
 
   // Check if there's activity today or yesterday (grace period)
   if (activityDates[0] < todayMidnight - oneDayMs) {
-    return 0; // Streak broken if no activity today or yesterday
+    return 0 // Streak broken if no activity today or yesterday
   }
 
   // Count consecutive days
   for (const activityDate of activityDates) {
     if (activityDate === expectedDate || activityDate === expectedDate - oneDayMs) {
-      streak++;
-      expectedDate = activityDate - oneDayMs;
+      streak++
+      expectedDate = activityDate - oneDayMs
     } else {
-      break;
+      break
     }
   }
 
-  return streak;
-};
+  return streak
+}
 
 const analytics = computed(() => {
   // const items = activeFoodItems.value
-  const wasteActivities = activities.value.filter(a => a.activityType === 'expFood')
+  const wasteActivities = activities.value.filter((a) => a.activityType === 'expFood')
   // fix: check activityType for consumed food activities
-  const usedActivities = activities.value.filter(a => a.activityType === 'conFood')
-  const donatedActivities = activities.value.filter(a => a.activityType === "donFood")
+  const usedActivities = activities.value.filter((a) => a.activityType === 'conFood')
+  const donatedActivities = activities.value.filter((a) => a.activityType === 'donFood')
   // console.log(wasteActivities)
   // console.log(usedActivities)
   // console.log("mine" + donatedActivities)
@@ -582,48 +587,48 @@ const analytics = computed(() => {
   const totalWasteItems = wasteActivities.length
   const totalWasteMoney = wasteActivities.reduce((total, activity) => {
     // Multiply price by quantity (convert price to number since it's a string)
-    return total + (Number(activity.price));
-  }, 0);
+    return total + Number(activity.price)
+  }, 0)
 
   // Total saved calculation: count only fully consumed food
   // Only activities with note === 'fully consumed' are counted as saved items.
   // Partial consumption events are intentionally excluded from the saved count,
   // as per current business logic. If partial consumption should contribute,
   // update this filter accordingly.
-  const totalSavedItems = activities.value.filter(a => a.activityType === 'conFood' && a.note === 'fully consumed').length
+  const totalSavedItems = activities.value.filter(
+    (a) => a.activityType === 'conFood' && a.note === 'fully consumed',
+  ).length
   const totalSavedMoney = usedActivities.reduce((total, activity) => {
-    return total + (Number(activity.price));
-  }, 0);
+    return total + Number(activity.price)
+  }, 0)
 
   // Reduction percentage - items used before expiry vs total items
   const totalItemsHandled = totalWasteItems + totalSavedItems
-  const reductionPercentage = totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
+  const reductionPercentage =
+    totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
   //test
 
   // Current inventory
   const inventoryValue = foodItems.value.reduce((sum, item) => {
-    const price = Number(item.price) || 0;
-    return sum + price;
-  }, 0);
-  const inventoryItems = foodItems.value.length;
+    const price = Number(item.price) || 0
+    return sum + price
+  }, 0)
+  const inventoryItems = foodItems.value.length
 
   // calculate streak
-  const streakDays = calculateActivityStreak();
-
-
+  const streakDays = calculateActivityStreak()
 
   // TODO Food Donated
   // const foodDonated = donatedActivities.length
 
   // foodScore algo = itemssaved - itemswasted + moneysaved
-  const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4);
-  const moneyScore = Math.max(0, (totalSavedMoney * 0.2) - (totalWasteMoney * 0.2))
+  const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4)
+  const moneyScore = Math.max(0, totalSavedMoney * 0.2 - totalWasteMoney * 0.2)
   const baseScore = Math.round(itemsScore + moneyScore)
 
   // Apply streak multi
   const streakMulti = streakDays > 0 ? 1 + streakDays / 7 : 0
-  const foodScore = Math.round(baseScore * Math.max(1, streakMulti));
-
+  const foodScore = Math.round(baseScore * Math.max(1, streakMulti))
 
   return {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
@@ -631,7 +636,7 @@ const analytics = computed(() => {
     reduction: reductionPercentage,
     inventory: { value: inventoryValue, items: inventoryItems },
     foodScore: foodScore,
-    streakDays: streakDays
+    streakDays: streakDays,
   }
 })
 
@@ -641,108 +646,110 @@ const chartOptions = {
   maintainAspectRatio: false,
   plugins: {
     legend: { display: true },
-    title: { display: false }
-  }
-};
+    title: { display: false },
+  },
+}
 
 // Waste vs Savings bar chart data
 const wasteVsSavingsChart = computed(() => {
-  const waste = analytics.value.totalWaste.items || 0;
-  const saved = analytics.value.totalSaved.items || 0;
+  const waste = analytics.value.totalWaste.items || 0
+  const saved = analytics.value.totalSaved.items || 0
   return {
     labels: ['Waste', 'Saved'],
     datasets: [
       {
         label: 'Items',
         backgroundColor: ['#dc2626', '#16a34a'],
-        data: [waste, saved]
-      }
-    ]
-  };
-});
+        data: [waste, saved],
+      },
+    ],
+  }
+})
 
 // Waste by category pie chart (simple breakdown based on activities)
 const wasteByCategoryChart = computed(() => {
-  const wasteActs = activities.value.filter(a => a.activityType === 'expFood');
-  const counts = {};
-  wasteActs.forEach(a => {
-    const cat = a.category || 'Unknown';
-    counts[cat] = (counts[cat] || 0) + (Number(a.quantity) || 1);
-  });
-  const labels = Object.keys(counts);
-  const data = labels.map(l => counts[l]);
+  const wasteActs = activities.value.filter((a) => a.activityType === 'expFood')
+  const counts = {}
+  wasteActs.forEach((a) => {
+    const cat = a.category || 'Unknown'
+    counts[cat] = (counts[cat] || 0) + (Number(a.quantity) || 1)
+  })
+  const labels = Object.keys(counts)
+  const data = labels.map((l) => counts[l])
   return {
     labels,
-    datasets: [{ data, backgroundColor: ['#eab308', '#f43f5e', '#10b981', '#3b82f6', '#a78bfa'] }]
-  };
-});
+    datasets: [{ data, backgroundColor: ['#eab308', '#f43f5e', '#10b981', '#3b82f6', '#a78bfa'] }],
+  }
+})
 
 // Monthly spending line chart (dummy aggregation by month from activities)
 const monthlySpendingChart = computed(() => {
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
-  const moneyByMonth = months.map(() => 0);
-  activities.value.forEach(a => {
-    const d = new Date(a.createdAt);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1)
+  const moneyByMonth = months.map(() => 0)
+  activities.value.forEach((a) => {
+    const d = new Date(a.createdAt)
     if (!isNaN(d)) {
-      const m = d.getMonth();
-      moneyByMonth[m] += Number(a.price) || 0;
+      const m = d.getMonth()
+      moneyByMonth[m] += Number(a.price) || 0
     }
-  });
+  })
   return {
-    labels: months.map(m => new Date(0, m - 1).toLocaleString('en-US', { month: 'short' })),
-    datasets: [{ label: 'Spending', data: moneyByMonth, borderColor: '#0ea5a4', tension: 0.3, fill: false }]
-  };
-});
+    labels: months.map((m) => new Date(0, m - 1).toLocaleString('en-US', { month: 'short' })),
+    datasets: [
+      { label: 'Spending', data: moneyByMonth, borderColor: '#0ea5a4', tension: 0.3, fill: false },
+    ],
+  }
+})
 
 const potentialLoss = computed(() =>
   foodItems.value
-    .filter(item => {
-      const days = getDaysLeft(item);
-      return days >= 0 && days <= 7;
+    .filter((item) => {
+      const days = getDaysLeft(item)
+      return days >= 0 && days <= 7
     })
-    .reduce((sum, item) => sum + (item.price || 0), 0)
-);
+    .reduce((sum, item) => sum + (item.price || 0), 0),
+)
 
 const toInputDateString = (d) => {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-};
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
 
 const openUse = (food) => {
-  useForm.id = food.id;
-  useForm.name = food.name;
-  useForm.quantity = 1; // default quantity to use
-  useForm.unit = food.unit || '';
-  showUseModal.value = true;
-};
+  useForm.id = food.id
+  useForm.name = food.name
+  useForm.quantity = 1 // default quantity to use
+  useForm.unit = food.unit || ''
+  showUseModal.value = true
+}
 const closeUse = () => {
-  showUseModal.value = false;
-  useForm.id = null;
-  useForm.name = '';
-  useForm.quantity = 0;
-  useForm.unit = '';
-};
+  showUseModal.value = false
+  useForm.id = null
+  useForm.name = ''
+  useForm.quantity = 0
+  useForm.unit = ''
+}
 const saveUse = async () => {
-  if (!useForm.id || useForm.quantity <= 0) return;
+  if (!useForm.id || useForm.quantity <= 0) return
 
-  const uid = userId.value;
-  if (!uid) return;
+  const uid = userId.value
+  if (!uid) return
 
   try {
     // Find the food item locally
-    const foodIndex = foodItems.value.findIndex(f => f.id === useForm.id);
-    if (foodIndex === -1) return;
+    const foodIndex = foodItems.value.findIndex((f) => f.id === useForm.id)
+    if (foodIndex === -1) return
 
-    const food = foodItems.value[foodIndex];
+    const food = foodItems.value[foodIndex]
 
     // Ensure we don't use more than available
-    const usedQty = Math.min(useForm.quantity, food.quantity);
-    const newQty = food.quantity - usedQty;
+    const usedQty = Math.min(useForm.quantity, food.quantity)
+    const newQty = food.quantity - usedQty
 
-    const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id);
-    const actRef = collection(db, 'user', uid, 'activities');
+    const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id)
+    const actRef = collection(db, 'user', uid, 'activities')
 
     // Log normal use activity
     const activityPayload = {
@@ -752,18 +759,18 @@ const saveUse = async () => {
       category: food.category || '',
       price: String(food.price || 0),
       quantity: String(usedQty),
-      unit: food.unit || ''
-    };
-    const docRef = await addDoc(actRef, activityPayload);
+      unit: food.unit || '',
+    }
+    const docRef = await addDoc(actRef, activityPayload)
     activities.value.unshift({
       id: docRef.id,
-      ...activityPayload
-    });
+      ...activityPayload,
+    })
 
     if (newQty <= 0) {
       // Remove from Firestore and local list
-      await deleteDoc(refDoc);
-      foodItems.value.splice(foodIndex, 1);
+      await deleteDoc(refDoc)
+      foodItems.value.splice(foodIndex, 1)
 
       // Log fully consumed activity
       const fullConsumedPayload = {
@@ -774,67 +781,67 @@ const saveUse = async () => {
         price: String(food.price || 0),
         quantity: '0',
         unit: food.unit || '',
-        note: 'fully consumed'
-      };
-      const docRef = await addDoc(actRef, fullConsumedPayload);
+        note: 'fully consumed',
+      }
+      const docRef = await addDoc(actRef, fullConsumedPayload)
       activities.value.unshift({
         id: docRef.id,
-        ...fullConsumedPayload
-      });
+        ...fullConsumedPayload,
+      })
 
-      showToastFor(`${food.name} fully consumed and removed`);
+      showToastFor(`${food.name} fully consumed and removed`)
     } else {
       // Update Firestore food quantity
       await updateDoc(refDoc, {
-        quantity: newQty
-      });
+        quantity: newQty,
+      })
       // Update local foodItems
-      foodItems.value[foodIndex].quantity = newQty;
-      showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`);
+      foodItems.value[foodIndex].quantity = newQty
+      showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`)
     }
-    closeUse();
+    closeUse()
   } catch (err) {
-    console.error('Failed to log used food:', err);
-    showToastFor('Failed to update food usage.');
+    console.error('Failed to log used food:', err)
+    showToastFor('Failed to update food usage.')
   }
-};
+}
 
 // Add computed property to get units based on selected category
 const availableUnits = computed(() => {
-  const category = editForm.category || addForm.category || 'All Categories';
-  return categoryUnits[category] || categoryUnits['All Categories'];
-});
+  const category = editForm.category || addForm.category || 'All Categories'
+  return categoryUnits[category] || categoryUnits['All Categories']
+})
 
 const openAdd = () => {
-  addForm.name = '';
-  addForm.category = '';
-  addForm.expirationDate = '';
-  addForm.createdAt = toInputDateString(new Date());
-  addForm.price = '';
-  addForm.quantity = '';
-  addForm.unit = '';
-  showAddModal.value = true;
-};
+  addForm.name = ''
+  addForm.category = ''
+  addForm.expirationDate = ''
+  addForm.createdAt = toInputDateString(new Date())
+  addForm.price = ''
+  addForm.quantity = ''
+  addForm.unit = ''
+  showAddModal.value = true
+}
 
 const closeAdd = () => {
-  showAddModal.value = false;
-  addForm.name = '';
-  addForm.category = '';
-  addForm.expirationDate = '';
-  addForm.createdAt = '';
-  addForm.price = '';
-  addForm.quantity = '';
-  addForm.unit = '';
-};
+  showAddModal.value = false
+  addForm.name = ''
+  addForm.category = ''
+  addForm.expirationDate = ''
+  addForm.createdAt = ''
+  addForm.price = ''
+  addForm.quantity = ''
+  addForm.unit = ''
+}
 
 const saveAdd = async () => {
   if (!userId.value) {
     console.warn('No userId available; cannot add food item')
-    return;
+    return
   }
 
-  const colRef = collection(db, 'user', userId.value, 'foodItems');
-  const actRef = collection(db, 'user', userId.value, 'activities');
+  const colRef = collection(db, 'user', userId.value, 'foodItems')
+  const actRef = collection(db, 'user', userId.value, 'activities')
 
   const foodPayload = {
     name: addForm.name || '',
@@ -845,16 +852,15 @@ const saveAdd = async () => {
     createdAt: addForm.createdAt
       ? Timestamp.fromDate(new Date(addForm.createdAt))
       : Timestamp.fromDate(new Date()),
-  };
+  }
 
   if (addForm.expirationDate) {
-    foodPayload.expirationDate = Timestamp.fromDate(new Date(addForm.expirationDate));
+    foodPayload.expirationDate = Timestamp.fromDate(new Date(addForm.expirationDate))
   }
 
   try {
     // Add food item to Firestore
-    const newDocRef = await addDoc(colRef, foodPayload);
-
+    const newDocRef = await addDoc(colRef, foodPayload)
 
     const activityPayload = {
       activityType: 'addFood',
@@ -863,88 +869,92 @@ const saveAdd = async () => {
       category: addForm.category || '',
       price: String(addForm.price || ''),
       quantity: String(addForm.quantity || ''),
-      unit: String(addForm.unit || '')
-    };
+      unit: String(addForm.unit || ''),
+    }
 
-    const activityDocRef = await addDoc(actRef, activityPayload);
+    const activityDocRef = await addDoc(actRef, activityPayload)
 
     // Add new item locally for instant UI feedback
-    foodItems.value.unshift({ id: newDocRef.id, ...foodPayload });
+    foodItems.value.unshift({ id: newDocRef.id, ...foodPayload })
 
     // Refresh activities list to show new log
     activities.value.unshift({
       id: activityDocRef.id,
       ...activityPayload,
-    });
+    })
 
-    showToastFor('Food item added and activity logged!');
-    closeAdd();
+    showToastFor('Food item added and activity logged!')
+    closeAdd()
   } catch (error) {
-    console.error('Error adding food item or activity:', error);
-    showToastFor('Failed to add food item.');
+    console.error('Error adding food item or activity:', error)
+    showToastFor('Failed to add food item.')
   }
-};
-
+}
 
 const openEdit = (food) => {
-  editFormOriginal.value = JSON.parse(JSON.stringify(food));
-  editForm.id = food.id || null;
-  editForm.name = food.name ?? '';
-  editForm.category = food.category ?? '';
-  let exp = null;
+  editFormOriginal.value = JSON.parse(JSON.stringify(food))
+  editForm.id = food.id || null
+  editForm.name = food.name ?? ''
+  editForm.category = food.category ?? ''
+  let exp = null
   if (food.expirationDate) {
     if (typeof food.expirationDate.toDate === 'function') {
-      exp = food.expirationDate.toDate();
+      exp = food.expirationDate.toDate()
     } else {
-      exp = new Date(food.expirationDate);
-      if (isNaN(exp)) exp = null;
+      exp = new Date(food.expirationDate)
+      if (isNaN(exp)) exp = null
     }
   }
-  editForm.expirationDate = exp ? toInputDateString(exp) : '';
-  const created = food.createdAt && food.createdAt.toDate ? food.createdAt.toDate() : (food.createdAt ? new Date(food.createdAt) : null);
-  editForm.createdAt = created ? toInputDateString(created) : '';
-  editForm.price = food.price != null ? food.price : '';
-  editForm.quantity = food.quantity != null ? food.quantity : '';
-  editForm.unit = food.unit ?? '';
-  showEditModal.value = true;
-};
+  editForm.expirationDate = exp ? toInputDateString(exp) : ''
+  const created =
+    food.createdAt && food.createdAt.toDate
+      ? food.createdAt.toDate()
+      : food.createdAt
+        ? new Date(food.createdAt)
+        : null
+  editForm.createdAt = created ? toInputDateString(created) : ''
+  editForm.price = food.price != null ? food.price : ''
+  editForm.quantity = food.quantity != null ? food.quantity : ''
+  editForm.unit = food.unit ?? ''
+  showEditModal.value = true
+}
 
 const closeEdit = () => {
-  showEditModal.value = false;
-  editForm.id = null;
-  editForm.name = '';
-  editForm.category = '';
-  editForm.expirationDate = '';
-  editForm.createdAt = '';
-  editForm.price = '';
-  editForm.quantity = '';
-  editForm.unit = '';
-  editFormOriginal.value = null;
-};
+  showEditModal.value = false
+  editForm.id = null
+  editForm.name = ''
+  editForm.category = ''
+  editForm.expirationDate = ''
+  editForm.createdAt = ''
+  editForm.price = ''
+  editForm.quantity = ''
+  editForm.unit = ''
+  editFormOriginal.value = null
+}
 
 const saveEdit = async () => {
-  if (!editForm.id) return;
-  const refDoc = doc(db, 'user', userId.value, 'foodItems', editForm.id);
+  if (!editForm.id) return
+  const refDoc = doc(db, 'user', userId.value, 'foodItems', editForm.id)
   const payload = {
     name: editForm.name,
     category: editForm.category,
     price: Number(editForm.price) || 0,
     quantity: Number(editForm.quantity) || 0,
-    unit: editForm.unit || ''
-  };
+    unit: editForm.unit || '',
+  }
   if (editForm.expirationDate) {
-    payload.expirationDate = Timestamp.fromDate(new Date(editForm.expirationDate));
+    payload.expirationDate = Timestamp.fromDate(new Date(editForm.expirationDate))
   }
   if (editForm.createdAt) {
-    payload.createdAt = Timestamp.fromDate(new Date(editForm.createdAt));
+    payload.createdAt = Timestamp.fromDate(new Date(editForm.createdAt))
   }
-  await updateDoc(refDoc, payload);
-  const idx = foodItems.value.findIndex(f => f.id === editForm.id);
+  await updateDoc(refDoc, payload)
+  const idx = foodItems.value.findIndex((f) => f.id === editForm.id)
   if (idx !== -1) {
-    foodItems.value[idx] = { ...foodItems.value[idx], ...payload };
+    foodItems.value[idx] = { ...foodItems.value[idx], ...payload }
   }
-  closeEdit();
-};
+  closeEdit()
+}
 
 import { query, where } from 'firebase/firestore';
 
@@ -967,75 +977,73 @@ watchEffect(async () => {
 });
 
 const deleteFood = async (food) => {
-  if (!food || food.id == null) return;
+  if (!food || food.id == null) return
   try {
-    const uid = userId.value;
+    const uid = userId.value
     if (!uid) {
-      console.warn('Not logged in');
-      return false;
+      console.warn('Not logged in')
+      return false
     }
     // Delete the food item doc
-    const refDoc = doc(db, 'user', uid, 'foodItems', food.id);
-    await deleteDoc(refDoc);
+    const refDoc = doc(db, 'user', uid, 'foodItems', food.id)
+    await deleteDoc(refDoc)
 
     // Delete corresponding activities
-    const actRef = collection(db, 'user', uid, 'activities');
+    const actRef = collection(db, 'user', uid, 'activities')
     // Find all activities for this food item by foodName and activityType (optional: tighten filter)
     const q = query(
       actRef,
       where('foodName', '==', food.name),
-      where('activityType', '==', 'addFood')
-    );
-    const actSnapshot = await getDocs(q);
+      where('activityType', '==', 'addFood'),
+    )
+    const actSnapshot = await getDocs(q)
 
     // Delete all matching activity docs
-    const deletePromises = [];
-    actSnapshot.forEach(docSnap => {
-      deletePromises.push(deleteDoc(docSnap.ref));
-    });
-    await Promise.all(deletePromises);
+    const deletePromises = []
+    actSnapshot.forEach((docSnap) => {
+      deletePromises.push(deleteDoc(docSnap.ref))
+    })
+    await Promise.all(deletePromises)
 
     // Remove locally
-    const idx = foodItems.value.findIndex(f => f.id === food.id);
-    if (idx !== -1) foodItems.value.splice(idx, 1);
+    const idx = foodItems.value.findIndex((f) => f.id === food.id)
+    if (idx !== -1) foodItems.value.splice(idx, 1)
 
     // (Optionally) update your activities UI list as well
     activities.value = activities.value.filter(
-      a => !(a.foodName === food.name && a.activityType === 'addFood')
-    );
+      (a) => !(a.foodName === food.name && a.activityType === 'addFood'),
+    )
 
-    return true;
+    return true
   } catch (err) {
-    console.error('Failed to delete food and its activity log:', err);
-    return false;
+    console.error('Failed to delete food and its activity log:', err)
+    return false
   }
-};
-
+}
 
 const openDelete = (food) => {
-  deleteTarget.value = food || null;
-  showDeleteModal.value = true;
-};
+  deleteTarget.value = food || null
+  showDeleteModal.value = true
+}
 
 const closeDelete = () => {
-  showDeleteModal.value = false;
-  deleteTarget.value = null;
-};
+  showDeleteModal.value = false
+  deleteTarget.value = null
+}
 
 const confirmDelete = async () => {
-  if (!deleteTarget.value) return;
-  const ok = await deleteFood(deleteTarget.value);
-  closeDelete();
-  if (ok) showToastFor('Item deleted');
-  else showToastFor('Failed to delete');
-};
-
+  if (!deleteTarget.value) return
+  const ok = await deleteFood(deleteTarget.value)
+  closeDelete()
+  if (ok) showToastFor('Item deleted')
+  else showToastFor('Failed to delete')
+}
 
 // food donation status
 const foodDonationStatus = computed(() => {
   const status = {}
-  const donationActs = activities.value.filter(a =>
-    ['pendingDonFood', 'donFood'].includes(a.activityType)
+  const donationActs = activities.value.filter((a) =>
+    ['pendingDonFood', 'donFood'].includes(a.activityType),
   )
 
   for (const act of donationActs) {
@@ -1043,7 +1051,7 @@ const foodDonationStatus = computed(() => {
     if (!status[name] || new Date(act.createdAt) > new Date(status[name].createdAt)) {
       status[name] = {
         type: act.activityType,
-        date: act.createdAt
+        date: act.createdAt,
       }
     }
   }
@@ -1089,168 +1097,269 @@ watch(() => analytics.value.foodScore, async (score) => {
           <p class="text-muted mb-0">Track your food inventory and reduce waste</p>
         </div>
         <div class="ms-3">
-          <div style="transform: rotateY(9.20483deg);">
-          <button @click="overviewCollapsed = !overviewCollapsed" :aria-expanded="!overviewCollapsed" class="btn btn-sm btn-outline-secondary header-collapse-btn">
-            <i :class="overviewCollapsed ? 'bi bi-chevron-up' :'bi bi-chevron-down'"></i>
-            <span class="visually-hidden">Toggle overview rows</span>
-          </button>
-        </div>
+          <div style="transform: rotateY(9.20483deg)">
+            <button
+              @click="overviewCollapsed = !overviewCollapsed"
+              :aria-expanded="!overviewCollapsed"
+              class="btn btn-sm btn-outline-secondary header-collapse-btn"
+            >
+              <i :class="overviewCollapsed ? 'bi bi-chevron-up' : 'bi bi-chevron-down'"></i>
+              <span class="visually-hidden">Toggle overview rows</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
-          <!-- Left: Icon + label -->
-          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
-            <div class="icon-circle mb-2">
-              <i class="bi bi-graph-up-arrow"></i>
+          <div
+            class="position-relative p-3 rounded-4 bg-success bg-gradient text-white shadow d-flex flex-column justify-content-between"
+            style="
+              background: linear-gradient(
+                135deg,
+                rgba(0, 102, 60, 0.85) 0%,
+                rgba(50, 200, 120, 0.6) 100%
+              );
+              box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+              height: 130px;
+            "
+          >
+            <!-- Left: Icon + label -->
+            <div
+              class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+              style="width: 90px"
+            >
+              <div
+                class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
+                style="width: 56px; height: 56px"
+              >
+                <i class="bi bi-graph-up-arrow fs-5 text-white"></i>
+              </div>
+              <small class="text-white text-center">Food Score</small>
             </div>
-            <small class="text-muted text-center">Food Score</small>
-          </div>
 
-          <!-- Right: Score + Streak -->
-          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-            <h3 class="fw-bold mb-0">{{ analytics.foodScore }}</h3>
-            <small class="text-muted">points</small>
+            <!-- Right: Score + Streak -->
+            <div class="text-end align-self-end pe-2 mt-2 position-relative">
+              <h3 class="fw-bold mb-0 text-white">{{ analytics.foodScore }}</h3>
+              <small class="text-white">points</small>
 
-            <!-- Streak badge -->
-            <div v-if="analytics.streakDays > 0" class="streak-badge mt-2" style="display: flex; justify-content: flex-end; gap: 4px;">
-              <span class="streak-fire" :class="{
-                'fire-small': analytics.streakDays < 7,
-                'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
-                'fire-large': analytics.streakDays >= 14
-              }">🔥</span>
-              <span class="streak-text text-secondary">
-                {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
-              </span>
+              <!-- Streak badge -->
+              <div v-if="analytics.streakDays > 0" class="mt-2">
+                <span
+                  class="streak-fire"
+                  :class="{
+                    'fire-small': analytics.streakDays < 7,
+                    'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
+                    'fire-large': analytics.streakDays >= 14,
+                  }"
+                  >🔥</span
+                >
+                <span class="streak-text text-white">
+                  {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
+                </span>
+              </div>
             </div>
           </div>
-          </div>
-          </div>
+        </div>
         <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
-          <!-- Left: Icon + label -->
-          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
-            <div class="icon-circle mb-2" style="background-color: #FFC107; box-shadow: 0 0 15px rgba(255, 193, 7, 0.6);">
-              <i class="bi bi-exclamation-triangle"></i>
+          <div
+            class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
+            style="
+              background: linear-gradient(
+                135deg,
+                rgba(0, 74, 173, 0.85) 0%,
+                rgba(59, 130, 246, 0.65) 100%
+              );
+              box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+              height: 130px;
+            "
+          >
+            <!-- Left: Icon + label -->
+            <div
+              class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+              style="width: 90px"
+            >
+              <div
+                class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
+                style="width: 56px; height: 56px"
+              >
+                <i class="bi bi-exclamation-triangle fs-5 text-white"></i>
+              </div>
+              <small class="text-white text-center">Expiring Soon</small>
             </div>
-            <small class="text-muted text-center">Expiring Soon</small>
-          </div>
 
-          <!-- Right: Count -->
-          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-            <h3 class="fw-bold mb-0">{{ expiringSoon }}</h3>
-            <small class="text-muted">items</small>
+            <!-- Right: Count -->
+            <div class="text-end align-self-end pe-2 mt-2 position-relative">
+              <h3 class="fw-bold mb-0 text-white">{{ expiringSoon }}</h3>
+              <small class="text-white">items</small>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
-          <!-- Left: Icon + label -->
-          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
-            <div class="icon-circle mb-2">
-              <i class="bi bi-currency-dollar"></i>
-            </div>
-            <small class="text-muted text-center">Potential Loss</small>
-          </div>
 
-          <!-- Right: Count -->
-          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-            <h3 class="fw-bold mb-0">${{ potentialLoss.toFixed(2) }}</h3>
-            <small class="text-muted">if expired</small>
+        <div class="col-6 col-lg-3">
+          <div
+            class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
+            style="
+              background: linear-gradient(
+                135deg,
+                rgba(153, 27, 27, 0.9) 0%,
+                rgba(239, 68, 68, 0.65) 100%
+              );
+              box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+              height: 130px;
+            "
+          >
+            <!-- Left: Icon + label -->
+            <div
+              class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+              style="width: 90px"
+            >
+              <div
+                class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-2"
+                style="width: 56px; height: 56px"
+              >
+                <i class="bi bi-currency-dollar fs-5 text-white"></i>
+              </div>
+              <small class="text-white text-center">Potential Loss</small>
+            </div>
+
+            <!-- Right: Count -->
+            <div class="text-end align-self-end pe-2 mt-2 position-relative">
+              <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
+              <small class="text-white">if expired</small>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
-          <!-- Left: Icon + label -->
-          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
-            <div class="icon-circle mb-2"  style="background-color: #EF4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);">
-              <i class="bi bi-calendar-x"></i>
+        <div class="col-6 col-lg-3">
+          <div
+            class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
+            style="
+              background: linear-gradient(
+                135deg,
+                rgba(202, 84, 0, 0.9) 0%,
+                rgba(249, 115, 22, 0.65) 100%
+              );
+              box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+              height: 130px;
+            "
+          >
+            <!-- Left: Icon + label -->
+            <div
+              class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+              style="width: 90px"
+            >
+              <div
+                class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
+                style="width: 56px; height: 56px"
+              >
+                <i class="bi bi-calendar-x fs-5 text-white"></i>
+              </div>
+              <small class="text-white text-center">Expired</small>
             </div>
-            <small class="text-muted text-center">Expired</small>
-          </div>
 
-          <!-- Right: Count -->
-          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-            <h3 class="fw-bold mb-0">{{ expired }}</h3>
-            <small class="text-muted">items</small>
+            <!-- Right: Count -->
+            <div class="text-end align-self-end pe-2 mt-2 position-relative">
+              <h3 class="fw-bold mb-0 text-white">{{ expired }}</h3>
+              <small class="text-white">items</small>
+            </div>
           </div>
         </div>
-      </div>
       </div>
 
       <div class="row g-3 mb-4" v-show="overviewCollapsed">
         <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
-          <!-- Left: Icon + label -->
-          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
-            <div class="icon-circle mb-2"  style="background-color: #EF4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);">
-              <i class="bi bi-trash"></i>
+          <div
+            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
+          >
+            <!-- Left: Icon + label -->
+            <div
+              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
+            >
+              <div
+                class="icon-circle mb-2"
+                style="background-color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6)"
+              >
+                <i class="bi bi-trash"></i>
+              </div>
+              <small class="text-muted text-center">Total Waste</small>
             </div>
-            <small class="text-muted text-center">Total Waste</small>
-          </div>
 
-          <!-- Right: Count -->
-          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-            <h3 class="fw-bold mb-0">${{ analytics.totalWaste.money }}</h3>
-            <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
+            <!-- Right: Count -->
+            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+              <h3 class="fw-bold mb-0">${{ analytics.totalWaste.money }}</h3>
+              <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
-          <!-- Left: Icon + label -->
-          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
-            <div class="icon-circle mb-2" >
-              <i class="bi bi-piggy-bank"></i>
+        <div class="col-6 col-lg-3">
+          <div
+            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
+          >
+            <!-- Left: Icon + label -->
+            <div
+              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
+            >
+              <div class="icon-circle mb-2">
+                <i class="bi bi-piggy-bank"></i>
+              </div>
+              <small class="text-muted text-center">Total Saved</small>
             </div>
-            <small class="text-muted text-center">Total Saved</small>
-          </div>
 
-          <!-- Right: Count -->
-          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-            <h3 class="fw-bold mb-0">${{ analytics.totalSaved.money }}</h3>
-            <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
+            <!-- Right: Count -->
+            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+              <h3 class="fw-bold mb-0">${{ analytics.totalSaved.money }}</h3>
+              <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
-          <!-- Left: Icon + label -->
-          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
-            <div class="icon-circle mb-2" style="background-color: #3B82F6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);" >
-              <i class="bi bi-calendar-x"></i>
+        <div class="col-6 col-lg-3">
+          <div
+            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
+          >
+            <!-- Left: Icon + label -->
+            <div
+              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
+            >
+              <div
+                class="icon-circle mb-2"
+                style="background-color: #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.6)"
+              >
+                <i class="bi bi-calendar-x"></i>
+              </div>
+              <small class="text-muted text-center">Reduction</small>
             </div>
-            <small class="text-muted text-center">Reduction</small>
-          </div>
 
-          <!-- Right: Count -->
-          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-            <h3 class="fw-bold mb-0">{{ analytics.reduction }}%</h3>
-            <small class="text-muted">food used before expiry</small>
+            <!-- Right: Count -->
+            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+              <h3 class="fw-bold mb-0">{{ analytics.reduction }}%</h3>
+              <small class="text-muted">food used before expiry</small>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative">
-          <!-- Left: Icon + label -->
-          <div class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3">
-            <div class="icon-circle mb-2"style="background-color: #5BC0EB; box-shadow: 0 0 15px rgba(91, 192, 235, 0.6);"
->
-              <i class="bi bi-box"></i>
+        <div class="col-6 col-lg-3">
+          <div
+            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
+          >
+            <!-- Left: Icon + label -->
+            <div
+              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
+            >
+              <div
+                class="icon-circle mb-2"
+                style="background-color: #5bc0eb; box-shadow: 0 0 15px rgba(91, 192, 235, 0.6)"
+              >
+                <i class="bi bi-box"></i>
+              </div>
+              <small class="text-muted text-center">Inventory</small>
             </div>
-            <small class="text-muted text-center">Inventory</small>
-          </div>
 
-          <!-- Right: Count -->
-          <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-            <h3 class="fw-bold mb-0">${{ analytics.inventory.value.toFixed(2) }}</h3>
-            <small class="text-muted">{{ analytics.inventory.items }} items</small>
+            <!-- Right: Count -->
+            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
+              <h3 class="fw-bold mb-0">${{ analytics.inventory.value.toFixed(2) }}</h3>
+              <small class="text-muted">{{ analytics.inventory.items }} items</small>
+            </div>
           </div>
         </div>
-      </div>
       </div>
 
       <!-- Charts Section -->
@@ -1262,7 +1371,7 @@ watch(() => analytics.value.foodScore, async (score) => {
               <i class="bi bi-bar-chart me-2"></i>
               Waste vs Savings
             </h5>
-            <div style="height: 300px;">
+            <div style="height: 300px">
               <Bar :data="wasteVsSavingsChart" :options="chartOptions" />
             </div>
           </div>
@@ -1275,7 +1384,7 @@ watch(() => analytics.value.foodScore, async (score) => {
               <i class="bi bi-pie-chart me-2"></i>
               Waste by Category
             </h5>
-            <div style="height: 300px;">
+            <div style="height: 300px">
               <Pie :data="wasteByCategoryChart" :options="chartOptions" />
             </div>
           </div>
@@ -1288,7 +1397,7 @@ watch(() => analytics.value.foodScore, async (score) => {
               <i class="bi bi-graph-up me-2"></i>
               Monthly Spending Trend
             </h5>
-            <div style="height: 300px;">
+            <div style="height: 300px">
               <Line :data="monthlySpendingChart" :options="chartOptions" />
             </div>
           </div>
@@ -1306,7 +1415,12 @@ watch(() => analytics.value.foodScore, async (score) => {
           </div>
           <div class="row g-2 mb-3">
             <div class="col-12 col-md-4">
-              <input v-model="searchText" type="text" class="form-control" placeholder="Search food items..." />
+              <input
+                v-model="searchText"
+                type="text"
+                class="form-control"
+                placeholder="Search food items..."
+              />
             </div>
             <div class="col-12 col-sm-6 col-md-3">
               <select v-model="selectedCategory" class="form-select">
@@ -1323,8 +1437,11 @@ watch(() => analytics.value.foodScore, async (score) => {
               </select>
             </div>
             <div class="col-3 col-sm-2 col-md-2">
-              <button @click="toggleSortDirection" class="btn btn-outline-secondary sort-direction-btn w-100"
-                :title="getSortButtonTitle">
+              <button
+                @click="toggleSortDirection"
+                class="btn btn-outline-secondary sort-direction-btn w-100"
+                :title="getSortButtonTitle"
+              >
                 <i :class="getSortButtonIcon"></i>
               </button>
             </div>
@@ -1336,8 +1453,17 @@ watch(() => analytics.value.foodScore, async (score) => {
           </div>
           <div v-else class="food-scroll-container">
             <div class="food-scroll-section">
-              <div v-for="food in filteredFoodItems" :key="food.id"
-                :class="['food-card', getFoodCardClass(food), 'd-flex', 'flex-column', 'justify-content-between']">
+              <div
+                v-for="food in filteredFoodItems"
+                :key="food.id"
+                :class="[
+                  'food-card',
+                  getFoodCardClass(food),
+                  'd-flex',
+                  'flex-column',
+                  'justify-content-between',
+                ]"
+              >
                 <div>
                   <div class="food-header">
                     <div>
@@ -1361,8 +1487,13 @@ watch(() => analytics.value.foodScore, async (score) => {
                   </div>
                 </div>
                 <div class="d-flex align-items-end justify-content-between mt-auto w-100">
-                  <button class="food-btn food-btn-recipe px-2 py-1" style="font-size: 0.92em; min-width: 0;"
-                    @click.prevent="goToRecipes(food)"><i class="bi bi-book"></i> Recipes</button>
+                  <button
+                    class="food-btn food-btn-recipe px-2 py-1"
+                    style="font-size: 0.92em; min-width: 0"
+                    @click.prevent="goToRecipes(food)"
+                  >
+                    <i class="bi bi-book"></i> Recipes
+                  </button>
                   <div class="food-actions d-flex gap-2">
                     <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
                       Edit</button>
@@ -1380,25 +1511,38 @@ watch(() => analytics.value.foodScore, async (score) => {
 
       <!-- Activities -->
       <div class="col-lg-4 d-none d-lg-block d-flex flex-column h-100">
-        <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0;">
+        <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0">
           <h3 class="h5 mb-2">Recent Activity</h3>
           <div class="d-flex align-items-center justify-content-between mb-3">
             <div class="d-flex gap-2 w-100">
-              <select v-model="activityTypeFilter" class="form-select form-select-sm"
-                style="width: auto; min-width: 110px;">
+              <select
+                v-model="activityTypeFilter"
+                class="form-select form-select-sm"
+                style="width: auto; min-width: 110px"
+              >
                 <option disabled value="">Activity</option>
-                <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-              </select>
-              <select v-model="activityTimeFrame" class="form-select form-select-sm"
-                style="width: auto; min-width: 90px;">
-                <option disabled value="">Time</option>
-                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">{{ opt.label }}
+                <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
                 </option>
               </select>
-              <button class="btn btn-outline-secondary btn-sm"
+              <select
+                v-model="activityTimeFrame"
+                class="form-select form-select-sm"
+                style="width: auto; min-width: 90px"
+              >
+                <option disabled value="">Time</option>
+                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+              <button
+                class="btn btn-outline-secondary btn-sm"
                 :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'"
-                @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'">
-                <i :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"></i>
+                @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'"
+              >
+                <i
+                  :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"
+                ></i>
               </button>
             </div>
           </div>
@@ -1407,10 +1551,17 @@ watch(() => analytics.value.foodScore, async (score) => {
               <p class="text-muted">No recent activity</p>
             </div>
             <div v-else class="d-flex flex-column gap-3 activity-scroll flex-grow-1">
-              <div v-for="activity in filteredSortedActivities" :key="activity.id" class="pb-3 border-bottom">
+              <div
+                v-for="activity in filteredSortedActivities"
+                :key="activity.id"
+                class="pb-3 border-bottom"
+              >
                 <div v-if="activity.activityType === 'addFood'">
                   <p class="mb-1 small">
-                    <strong>{{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added</strong>
+                    <strong
+                      >{{ activity.quantity }} {{ activity.unit }} of
+                      {{ activity.foodName }} added</strong
+                    >
                   </p>
                 </div>
                 <div v-else-if="activity.activityType === 'conFood'">
@@ -1443,7 +1594,6 @@ watch(() => analytics.value.foodScore, async (score) => {
           </div>
         </div>
       </div>
-
     </div>
 
     <!-- Edit Food Modal -->
@@ -1458,7 +1608,11 @@ watch(() => analytics.value.foodScore, async (score) => {
           <label class="form-label">Category</label>
           <select v-model="editForm.category" class="form-select">
             <option disabled value="">{{ editForm.category || 'Select a category' }}</option>
-            <option v-for="cat in categories.filter(c => c !== 'All Categories')" :key="cat" :value="cat">
+            <option
+              v-for="cat in categories.filter((c) => c !== 'All Categories')"
+              :key="cat"
+              :value="cat"
+            >
               {{ cat }}
             </option>
           </select>
@@ -1501,7 +1655,9 @@ watch(() => analytics.value.foodScore, async (score) => {
     <div v-if="showUseModal" class="modal-backdrop">
       <div class="modal-card">
         <h3 class="h5 mb-3">Use Food Item</h3>
-        <p>How much of <strong>{{ useForm.name }}</strong> did you use?</p>
+        <p>
+          How much of <strong>{{ useForm.name }}</strong> did you use?
+        </p>
         <div class="row g-2 mt-2">
           <div class="col-6">
             <label class="form-label">Quantity</label>
@@ -1518,7 +1674,6 @@ watch(() => analytics.value.foodScore, async (score) => {
         </div>
       </div>
     </div>
-
 
     <!-- Floating Add Button -->
     <button class="fab-add" @click="openAdd" title="Add Food">
@@ -1538,7 +1693,12 @@ watch(() => analytics.value.foodScore, async (score) => {
           <label class="form-label">Category</label>
           <select v-model="addForm.category" class="form-select">
             <option disabled value="">Select a category</option>
-            <option v-for="cat in categories.filter(c => c !== 'All Categories')" :key="cat" :value="cat">{{ cat }}
+            <option
+              v-for="cat in categories.filter((c) => c !== 'All Categories')"
+              :key="cat"
+              :value="cat"
+            >
+              {{ cat }}
             </option>
           </select>
         </div>
@@ -1581,7 +1741,10 @@ watch(() => analytics.value.foodScore, async (score) => {
   <div v-if="showDeleteModal" class="modal-backdrop">
     <div class="modal-card delete-modal">
       <h5>Delete Item</h5>
-      <p>Are you sure you want to delete <strong>{{ deleteTarget?.name }}</strong>? This action cannot be undone.</p>
+      <p>
+        Are you sure you want to delete <strong>{{ deleteTarget?.name }}</strong
+        >? This action cannot be undone.
+      </p>
       <div class="d-flex justify-content-end gap-2">
         <button class="btn btn-secondary" @click="closeDelete">Cancel</button>
         <button class="btn btn-danger" @click="confirmDelete">Delete</button>
@@ -1642,7 +1805,9 @@ watch(() => analytics.value.foodScore, async (score) => {
   border-radius: 6px;
   padding: 2px 10px;
   font-weight: bold;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
 .badge-expired {
@@ -1662,18 +1827,19 @@ watch(() => analytics.value.foodScore, async (score) => {
 /* --- Stat Card Alignment Fix --- */
 .stat-card {
   display: flex;
-  align-items: center;           /* vertically align icon + text */
+  align-items: center; /* vertically align icon + text */
   justify-content: space-between;
   min-height: 150px;
   padding: 20px 24px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+  background: linear-gradient(135deg, rgba(4, 99, 7, 0.8), rgba(56, 176, 0, 0.5));
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+  color: white;
 }
 
 /* Icon + Label container (fixed width) */
 .left-section {
-  flex: 0 0 90px;                /* fixed width for all cards */
+  flex: 0 0 90px; /* fixed width for all cards */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1689,8 +1855,7 @@ watch(() => analytics.value.foodScore, async (score) => {
   place-items: center;
   color: #fff;
   font-size: 24px;
-  background-color:#10B981; 
-  box-shadow:0 0 15px rgba(16, 185, 129, 0.6);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 /* Label under icon */
@@ -1700,9 +1865,8 @@ watch(() => analytics.value.foodScore, async (score) => {
   font-size: 13px;
   color: #6b7684;
   text-align: center;
-  width: 86px;          /* consistent width */
+  width: 86px; /* consistent width */
 }
-
 
 /* Text section (dynamic width) */
 .content {
@@ -1758,7 +1922,6 @@ watch(() => analytics.value.foodScore, async (score) => {
   }
 }
 
-
 .food-header {
   display: flex;
   align-items: center;
@@ -1810,7 +1973,9 @@ watch(() => analytics.value.foodScore, async (score) => {
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
 .food-btn-edit {
@@ -1908,7 +2073,8 @@ watch(() => analytics.value.foodScore, async (score) => {
   max-width: 0;
   opacity: 0;
   overflow: hidden;
-  transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+  transition:
+    max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
     opacity 0.3s ease;
 }
 
@@ -1933,11 +2099,11 @@ watch(() => analytics.value.foodScore, async (score) => {
 }
 
 .modal-card h5 {
-  margin-bottom: 8px
+  margin-bottom: 8px;
 }
 
 .modal-card p {
-  margin-bottom: 12px
+  margin-bottom: 12px;
 }
 
 /* Delete modal — white interior with pulsing red glow */
@@ -1961,21 +2127,29 @@ watch(() => analytics.value.foodScore, async (score) => {
 
 /* pulsing red glow around the modal */
 .modal-backdrop .delete-modal {
-  box-shadow: 0 8px 30px rgba(229, 57, 53, 0.08), 0 0 0 rgba(229, 57, 53, 0);
+  box-shadow:
+    0 8px 30px rgba(229, 57, 53, 0.08),
+    0 0 0 rgba(229, 57, 53, 0);
   animation: pulseRed 1.6s ease-in-out infinite;
 }
 
 @keyframes pulseRed {
   0% {
-    box-shadow: 0 8px 30px rgba(229, 57, 53, 0.06), 0 0 0 rgba(229, 57, 53, 0);
+    box-shadow:
+      0 8px 30px rgba(229, 57, 53, 0.06),
+      0 0 0 rgba(229, 57, 53, 0);
   }
 
   50% {
-    box-shadow: 0 18px 60px rgba(229, 57, 53, 0.28), 0 0 36px rgba(229, 57, 53, 0.12);
+    box-shadow:
+      0 18px 60px rgba(229, 57, 53, 0.28),
+      0 0 36px rgba(229, 57, 53, 0.12);
   }
 
   100% {
-    box-shadow: 0 8px 30px rgba(229, 57, 53, 0.06), 0 0 0 rgba(229, 57, 53, 0);
+    box-shadow:
+      0 8px 30px rgba(229, 57, 53, 0.06),
+      0 0 0 rgba(229, 57, 53, 0);
   }
 }
 
@@ -1999,10 +2173,12 @@ watch(() => analytics.value.foodScore, async (score) => {
   right: 0;
   bottom: 0;
   opacity: 0.08;
-  background: linear-gradient(135deg,
-      rgba(251, 191, 36, 0.3) 0%,
-      rgba(245, 158, 11, 0.2) 50%,
-      rgba(239, 68, 68, 0.1) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(251, 191, 36, 0.3) 0%,
+    rgba(245, 158, 11, 0.2) 50%,
+    rgba(239, 68, 68, 0.1) 100%
+  );
   animation: fireGlow 3s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
@@ -2017,14 +2193,15 @@ watch(() => analytics.value.foodScore, async (score) => {
 .streak-fire-bg.streak-blazing {
   opacity: 0.18;
   animation-duration: 1.5s;
-  background: linear-gradient(135deg,
-      rgba(239, 68, 68, 0.3) 0%,
-      rgba(251, 146, 60, 0.2) 50%,
-      rgba(251, 191, 36, 0.1) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.3) 0%,
+    rgba(251, 146, 60, 0.2) 50%,
+    rgba(251, 191, 36, 0.1) 100%
+  );
 }
 
 @keyframes fireGlow {
-
   0%,
   100% {
     transform: scale(1);
@@ -2041,7 +2218,6 @@ watch(() => analytics.value.foodScore, async (score) => {
 .streak-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   padding: 4px 10px;
   background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
   border: 1px solid rgba(251, 191, 36, 0.3);
@@ -2075,7 +2251,6 @@ watch(() => analytics.value.foodScore, async (score) => {
 }
 
 @keyframes fireFlicker {
-
   0%,
   100% {
     transform: scale(1) rotate(-2deg);
@@ -2104,9 +2279,8 @@ watch(() => analytics.value.foodScore, async (score) => {
   position: relative;
 }
 
-.stat-card>* {
+.stat-card > * {
   position: relative;
   z-index: 1;
 }
-
 </style>
