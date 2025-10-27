@@ -82,4 +82,26 @@ h1, h2, h3, h4, h5, h6 {
   background-color: #059669;
 }
 
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .stat-card {
+    margin-bottom: 0.75rem;
+  }
+
+  .glass-card {
+    border-radius: 0.5rem;
+    padding: 1rem;
+  }
+
+  .dashboard-overview {
+    padding: 1rem;
+  }
+}
+
+@media (min-width: 992px) {
+  html {
+    --vueuse-safe-area-right: 0px !important;
+  }
+}
+
 
