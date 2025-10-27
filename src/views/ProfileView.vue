@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { doc, getDoc, getDocs, updateDoc, deleteDoc, collection, setDoc } from "firebase/firestore";
 import { getAuth, updateProfile, updatePassword, deleteUser } from "firebase/auth";
 import { db } from "@/firebase";
+import MonkeyAvatar from '@/composables/monkeyAvatar.vue'
 
 const router = useRouter()
 const auth = getAuth()
@@ -208,6 +209,33 @@ async function deleteAccount() {
 onMounted(() => {
   loadUser()
 })
+
+const allAccessories = ref([])
+const unlockedCount = ref(0)
+const totalAccessories = ref(0)
+
+// Load accessories + count unlocked
+async function loadAccessories() {
+  const snap = await getDocs(collection(db, 'accessories'))
+  allAccessories.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  totalAccessories.value = allAccessories.value.length
+
+  // Count unlocked from current user
+  const userSnap = await getDoc(doc(db, 'users', currentUser.value.uid))
+  const monkey = userSnap.data()?.monkey || { accessories: [] }
+  unlockedCount.value = monkey.accessories.length
+}
+
+onMounted(() => {
+  if (currentUser.value) loadAccessories()
+})
+
+function isUnlocked(acc) {
+  const userSnap = /* get from your existing user data or use a ref */
+  const monkey = userData.value?.monkey || { accessories: [] }
+  return monkey.accessories.includes(acc.id)
+}
+
 </script>
 
 <template>
@@ -221,6 +249,41 @@ onMounted(() => {
           </div>
           <h2 class="profile-title">{{ editableUser.name || 'User Profile' }}</h2>
           <p class="profile-subtitle">Manage your account settings</p>
+        </div>
+      </div>
+
+      <!-- monkey avatar -->
+      <div class="monkey-section text-center mb-4">
+        <MonkeyAvatar size="150px" class="mx-auto shadow-lg rounded-circle" />
+        <h4 class="mt-3 mb-1">Your Food Monkey</h4>
+        <p class="text-muted small">Earn points to dress it up!</p>
+      </div>
+
+      <div class="form-section monkey-shop">
+        <h3 class="section-title">
+          <i class="bi bi-stars"></i>
+          Monkey Wardrobe
+          <span class="badge bg-success ms-2">{{ unlockedCount }} / {{ totalAccessories }}</span>
+        </h3>
+
+        <div class="accessory-grid">
+          <div
+            v-for="acc in allAccessories"
+            :key="acc.id"
+            class="accessory-item"
+            :class="{ locked: !isUnlocked(acc) }"
+          >
+            <div class="accessory-image-wrapper">
+              <img :src="acc.image" :alt="acc.name" />
+              <div v-if="!isUnlocked(acc)" class="lock-overlay">
+                <i class="bi bi-lock-fill"></i>
+              </div>
+            </div>
+            <p class="accessory-name">{{ acc.name }}</p>
+            <small v-if="!isUnlocked(acc)" class="text-muted">
+              Need {{ acc.requiredScore }} pts
+            </small>
+          </div>
         </div>
       </div>
 

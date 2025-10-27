@@ -1032,6 +1032,31 @@ const foodDonationStatus = computed(() => {
   return status
 })
 
+//monkey gamification
+async function checkAndUnlockAccessories(uid, newScore) {
+  const accSnap = await getDocs(
+    query(collection(db, "accessories"), where("requiredScore", "<=", newScore))
+  );
+
+  const unlockedIds = accSnap.docs.map(d => d.id);
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+  const current = userSnap.data().monkey.accessories || [];
+
+  const toAdd = unlockedIds.filter(id => !current.includes(id));
+  if (toAdd.length) {
+    await updateDoc(userRef, {
+      "monkey.accessories": arrayUnion(...toAdd)
+    });
+  }
+}
+
+watch(() => analytics.value.foodScore, async (score) => {
+  if (currentUser.value) {
+    await checkAndUnlockAccessories(currentUser.value.uid, score);
+    await loadUserMonkey();   // refresh UI
+  }
+});
 
 
 
@@ -1307,20 +1332,6 @@ const foodDonationStatus = computed(() => {
                           <span v-else-if="getDaysLeft(food) == 0">Today</span>
                           <span v-else>{{ getDaysLeft(food) }} days</span>
                         </span>
-
-                        <!-- donated badge -->
-                          <span
-                            v-if="foodDonationStatus[food.name]?.type === 'pendingDonFood'"
-                            class="badge bg-warning text-dark"
-                          >
-                            Pending Donation
-                          </span>
-                          <span
-                            v-else-if="foodDonationStatus[food.name]?.type === 'donFood'"
-                            class="badge bg-success"
-                          >
-                            Donated
-                          </span>
                       </div>
                       <div class="food-category">{{ food.category }}</div>
                       <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
