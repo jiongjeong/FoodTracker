@@ -1048,7 +1048,7 @@ const foodDonationStatus = computed(() => {
         <div class="ms-3">
           <div style="transform: rotateY(9.20483deg);">
           <button @click="overviewCollapsed = !overviewCollapsed" :aria-expanded="!overviewCollapsed" class="btn btn-sm btn-outline-secondary header-collapse-btn">
-            <i :class="overviewCollapsed ? 'bi bi-chevron-down' : 'bi bi-chevron-up'"></i>
+            <i :class="overviewCollapsed ? 'bi bi-chevron-up' :'bi bi-chevron-down'"></i>
             <span class="visually-hidden">Toggle overview rows</span>
           </button>
         </div>
