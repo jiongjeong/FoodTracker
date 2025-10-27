@@ -948,6 +948,24 @@ const saveEdit = async () => {
 
 import { query, where } from 'firebase/firestore';
 
+
+// Watch foodScore and update Firebase when it changes
+watchEffect(async () => {
+  const score = analytics.value.foodScore;
+  const uid = userId.value;
+  
+  if (uid && activitiesLoaded.value && foodItems.value.length >= 0) {
+    try {
+      const userDocRef = doc(db, 'user', uid);
+      await updateDoc(userDocRef, {
+        foodScore: score
+      });
+    } catch (err) {
+      console.error('Failed to update foodScore:', err);
+    }
+  }
+});
+
 const deleteFood = async (food) => {
   if (!food || food.id == null) return;
   try {
