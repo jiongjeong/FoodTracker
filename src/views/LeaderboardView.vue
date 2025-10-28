@@ -48,7 +48,7 @@ const fetchLeaderboard = async () => {
         rank: idx + 1,
         name: data.name || 'Anonymous',
         score: data.foodScore || 0,
-        streak: data.currentStreak || 0,
+        streak: data.streak || 0,
         initials: (data.name ? data.name.trim().split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() : 'U'),
         isCurrentUser: auth.currentUser && doc.id === auth.currentUser.uid
       }
@@ -71,6 +71,7 @@ const getRankBadgeClass = (rank) => {
   if (rank === 3) return 'rank-badge-bronze'
   return ''
 }
+console.log(leaderboard)
 </script>
 
 <template>
