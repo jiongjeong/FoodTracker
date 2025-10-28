@@ -18,7 +18,7 @@ import {
   LineElement,
 } from 'chart.js'
 
-// Register Chart.js components so charts render
+// Register Chart.js components
 ChartJS.register(
   Title,
   Tooltip,
@@ -32,10 +32,16 @@ ChartJS.register(
 )
 
 const router = useRouter()
-function goToRecipes(food) {
-  // Navigate to /recipes with a query param for search
-  router.push({ path: '/recipes', query: { search: food.name } })
-}
+const auth = getAuth()
+const user = ref(auth.currentUser)
+const userId = computed(() => user.value?.uid || null)
+
+// State variables
+const foodItems = ref([])
+const recipes = ref([])
+const activities = ref([])
+const activitiesLoaded = ref(false)
+
 const searchText = ref('')
 const selectedCategory = ref('All Categories')
 const sortBy = ref('expiration')
@@ -45,6 +51,9 @@ const showEditModal = ref(false)
 const showAddModal = ref(false)
 const showDeleteModal = ref(false)
 const showUseModal = ref(false)
+const showToast = ref(false)
+const toastMessage = ref('')
+const overviewCollapsed = ref(false)
 
 const editForm = reactive({
   id: null,
@@ -68,6 +77,7 @@ const addForm = reactive({
   quantity: '',
   unit: '',
 })
+
 const useForm = reactive({
   id: null,
   name: '',
@@ -76,26 +86,11 @@ const useForm = reactive({
 })
 
 const deleteTarget = ref(null)
-const showToast = ref(false)
-const toastMessage = ref('')
-
-// Collapse state for overview lower rows
-const overviewCollapsed = ref(false)
-
-function showToastFor(msg, ms = 2200) {
-  toastMessage.value = msg
-  showToast.value = true
-  setTimeout(() => (showToast.value = false), ms)
-}
-
-const foodItems = ref([])
-const recipes = ref([])
-const activities = ref([])
-const activitiesLoaded = ref(false)
 
 // Activity filter and sort controls
-const activityTypeFilter = ref('') // default to placeholder
-const activitySortDirection = ref('desc') // 'desc' = newest first, 'asc' = oldest first
+const activityTypeFilter = ref('All')
+const activitySortDirection = ref('desc')
+const activityTimeFrame = ref('all')
 
 const activityTypeOptions = [
   { label: 'All', value: 'All' },
@@ -106,8 +101,6 @@ const activityTypeOptions = [
   { label: 'Pending Donation', value: 'pendingDonFood' },
 ]
 
-// Time frame filter
-const activityTimeFrame = ref('') // default to placeholder
 const activityTimeFrameOptions = [
   { label: 'All', value: 'all' },
   { label: '24h', value: '24h' },
@@ -115,102 +108,7 @@ const activityTimeFrameOptions = [
   { label: '30d', value: '30d' },
 ]
 
-const filteredSortedActivities = computed(() => {
-  let acts = [...activities.value]
-  // Filter by type
-  if (activityTypeFilter.value && activityTypeFilter.value !== 'All') {
-    acts = acts.filter((a) => a.activityType === activityTypeFilter.value)
-  }
-  // Filter by time frame
-  if (activityTimeFrame.value && activityTimeFrame.value !== 'all') {
-    const now = new Date()
-    let cutoff
-    if (activityTimeFrame.value === '24h') {
-      cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-    } else if (activityTimeFrame.value === '7d') {
-      cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    } else if (activityTimeFrame.value === '30d') {
-      cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    }
-    acts = acts.filter((a) => {
-      const d = new Date(a.createdAt)
-      return d >= cutoff
-    })
-  }
-  // Sort by createdAt
-  acts.sort((a, b) => {
-    const dateA = new Date(a.createdAt)
-    const dateB = new Date(b.createdAt)
-    if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0
-    if (isNaN(dateA.getTime())) return activitySortDirection.value === 'desc' ? 1 : -1
-    if (isNaN(dateB.getTime())) return activitySortDirection.value === 'desc' ? -1 : 1
-    return activitySortDirection.value === 'desc' ? dateB - dateA : dateA - dateB
-  })
-  return acts
-})
-
-const auth = getAuth()
-const user = ref(auth.currentUser)
-const userId = computed(() => user.value?.uid || null)
-
-auth.onAuthStateChanged((u) => {
-  user.value = u
-})
-
-watch(userId, async (val) => {
-  if (val) {
-    // Load all user collections live after userId is available
-    const foodItemsRef = collection(db, 'user', val, 'foodItems')
-    const foodItemsSnapshot = await getDocs(foodItemsRef)
-    foodItems.value = foodItemsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-
-    const recipesRef = collection(db, 'user', val, 'recipes')
-    const recipesSnapshot = await getDocs(recipesRef)
-    recipes.value = recipesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-
-    const activityRef = collection(db, 'user', val, 'activities')
-    const activitySnapshot = await getDocs(activityRef)
-    activities.value = activitySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-  } else {
-    // Clear data if user logs out
-    foodItems.value = []
-    recipes.value = []
-    activities.value = []
-  }
-})
-
-// Fetch food items function
-async function loadFoodItems() {
-  if (userId.value) {
-    const foodItemsRef = collection(db, 'user', userId.value, 'foodItems')
-    const foodItemsSnapshot = await getDocs(foodItemsRef)
-    foodItems.value = foodItemsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-  }
-}
-
-// Fetch activities function
-async function loadActivities() {
-  if (userId.value) {
-    const activityRef = collection(db, 'user', userId.value, 'activities')
-    const activitySnapshot = await getDocs(activityRef)
-    activities.value = activitySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-    activitiesLoaded.value = true
-  }
-}
-
-// Call loadFoodItems and loadActivities on load
-onMounted(() => {
-  loadFoodItems()
-  loadActivities()
-})
-
-// Also, watch for userId changes (like login)
-watch(userId, () => {
-  loadFoodItems()
-  loadActivities()
-})
-
-// Categories for select input
+// Categories
 const categories = [
   'All Categories',
   'Fruits & Vegetables',
@@ -247,14 +145,7 @@ const categoryUnits = {
   Seafood: ['kg(s)', 'gram(s)', 'lb(s)', 'ounce(s)', 'piece(s)', 'pack(s)'],
   Snacks: ['piece(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)', 'lb(s)'],
   Beverages: ['liter(s)', 'milliliter(s)', 'bottle(s)', 'can(s)', 'pack(s)', 'gallon(s)'],
-  'Condiments & Sauces': [
-    'milliliter(s)',
-    'liter(s)',
-    'jar(s)',
-    'bottle(s)',
-    'gram(s)',
-    'ounce(s)',
-  ],
+  'Condiments & Sauces': ['milliliter(s)', 'liter(s)', 'jar(s)', 'bottle(s)', 'gram(s)', 'ounce(s)'],
   'Canned & Jarred Goods': ['can(s)', 'jar(s)', 'gram(s)', 'ounce(s)', 'pack(s)'],
   'Frozen Foods': ['kg(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)', 'lb(s)'],
   'Grains & Pasta': ['kg(s)', 'gram(s)', 'lb(s)', 'bag(s)', 'box(es)', 'pack(s)'],
@@ -263,7 +154,266 @@ const categoryUnits = {
   Other: ['piece(s)', 'unit(s)', 'pack(s)', 'box(es)', 'kg(s)', 'gram(s)'],
 }
 
-// Filtered food items (remove duplicates, search, filter, sort)
+// Functions
+function showToastFor(msg, ms = 2200) {
+  toastMessage.value = msg
+  showToast.value = true
+  setTimeout(() => (showToast.value = false), ms)
+}
+
+function goToRecipes(food) {
+  router.push({ path: '/recipes', query: { search: food.name } })
+}
+
+async function loadFoodItems() {
+  if (userId.value) {
+    const foodItemsRef = collection(db, 'user', userId.value, 'foodItems')
+    const foodItemsSnapshot = await getDocs(foodItemsRef)
+    foodItems.value = foodItemsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  }
+}
+
+async function loadActivities() {
+  if (userId.value) {
+    const activityRef = collection(db, 'user', userId.value, 'activities')
+    const activitySnapshot = await getDocs(activityRef)
+    activities.value = activitySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    activitiesLoaded.value = true
+  }
+}
+
+// Auth state changed
+auth.onAuthStateChanged((u) => {
+  user.value = u
+})
+
+// Watch userId changes
+watch(userId, async (val) => {
+  if (val) {
+    await loadFoodItems()
+
+    const recipesRef = collection(db, 'user', val, 'recipes')
+    const recipesSnapshot = await getDocs(recipesRef)
+    recipes.value = recipesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+
+    await loadActivities()
+  } else {
+    foodItems.value = []
+    recipes.value = []
+    activities.value = []
+  }
+})
+
+// Watch for expired foods and donations
+watchEffect(async () => {
+  if (!activitiesLoaded.value) return
+  const uid = userId.value
+  if (!uid) return
+
+  // Handle expired foods
+  const expiredFoods = foodItems.value.filter((food) => getDaysLeft(food) < 0)
+  for (const food of expiredFoods) {
+    const alreadyLogged = activities.value.some(
+      (a) => a.foodName === food.name && a.activityType === 'expFood',
+    )
+    if (!alreadyLogged) {
+      const actRef = collection(db, 'user', uid, 'activities')
+      const q = query(
+        actRef,
+        where('foodName', '==', food.name),
+        where('activityType', '==', 'expFood'),
+      )
+      const snapshot = await getDocs(q)
+      if (snapshot.empty) {
+        const payload = {
+          activityType: 'expFood',
+          createdAt: new Date().toISOString(),
+          foodName: food.name || '',
+          category: food.category || 'Other',
+          price: String(food.price || ''),
+          quantity: String(food.quantity || ''),
+          unit: String(food.unit || ''),
+          note: 'expired',
+        }
+        const docRef = await addDoc(actRef, payload)
+        activities.value.unshift({
+          id: docRef.id,
+          ...payload,
+        })
+      }
+    }
+  }
+
+  // Handle completed donations (donFood)
+  const donatedActivities = activities.value.filter(a => a.activityType === 'donFood')
+
+  for (const donActivity of donatedActivities) {
+    const foodIndex = foodItems.value.findIndex(f => f.name === donActivity.foodName)
+
+    if (foodIndex !== -1) {
+      const food = foodItems.value[foodIndex]
+      const donatedQty = Number(donActivity.quantity) || 0
+
+      if (donatedQty >= food.quantity) {
+        const refDoc = doc(db, 'user', uid, 'foodItems', food.id)
+        await deleteDoc(refDoc)
+        foodItems.value.splice(foodIndex, 1)
+      } else {
+        const newQty = food.quantity - donatedQty
+        const refDoc = doc(db, 'user', uid, 'foodItems', food.id)
+        await updateDoc(refDoc, { quantity: newQty })
+        foodItems.value[foodIndex].quantity = newQty
+      }
+    }
+  }
+})
+
+// Utility functions
+const toInputDateString = (d) => {
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+const formatDate = (dateObj) => {
+  let date
+  if (dateObj) {
+    if (typeof dateObj.toDate === 'function') {
+      date = dateObj.toDate()
+    } else if (dateObj instanceof Date) {
+      date = dateObj
+    } else {
+      date = new Date(dateObj)
+    }
+  } else {
+    return ''
+  }
+
+  if (isNaN(date)) return ''
+
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = date.toLocaleString('en-US', { month: 'short' })
+  const year = date.getFullYear()
+  return `${day} ${month} ${year}`
+}
+
+const getRelativeTime = (dateString) => {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+  if (diffInSeconds < 60) return 'Just now'
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+  return `${Math.floor(diffInSeconds / 86400)}d ago`
+}
+
+const getDaysLeft = (food) => {
+  const now = new Date()
+  let expDate
+
+  if (food.expirationDate) {
+    if (typeof food.expirationDate.toDate === 'function') {
+      expDate = food.expirationDate.toDate()
+    } else if (food.expirationDate instanceof Date) {
+      expDate = food.expirationDate
+    } else {
+      expDate = new Date(food.expirationDate)
+    }
+  } else {
+    return 0
+  }
+
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate())
+  return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
+}
+
+const getFoodCardClass = (food) => {
+  const now = new Date()
+  let expDate
+
+  if (food.expirationDate) {
+    if (typeof food.expirationDate.toDate === 'function') {
+      expDate = food.expirationDate.toDate()
+    } else if (food.expirationDate instanceof Date) {
+      expDate = food.expirationDate
+    } else {
+      expDate = new Date(food.expirationDate)
+    }
+  } else {
+    return 'normal-card'
+  }
+
+  if (isNaN(expDate)) return 'normal-card'
+
+  const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24))
+
+  if (expDate < now) {
+    return 'expired-card'
+  } else if (daysLeft >= 1 && daysLeft <= 7) {
+    return 'warning-card'
+  } else {
+    return 'normal-card'
+  }
+}
+
+const getBadgeClass = (food) => {
+  const daysLeft = getDaysLeft(food)
+  if (daysLeft <= 1) {
+    return 'badge-expired'
+  } else if (daysLeft <= 7) {
+    return 'badge-warning'
+  } else {
+    return 'badge-transparent'
+  }
+}
+
+const calculateActivityStreak = () => {
+  if (!activitiesLoaded.value || activities.value.length === 0) return 0
+
+  const activityDates = [
+    ...new Set(
+      activities.value
+        .map((a) => {
+          const date = new Date(a.createdAt)
+          return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+        })
+        .filter((timestamp) => !isNaN(timestamp)),
+    ),
+  ].sort((a, b) => b - a)
+
+  if (activityDates.length === 0) return 0
+
+  const today = new Date()
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  const oneDayMs = 24 * 60 * 60 * 1000
+
+  let streak = 0
+  let expectedDate = todayMidnight
+
+  if (activityDates[0] < todayMidnight - oneDayMs) {
+    return 0
+  }
+
+  for (const activityDate of activityDates) {
+    if (activityDate === expectedDate || activityDate === expectedDate - oneDayMs) {
+      streak++
+      expectedDate = activityDate - oneDayMs
+    } else {
+      break
+    }
+  }
+
+  return streak
+}
+
+// Computed properties
+const availableUnits = computed(() => {
+  const category = editForm.category || addForm.category || 'All Categories'
+  return categoryUnits[category] || categoryUnits['All Categories']
+})
+
 const filteredFoodItems = computed(() => {
   const uniqueItems = foodItems.value.filter(
     (item, index, self) => index === self.findIndex((i) => i.id === item.id),
@@ -271,22 +421,17 @@ const filteredFoodItems = computed(() => {
 
   let items = [...uniqueItems]
 
-  // Exclude items with empty or whitespace-only names
   items = items.filter((item) => item.name && item.name.trim().length > 0)
 
-  // Search
   if (searchText.value && searchText.value.trim()) {
     const searchTerm = searchText.value.toLowerCase().trim()
     items = items.filter((item) => item.name.toLowerCase().includes(searchTerm))
   }
 
-  // Category filter
   if (selectedCategory.value && selectedCategory.value !== 'All Categories') {
     items = items.filter((item) => item.category === selectedCategory.value)
   }
 
-  // ... rest of your sorting logic
-  // Apply sorting
   const direction = sortDirection.value === 'desc' ? -1 : 1
 
   switch (sortBy.value) {
@@ -325,7 +470,6 @@ const filteredFoodItems = computed(() => {
         const categoryCompare = catA.localeCompare(catB) * direction
         if (categoryCompare !== 0) return categoryCompare
 
-        // Secondary sort by name
         const nameA = (a.name || '').toLowerCase()
         const nameB = (b.name || '').toLowerCase()
         return nameA.localeCompare(nameB)
@@ -352,117 +496,39 @@ const filteredFoodItems = computed(() => {
   return items
 })
 
-const toggleSortDirection = () => {
-  sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
-}
+const filteredSortedActivities = computed(() => {
+  let acts = [...activities.value]
 
-const getSortButtonIcon = computed(() => {
-  return sortDirection.value === 'asc' ? 'bi bi-sort-up' : 'bi bi-sort-down'
+  if (activityTypeFilter.value && activityTypeFilter.value !== 'All') {
+    acts = acts.filter((a) => a.activityType === activityTypeFilter.value)
+  }
+
+  if (activityTimeFrame.value && activityTimeFrame.value !== 'all') {
+    const now = new Date()
+    let cutoff
+    if (activityTimeFrame.value === '24h') {
+      cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    } else if (activityTimeFrame.value === '7d') {
+      cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    } else if (activityTimeFrame.value === '30d') {
+      cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    }
+    acts = acts.filter((a) => {
+      const d = new Date(a.createdAt)
+      return d >= cutoff
+    })
+  }
+
+  acts.sort((a, b) => {
+    const dateA = new Date(a.createdAt)
+    const dateB = new Date(b.createdAt)
+    if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0
+    if (isNaN(dateA.getTime())) return activitySortDirection.value === 'desc' ? 1 : -1
+    if (isNaN(dateB.getTime())) return activitySortDirection.value === 'desc' ? -1 : 1
+    return activitySortDirection.value === 'desc' ? dateB - dateA : dateA - dateB
+  })
+  return acts
 })
-
-const getSortButtonTitle = computed(() => {
-  const direction = sortDirection.value === 'asc' ? 'Ascending' : 'Descending'
-  return `Sort ${direction}`
-})
-
-const formatDate = (dateObj) => {
-  let date
-  if (dateObj) {
-    if (typeof dateObj.toDate === 'function') {
-      date = dateObj.toDate() // Firestore Timestamp
-    } else if (dateObj instanceof Date) {
-      date = dateObj // JS Date
-    } else {
-      date = new Date(dateObj) // try parsing string or other formats
-    }
-  } else {
-    return '' // or some default string for missing date
-  }
-
-  if (isNaN(date)) {
-    return '' // Handle invalid date
-  }
-
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = date.toLocaleString('en-US', { month: 'short' })
-  const year = date.getFullYear()
-  return `${day} ${month} ${year}`
-}
-
-const getRelativeTime = (dateString) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-  if (diffInSeconds < 60) return 'Just now'
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
-  return `${Math.floor(diffInSeconds / 86400)}d ago`
-}
-
-const getDaysLeft = (food) => {
-  const now = new Date()
-  let expDate
-
-  if (food.expirationDate) {
-    if (typeof food.expirationDate.toDate === 'function') {
-      // Firestore Timestamp
-      expDate = food.expirationDate.toDate()
-    } else if (food.expirationDate instanceof Date) {
-      // Plain JS Date
-      expDate = food.expirationDate
-    } else {
-      // Try to parse a string
-      expDate = new Date(food.expirationDate)
-    }
-  } else {
-    // No expiration date, assume far future or zero days left
-    return 0
-  }
-
-  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate())
-  return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
-}
-
-const getFoodCardClass = (food) => {
-  const now = new Date()
-  let expDate
-
-  if (food.expirationDate) {
-    if (typeof food.expirationDate.toDate === 'function') {
-      expDate = food.expirationDate.toDate()
-    } else if (food.expirationDate instanceof Date) {
-      expDate = food.expirationDate
-    } else {
-      expDate = new Date(food.expirationDate)
-    }
-  } else {
-    return 'normal-card' // fallback class if no expirationDate
-  }
-
-  if (isNaN(expDate)) return 'normal-card' // protect against invalid date
-
-  const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24))
-
-  if (expDate < now) {
-    return 'expired-card'
-  } else if (daysLeft >= 1 && daysLeft <= 7) {
-    return 'warning-card'
-  } else {
-    return 'normal-card'
-  }
-}
-
-const getBadgeClass = (food) => {
-  const daysLeft = getDaysLeft(food)
-  if (daysLeft <= 1) {
-    return 'badge-expired'
-  } else if (daysLeft <= 7) {
-    return 'badge-warning'
-  } else {
-    return 'badge-transparent'
-  }
-}
 
 const expiringSoon = computed(
   () =>
@@ -480,145 +546,55 @@ const expired = computed(
     }).length,
 )
 
-watchEffect(async () => {
-  if (!activitiesLoaded.value) return
-  const expiredFoods = foodItems.value.filter((food) => getDaysLeft(food) < 0)
-  const uid = userId.value
-
-  for (const food of expiredFoods) {
-    // Prevent duplicate logs by checking both local and Firestore activities
-    const alreadyLogged = activities.value.some(
-      (a) => a.foodName === food.name && a.activityType === 'expFood',
-    )
-    if (!alreadyLogged && uid) {
-      // Check Firestore for existing expFood activity for this food
-      const actRef = collection(db, 'user', uid, 'activities')
-      const q = query(
-        actRef,
-        where('foodName', '==', food.name),
-        where('activityType', '==', 'expFood'),
-      )
-      const snapshot = await getDocs(q)
-      if (snapshot.empty) {
-        // Add to Firestore
-        const payload = {
-          activityType: 'expFood',
-          createdAt: new Date().toISOString(),
-          foodName: food.name || '',
-          category: food.category || 'Other',
-          price: String(food.price || ''),
-          quantity: String(food.quantity || ''),
-          unit: String(food.unit || ''),
-          note: 'expired',
-        }
-        const docRef = await addDoc(actRef, payload)
-        activities.value.unshift({
-          id: docRef.id,
-          ...payload,
-        })
-      }
-    }
-  }
-})
-
-// Calculate consecutive activity days streak
-const calculateActivityStreak = () => {
-  if (!activitiesLoaded.value || activities.value.length === 0) return 0
-
-  // Get unique activity dates, sorted from newest to oldest
-  const activityDates = [
-    ...new Set(
-      activities.value
-        .map((a) => {
-          const date = new Date(a.createdAt)
-          return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-        })
-        .filter((timestamp) => !isNaN(timestamp)),
-    ),
-  ].sort((a, b) => b - a)
-
-  if (activityDates.length === 0) return 0
-
-  const today = new Date()
-  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
-  const oneDayMs = 24 * 60 * 60 * 1000
-
-  let streak = 0
-  let expectedDate = todayMidnight
-
-  // Check if there's activity today or yesterday (grace period)
-  if (activityDates[0] < todayMidnight - oneDayMs) {
-    return 0 // Streak broken if no activity today or yesterday
-  }
-
-  // Count consecutive days
-  for (const activityDate of activityDates) {
-    if (activityDate === expectedDate || activityDate === expectedDate - oneDayMs) {
-      streak++
-      expectedDate = activityDate - oneDayMs
-    } else {
-      break
-    }
-  }
-
-  return streak
-}
+const potentialLoss = computed(() =>
+  foodItems.value
+    .filter((item) => {
+      const days = getDaysLeft(item)
+      return days >= 0 && days <= 7
+    })
+    .reduce((sum, item) => sum + (item.price || 0), 0),
+)
 
 const analytics = computed(() => {
-  // const items = activeFoodItems.value
   const wasteActivities = activities.value.filter((a) => a.activityType === 'expFood')
-  // fix: check activityType for consumed food activities
   const usedActivities = activities.value.filter((a) => a.activityType === 'conFood')
   const donatedActivities = activities.value.filter((a) => a.activityType === 'donFood')
-  // console.log(wasteActivities)
-  // console.log(usedActivities)
-  // console.log("mine" + donatedActivities)
-  // console.log("end")
+  const pendingDonations = activities.value.filter((a) => a.activityType === 'pendingDonFood')
 
-  // Total waste calculation
   const totalWasteItems = wasteActivities.length
   const totalWasteMoney = wasteActivities.reduce((total, activity) => {
-    // Multiply price by quantity (convert price to number since it's a string)
     return total + Number(activity.price)
   }, 0)
 
-  // Total saved calculation: count only fully consumed food
-  // Only activities with note === 'fully consumed' are counted as saved items.
-  // Partial consumption events are intentionally excluded from the saved count,
-  // as per current business logic. If partial consumption should contribute,
-  // update this filter accordingly.
   const totalSavedItems = activities.value.filter(
-    (a) => a.activityType === 'conFood' && a.note === 'fully consumed',
+    (a) => (a.activityType === 'conFood' && a.note === 'fully consumed') ||
+           (a.activityType === 'donFood')
   ).length
+
   const totalSavedMoney = usedActivities.reduce((total, activity) => {
     return total + Number(activity.price)
+  }, 0) + donatedActivities.reduce((total, activity) => {
+    return total + Number(activity.price)
   }, 0)
 
-  // Reduction percentage - items used before expiry vs total items
   const totalItemsHandled = totalWasteItems + totalSavedItems
   const reductionPercentage =
     totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
-  //test
 
-  // Current inventory
   const inventoryValue = foodItems.value.reduce((sum, item) => {
     const price = Number(item.price) || 0
     return sum + price
   }, 0)
   const inventoryItems = foodItems.value.length
 
-  // calculate streak
   const streakDays = calculateActivityStreak()
+  const foodDonated = donatedActivities.length
 
-  // TODO Food Donated
-  // const foodDonated = donatedActivities.length
-
-  // foodScore algo = itemssaved - itemswasted + moneysaved
   const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4)
   const moneyScore = Math.max(0, totalSavedMoney * 0.2 - totalWasteMoney * 0.2)
-  const baseScore = Math.round(itemsScore + moneyScore)
+  const donationBonus = foodDonated * 0.5
+  const baseScore = Math.round(itemsScore + moneyScore + donationBonus)
 
-  // Apply streak multi
   const streakMulti = streakDays > 0 ? 1 + streakDays / 7 : 0
   const foodScore = Math.round(baseScore * Math.max(1, streakMulti))
 
@@ -629,21 +605,22 @@ const analytics = computed(() => {
     inventory: { value: inventoryValue, items: inventoryItems },
     foodScore: foodScore,
     streakDays: streakDays,
+    foodDonated: foodDonated,
+    pendingDonations: pendingDonations.length,
   }
 })
 
-// Watch foodScore and update Firebase when it changes
+// Watch foodScore and update Firebase
 watchEffect(async () => {
   const score = analytics.value.foodScore;
   const uid = userId.value;
-  
-  
+
   if (uid && activitiesLoaded.value && foodItems.value.length >= 0) {
     try {
       const userDocRef = doc(db, 'user', uid);
       await updateDoc(userDocRef, {
         foodScore: score,
-        streak : analytics.value.streakDays
+        streak: analytics.value.streakDays
       });
     } catch (err) {
       console.error('Failed to update foodScore:', err);
@@ -651,7 +628,7 @@ watchEffect(async () => {
   }
 });
 
-// Chart options
+// Chart data
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -661,7 +638,6 @@ const chartOptions = {
   },
 }
 
-// Waste vs Savings bar chart data
 const wasteVsSavingsChart = computed(() => {
   const waste = analytics.value.totalWaste.items || 0
   const saved = analytics.value.totalSaved.items || 0
@@ -677,7 +653,6 @@ const wasteVsSavingsChart = computed(() => {
   }
 })
 
-// Waste by category pie chart (simple breakdown based on activities)
 const wasteByCategoryChart = computed(() => {
   const wasteActs = activities.value.filter((a) => a.activityType === 'expFood')
   const counts = {}
@@ -693,7 +668,6 @@ const wasteByCategoryChart = computed(() => {
   }
 })
 
-// Monthly spending line chart (dummy aggregation by month from activities)
 const monthlySpendingChart = computed(() => {
   const months = Array.from({ length: 12 }, (_, i) => i + 1)
   const moneyByMonth = months.map(() => 0)
@@ -712,29 +686,28 @@ const monthlySpendingChart = computed(() => {
   }
 })
 
-const potentialLoss = computed(() =>
-  foodItems.value
-    .filter((item) => {
-      const days = getDaysLeft(item)
-      return days >= 0 && days <= 7
-    })
-    .reduce((sum, item) => sum + (item.price || 0), 0),
-)
-
-const toInputDateString = (d) => {
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
+const toggleSortDirection = () => {
+  sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
 }
 
+const getSortButtonIcon = computed(() => {
+  return sortDirection.value === 'asc' ? 'bi bi-sort-up' : 'bi bi-sort-down'
+})
+
+const getSortButtonTitle = computed(() => {
+  const direction = sortDirection.value === 'asc' ? 'Ascending' : 'Descending'
+  return `Sort ${direction}`
+})
+
+// Modal functions
 const openUse = (food) => {
   useForm.id = food.id
   useForm.name = food.name
-  useForm.quantity = 1 // default quantity to use
+  useForm.quantity = 1
   useForm.unit = food.unit || ''
   showUseModal.value = true
 }
+
 const closeUse = () => {
   showUseModal.value = false
   useForm.id = null
@@ -742,6 +715,7 @@ const closeUse = () => {
   useForm.quantity = 0
   useForm.unit = ''
 }
+
 const saveUse = async () => {
   if (!useForm.id || useForm.quantity <= 0) return
 
@@ -749,20 +723,17 @@ const saveUse = async () => {
   if (!uid) return
 
   try {
-    // Find the food item locally
     const foodIndex = foodItems.value.findIndex((f) => f.id === useForm.id)
     if (foodIndex === -1) return
 
     const food = foodItems.value[foodIndex]
 
-    // Ensure we don't use more than available
     const usedQty = Math.min(useForm.quantity, food.quantity)
     const newQty = food.quantity - usedQty
 
     const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id)
     const actRef = collection(db, 'user', uid, 'activities')
 
-    // Log normal use activity
     const activityPayload = {
       activityType: 'conFood',
       createdAt: new Date().toISOString(),
@@ -779,11 +750,9 @@ const saveUse = async () => {
     })
 
     if (newQty <= 0) {
-      // Remove from Firestore and local list
       await deleteDoc(refDoc)
       foodItems.value.splice(foodIndex, 1)
 
-      // Log fully consumed activity
       const fullConsumedPayload = {
         activityType: 'conFood',
         createdAt: new Date().toISOString(),
@@ -794,19 +763,15 @@ const saveUse = async () => {
         unit: food.unit || '',
         note: 'fully consumed',
       }
-      const docRef = await addDoc(actRef, fullConsumedPayload)
+      const docRef2 = await addDoc(actRef, fullConsumedPayload)
       activities.value.unshift({
-        id: docRef.id,
+        id: docRef2.id,
         ...fullConsumedPayload,
       })
 
       showToastFor(`${food.name} fully consumed and removed`)
     } else {
-      // Update Firestore food quantity
-      await updateDoc(refDoc, {
-        quantity: newQty,
-      })
-      // Update local foodItems
+      await updateDoc(refDoc, { quantity: newQty })
       foodItems.value[foodIndex].quantity = newQty
       showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`)
     }
@@ -816,12 +781,6 @@ const saveUse = async () => {
     showToastFor('Failed to update food usage.')
   }
 }
-
-// Add computed property to get units based on selected category
-const availableUnits = computed(() => {
-  const category = editForm.category || addForm.category || 'All Categories'
-  return categoryUnits[category] || categoryUnits['All Categories']
-})
 
 const openAdd = () => {
   addForm.name = ''
@@ -870,7 +829,6 @@ const saveAdd = async () => {
   }
 
   try {
-    // Add food item to Firestore
     const newDocRef = await addDoc(colRef, foodPayload)
 
     const activityPayload = {
@@ -885,10 +843,8 @@ const saveAdd = async () => {
 
     const activityDocRef = await addDoc(actRef, activityPayload)
 
-    // Add new item locally for instant UI feedback
     foodItems.value.unshift({ id: newDocRef.id, ...foodPayload })
 
-    // Refresh activities list to show new log
     activities.value.unshift({
       id: activityDocRef.id,
       ...activityPayload,
@@ -965,8 +921,7 @@ const saveEdit = async () => {
     foodItems.value[idx] = { ...foodItems.value[idx], ...payload }
   }
   closeEdit()
-};
-
+}
 
 const deleteFood = async (food) => {
   if (!food || food.id == null) return
@@ -976,13 +931,10 @@ const deleteFood = async (food) => {
       console.warn('Not logged in')
       return false
     }
-    // Delete the food item doc
     const refDoc = doc(db, 'user', uid, 'foodItems', food.id)
     await deleteDoc(refDoc)
 
-    // Delete corresponding activities
     const actRef = collection(db, 'user', uid, 'activities')
-    // Find all activities for this food item by foodName and activityType (optional: tighten filter)
     const q = query(
       actRef,
       where('foodName', '==', food.name),
@@ -990,18 +942,15 @@ const deleteFood = async (food) => {
     )
     const actSnapshot = await getDocs(q)
 
-    // Delete all matching activity docs
     const deletePromises = []
     actSnapshot.forEach((docSnap) => {
       deletePromises.push(deleteDoc(docSnap.ref))
     })
     await Promise.all(deletePromises)
 
-    // Remove locally
     const idx = foodItems.value.findIndex((f) => f.id === food.id)
     if (idx !== -1) foodItems.value.splice(idx, 1)
 
-    // (Optionally) update your activities UI list as well
     activities.value = activities.value.filter(
       (a) => !(a.foodName === food.name && a.activityType === 'addFood'),
     )
@@ -1031,53 +980,11 @@ const confirmDelete = async () => {
   else showToastFor('Failed to delete')
 }
 
-// food donation status
-const foodDonationStatus = computed(() => {
-  const status = {}
-  const donationActs = activities.value.filter((a) =>
-    ['pendingDonFood', 'donFood'].includes(a.activityType),
-  )
-
-  for (const act of donationActs) {
-    const name = act.foodName
-    if (!status[name] || new Date(act.createdAt) > new Date(status[name].createdAt)) {
-      status[name] = {
-        type: act.activityType,
-        date: act.createdAt,
-      }
-    }
-  }
-  return status
+// On mounted
+onMounted(() => {
+  loadFoodItems()
+  loadActivities()
 })
-
-//monkey gamification
-async function checkAndUnlockAccessories(uid, newScore) {
-  const accSnap = await getDocs(
-    query(collection(db, "accessories"), where("requiredScore", "<=", newScore))
-  );
-
-  const unlockedIds = accSnap.docs.map(d => d.id);
-  const userRef = doc(db, "users", uid);
-  const userSnap = await getDoc(userRef);
-  const current = userSnap.data().monkey.accessories || [];
-
-  const toAdd = unlockedIds.filter(id => !current.includes(id));
-  if (toAdd.length) {
-    await updateDoc(userRef, {
-      "monkey.accessories": arrayUnion(...toAdd)
-    });
-  }
-}
-
-watch(() => analytics.value.foodScore, async (score) => {
-  if (currentUser.value) {
-    await checkAndUnlockAccessories(currentUser.value.uid, score);
-    await loadUserMonkey();   // refresh UI
-  }
-});
-
-
-
 </script>
 
 <template>
@@ -1299,7 +1206,7 @@ watch(() => analytics.value.foodScore, async (score) => {
 
             <!-- Right: Count -->
             <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0">${{ analytics.totalSaved.money }}</h3>
+              <h3 class="fw-bold mb-0">{{ analytics.totalSaved.money }}</h3>
               <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
             </div>
           </div>
@@ -1347,7 +1254,7 @@ watch(() => analytics.value.foodScore, async (score) => {
 
             <!-- Right: Count -->
             <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0">${{ analytics.inventory.value.toFixed(2) }}</h3>
+              <h3 class="fw-bold mb-0">{{ analytics.inventory.value.toFixed(2) }}</h3>
               <small class="text-muted">{{ analytics.inventory.items }} items</small>
             </div>
           </div>
@@ -1431,6 +1338,7 @@ watch(() => analytics.value.foodScore, async (score) => {
             <div class="col-3 col-sm-2 col-md-2">
               <button
                 @click="toggleSortDirection"
+
                 class="btn btn-outline-secondary sort-direction-btn w-100"
                 :title="getSortButtonTitle"
               >
@@ -1548,6 +1456,22 @@ watch(() => analytics.value.foodScore, async (score) => {
                 :key="activity.id"
                 class="pb-3 border-bottom"
               >
+              <div v-if="activity.activityType === 'donFood'">
+                  <p class="mb-1 small">
+                    <strong
+                      >{{ activity.quantity }} {{ activity.unit }} of
+                      {{ activity.foodName }} donated</strong
+                    >
+                  </p>
+                </div>
+                <div v-if="activity.activityType === 'pendingDonFood'">
+                  <p class="mb-1 small">
+                    <strong
+                      >{{ activity.quantity }} {{ activity.unit }} of
+                      {{ activity.foodName}} pending donation</strong
+                    >
+                  </p>
+                </div>
                 <div v-if="activity.activityType === 'addFood'">
                   <p class="mb-1 small">
                     <strong
@@ -1573,11 +1497,11 @@ watch(() => analytics.value.foodScore, async (score) => {
                     </strong>
                   </p>
                 </div>
-                <div v-else>
+                <!-- <div v-else>
                   <p class="mb-1 small">
                     <strong>{{ activity.foodName }} — {{ activity.activityType }}</strong>
                   </p>
-                </div>
+                </div> -->
                 <small class="text-muted">
                   {{ getRelativeTime(activity.createdAt) }}
                 </small>
@@ -2120,7 +2044,7 @@ watch(() => analytics.value.foodScore, async (score) => {
 /* pulsing red glow around the modal */
 .modal-backdrop .delete-modal {
   box-shadow:
-    0 8px 30px rgba(229, 57, 53, 0.08),
+    0 8px 30px rgba(229, 57, 53, 0.06),
     0 0 0 rgba(229, 57, 53, 0);
   animation: pulseRed 1.6s ease-in-out infinite;
 }

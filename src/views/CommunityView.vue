@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, watch, computed, nextTick } from 'vue';
 import { db, auth } from '../firebase.js';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
@@ -178,19 +178,71 @@ async function loadMyListings() {
 async function loadAvailableListings() {
   const sharedItemsRef = collection(db, "communityListings")
   const sharedItemsSnapshot = await getDocs(sharedItemsRef)
+
+  // Get all unique owner IDs
+  const ownerIds = [...new Set(sharedItemsSnapshot.docs.map(doc => doc.data().ownerId))]
+
+  // Fetch all owner information
+  const ownersMap = {}
+  for (const ownerId of ownerIds) {
+    try {
+      const userDocRef = doc(db, 'user', ownerId)
+      const userSnap = await getDoc(userDocRef)
+
+      if (userSnap.exists()) {
+        const userData = userSnap.data()
+        ownersMap[ownerId] = {
+          name: userData.name || 'Anonymous',
+          email: userData.email || '',
+          phone: userData.contactNo || 'Not provided',  // ← Fixed: contactNo instead of phone
+          handle: userData.handle || ''
+        }
+      } else {
+        ownersMap[ownerId] = {
+          name: 'Anonymous',
+          email: '',
+          phone: 'Not provided',
+          handle: ''
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching owner ${ownerId}:`, error)
+      ownersMap[ownerId] = {
+        name: 'Anonymous',
+        email: '',
+        phone: 'Not provided',
+        handle: ''
+      }
+    }
+  }
+
   sharedItems.value = sharedItemsSnapshot.docs.map(doc => {
     const data = doc.data()
-    const foodName = foodNameMap.value[data.foodId] || 'Unknown Item'
+    const owner = ownersMap[data.ownerId] || {
+      name: 'Anonymous',
+      email: '',
+      phone: 'Not provided',
+      handle: ''
+    }
+
     return {
       id: doc.id,
       foodId: data.foodId,
-      foodName,  // ← Use resolved name
+      foodName: data.foodName || 'Unknown Item',
       ...data,
+      sharedBy: owner.name,
+      contact: {
+        email: owner.email,
+        phone: owner.phone,  // ← This now contains contactNo
+        handle: owner.handle
+      },
       daysUntilExpiration: getDaysLeft(data.expirationDate),
       pickupTime: data.pickupTime || 'Not specified',
       notes: data.notes || ''
     }
-  }).filter(item => item.ownerId !== currentUser.value?.uid)
+  })
+    .filter(item => item.ownerId !== currentUser.value?.uid)
+    .filter(item => !item.donated)
 }
 
 
@@ -198,14 +250,14 @@ async function loadAvailableListings() {
 async function submitShare() {
   if (!currentUser.value) return alert("Please log in first")
   if (!shareForm.value.location?.lat || !shareForm.value.location?.lng) {
-  return alert('Please select a pickup location')
-}
+    return alert('Please select a pickup location')
+  }
   try {
     const expDate = new Date(shareForm.value.expirationDate)
 
     const data = {
       ownerId: currentUser.value.uid,
-      // foodName: shareForm.value.foodName,
+      foodName: shareForm.value.foodName,
       foodId: shareForm.value.foodItemId,
       category: shareForm.value.category,
       quantity: shareForm.value.quantity,
@@ -242,15 +294,15 @@ async function submitShare() {
     })
     const remaining = getRemainingQuantity(shareForm.value.foodName)
     if (shareForm.value.quantity > remaining) {
-    return alert(`You only have ${remaining} ${shareForm.value.unit} left to share.`)
-  }
+      return alert(`You only have ${remaining} ${shareForm.value.unit} left to share.`)
+    }
 
     await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
       activityType: 'pendingDonFood',
       createdAt: new Date().toISOString(),
       category: data.category,
       price: 0,
-      // foodName: data.foodName,
+      foodName: data.foodName,
       foodId: data.foodId,
       quantity: data.quantity,
       unit: data.unit,
@@ -279,6 +331,24 @@ async function markAsDonated(item) {
       donated: true,
       donatedAt: serverTimestamp()
     })
+    // Delete the pending donation activity first
+    try {
+      const pendingActivitiesQuery = query(
+        collection(db, 'user', currentUser.value.uid, 'activities'),
+        where('activityType', '==', 'pendingDonFood'),
+        where('foodId', '==', item.foodId)
+      )
+
+      const pendingActivitiesSnap = await getDocs(pendingActivitiesQuery)
+
+      if (!pendingActivitiesSnap.empty) {
+        const deletePromises = pendingActivitiesSnap.docs.map(doc => deleteDoc(doc.ref))
+        await Promise.all(deletePromises)
+      }
+    } catch (activityError) {
+      console.warn('Failed to delete pending activities:', activityError)
+      // Continue anyway since we still want to log the donation
+    }
 
     // Log donation in user's activities
     await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
@@ -421,7 +491,7 @@ function calculateDistances() {
       const p2 = new google.maps.LatLng(itemLat, itemLng)
       const meters = geometry.value.spherical.computeDistanceBetween(p1, p2)
       const km = (meters / 1000).toFixed(1)
-      return { ...item, distance: `${km} km` }
+      return { ...item, distance: `${km}km` + " Away" }
     } catch (e) {
       console.warn('Distance calc failed:', e)
       return { ...item, distance: null }
@@ -477,8 +547,8 @@ async function editDonated(item) {
     expirationDate: item.expirationDate instanceof Date
       ? item.expirationDate.toISOString().slice(0, 10)
       : typeof item.expirationDate?.toDate === 'function'
-      ? item.expirationDate.toDate().toISOString().slice(0, 10)
-      : item.expirationDate?.slice(0, 10) || '',
+        ? item.expirationDate.toDate().toISOString().slice(0, 10)
+        : item.expirationDate?.slice(0, 10) || '',
     pickupTime: item.pickupTime || '',
     notes: item.notes || '',
     location: item.location || null,
@@ -687,520 +757,1362 @@ async function canDonated(item) {
 
 
 <template>
-  <div class="container-fluid p-4">
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-4">
-      <!-- Title & subtitle -->
-      <div>
-        <h1 class="h2 mb-2">Community Food Sharing</h1>
-        <p class="text-muted">Share expiring food with neighbors to reduce waste</p>
-      </div>
-
-      <!-- Location picker (right side) -->
-      <div class="d-flex flex-column gap-2 align-self-md-start" style="min-width: 280px;">
-        <label class="form-label fw-medium">
-          <i class="bi bi-geo-alt-fill me-1"></i> Preferred Pickup Location
-        </label>
-
-        <!-- No location selected -->
-        <template v-if="!preferredLocation">
-          <LocationPicker @place-selected="setPreferredLocation" class="w-100" />
-        </template>
-
-        <!-- Location selected -->
-        <template v-else>
-          <!-- Picker (change) -->
-          <LocationPicker
-            @place-selected="setPreferredLocation"
-            class="w-100"
-            style="max-width: 300px;"
-          />
-
-          <!-- Address BELOW the picker -->
-          <div class="d-flex align-items-center gap-2 mt-1">
-            <div
-              class="bg-light rounded px-3 py-1 text-dark text-truncate flex-grow-1"
-              style="font-size: 0.9rem; max-width: 260px;"
-              :title="preferredLocation.address"
-            >
-              <strong>{{ preferredLocation.address }}</strong>
+  <!-- Hero Section with Gradient Background -->
+  <div class="hero-section">
+    <div class="container-fluid p-4">
+      <div class="row align-items-center g-4">
+        <!-- Left: Title & Description -->
+        <div class="col-lg-7">
+          <div class="hero-content">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <div class="icon-wrapper">
+                <i class="bi bi-heart-fill"></i>
+              </div>
+              <div>
+                <h1 class="hero-title mb-2">Community Food Sharing</h1>
+                <p class="hero-subtitle mb-0">
+                  <i class="bi bi-leaf me-2"></i>
+                  Share expiring food with neighbors to reduce waste and build community
+                </p>
+              </div>
             </div>
 
-            <button
-              @click="clearPreferredLocation"
-              class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1"
-              title="Clear location"
-            >
-              <i class="bi bi-x-circle"></i>
-              <span class="d-none d-sm-inline">Clear</span>
-            </button>
+            <!-- Stats Row -->
+            <div class="stats-row d-flex gap-4 mt-4">
+              <div class="stat-item">
+                <i class="bi bi-people-fill text-success"></i>
+                <div>
+                  <strong>{{ mySharedItems.length }}</strong>
+                  <small>Items Shared</small>
+                </div>
+              </div>
+              <div class="stat-item">
+                <i class="bi bi-box-seam text-primary"></i>
+                <div>
+                  <strong>{{ itemsWithDistance.length }}</strong>
+                  <small>Available</small>
+                </div>
+              </div>
+              <div class="stat-item">
+                <i class="bi bi-recycle text-warning"></i>
+                <div>
+                  <strong>Zero</strong>
+                  <small>Waste Goal</small>
+                </div>
+              </div>
+            </div>
           </div>
-        </template>
+        </div>
+
+        <!-- Right: Location Picker Card -->
+        <div class="col-lg-5">
+          <div class="location-card">
+            <div class="location-card-header">
+              <div class="d-flex align-items-center gap-2">
+                <div class="location-icon">
+                  <i class="bi bi-geo-alt-fill"></i>
+                </div>
+                <div>
+                  <h5 class="mb-0">Pickup Location</h5>
+                  <small class="text-muted">Find items near you</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="location-card-body">
+              <!-- No location selected -->
+              <template v-if="!preferredLocation">
+                <div class="empty-location">
+                  <i class="bi bi-pin-map display-4 text-muted mb-3"></i>
+                  <p class="text-muted mb-3">Set your preferred location to see distances</p>
+                  <LocationPicker @place-selected="setPreferredLocation" class="w-100" />
+                </div>
+              </template>
+
+              <!-- Location selected -->
+              <template v-else>
+                <div class="selected-location">
+                  <div class="location-display">
+                    <i class="bi bi-geo-alt-fill text-success"></i>
+                    <div class="flex-grow-1">
+                      <strong class="d-block">Current Location</strong>
+                      <span class="text-muted">{{ preferredLocation.address }}</span>
+                    </div>
+                    <button @click="clearPreferredLocation" class="btn btn-sm btn-outline-danger"
+                      title="Clear location">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+
+                  <div class="change-location mt-3">
+                    <label class="form-label text-muted small mb-2">
+                      <i class="bi bi-arrow-repeat me-1"></i>
+                      Change Location
+                    </label>
+                    <LocationPicker @place-selected="setPreferredLocation" class="w-100" />
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-    <div class="glass-card p-4 mb-4">
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="h5 mb-0">My Shared Items</h3>
-        <button class="btn btn-primary" @click="handleShareFood">
-          <i class="bi bi-plus-lg me-2"></i> Share Food
+  <!-- Shared Items Section -->
+  <div class="section-container mb-4">
+    <div class="section-header">
+      <div class="section-header-content">
+        <div class="section-icon-wrapper">
+          <i class="bi bi-share-fill"></i>
+        </div>
+        <div>
+          <h3 class="section-title mb-1">My Shared Items</h3>
+          <p class="section-subtitle mb-0">Manage your food donations</p>
+        </div>
+      </div>
+      <button class="btn btn-gradient" @click="handleShareFood">
+        <i class="bi bi-plus-circle-fill me-2"></i>
+        Share Food
+      </button>
+    </div>
+
+    <div class="section-body">
+      <!-- Empty State -->
+      <div v-if="mySharedItems.length === 0" class="empty-state">
+        <div class="empty-state-icon">
+          <i class="bi bi-inbox"></i>
+        </div>
+        <h5 class="empty-state-title">No items shared yet</h5>
+        <p class="empty-state-text">Start sharing food to help your community and reduce waste</p>
+        <button class="btn btn-primary mt-3" @click="handleShareFood">
+          <i class="bi bi-plus-lg me-2"></i>
+          Share Your First Item
         </button>
       </div>
 
-      <div v-if="mySharedItems.length === 0" class="text-center py-4">
-        <i class="bi bi-share fs-1 text-muted"></i>
-        <p class="text-muted mt-3">You haven't shared any items yet</p>
-      </div>
+      <!-- Items Grid -->
+      <div v-else class="items-grid">
+        <div v-for="item in sortedMySharedItems" :key="item.id" class="item-card-wrapper">
+          <div class="item-card" :class="{ 'item-card-donated': item.donated }">
+            <!-- Status Badge -->
+            <div class="card-status-badge" v-if="item.donated">
+              <i class="bi bi-check-circle-fill me-1"></i>
+              Donated
+            </div>
+            <div class="card-status-badge status-active" v-else>
+              <i class="bi bi-clock-fill me-1"></i>
+              Active
+            </div>
 
-      <div v-else class="row g-3">
-        <!-- Changed from mySharedItems to sortedMySharedItems -->
-        <div v-for="item in sortedMySharedItems" :key="item.id" class="col-12 col-md-6 col-lg-4">
-          <div class="card h-100" :class="{ 'card-donated': item.donated }">
-            <div class="card-body position-relative d-flex flex-column">
-              <!-- Edit and Cancel buttons at top right -->
-              <div v-if="!item.donated" class="action-buttons">
-                <button
-                  @click="editDonated(item)"
-                  class="btn btn-sm btn-secondary"
-                  title="Edit"
-                >
-                  <i class="bi bi-pencil-square"></i>
-                </button>
-
-                <button
-                  @click="canDonated(item)"
-                  class="btn btn-sm btn-danger"
-                  title="Cancel"
-                >
-                  <i class="bi bi-x-circle"></i>
-                </button>
-              </div>
-
-              <!-- Content section -->
-              <div class="flex-grow-1">
-                <h5 class="card-title mb-2">{{ item.foodName }}</h5>
-                <p class="text-muted mb-0">{{ item.quantity }} {{ item.unit }}</p>
-                <p class="text-muted small mb-2">
-                  <i class="bi bi-geo-alt me-1"></i>
-                  {{ item.location?.address || 'No address' }}
-                </p>
-                <p class="text-muted small mb-2">
-                  <i class="bi bi-clock me-1"></i>
-                  Pickup Time: {{ item.pickupTime }}
-                </p>
-
-                <p v-if="item.notes" class="text-muted small mb-2">
-                  <i class="bi bi-chat-text me-1"></i>
-                  {{ item.notes }}
-                </p>
-                <span class="badge badge-warning-orange mt-2 text-black">
-                  Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}
-                </span>
-              </div>
-
-              <!-- Mark as Donated button - always at bottom -->
-              <button
-                v-if="!item.donated"
-                @click="markAsDonated(item)"
-                class="btn btn-success btn-sm w-100 mt-3"
-              >
-                <i class="bi bi-check-circle-fill me-1"></i>
-                Mark as Donated
+            <!-- Action Buttons -->
+            <div v-if="!item.donated" class="card-action-buttons">
+              <button @click="editDonated(item)" class="action-btn action-btn-edit" title="Edit">
+                <i class="bi bi-pencil-fill"></i>
               </button>
+              <button @click="canDonated(item)" class="action-btn action-btn-delete" title="Cancel">
+                <i class="bi bi-trash-fill"></i>
+              </button>
+            </div>
 
-              <div v-else class="donated-badge w-100 text-center py-2 mt-3">
-                <i class="bi bi-check-circle-fill me-1"></i>
-                Donated
+            <!-- Card Content -->
+            <div class="card-content">
+              <div class="card-image">
+                <i class="bi bi-box-seam-fill"></i>
+              </div>
+
+              <div class="card-info">
+                <h5 class="card-food-name">{{ item.foodName }}</h5>
+                <div class="card-quantity">
+                  <i class="bi bi-layers-fill me-1"></i>
+                  {{ item.quantity }} {{ item.unit }}
+                </div>
+              </div>
+
+              <div class="card-details">
+                <div class="detail-item">
+                  <i class="bi bi-geo-alt-fill"></i>
+                  <span>{{ item.location?.address || 'No address' }}</span>
+                </div>
+                <div class="detail-item">
+                  <i class="bi bi-clock-history"></i>
+                  <span>{{ item.pickupTime }}</span>
+                </div>
+                <div class="detail-item" v-if="item.notes">
+                  <i class="bi bi-chat-left-text-fill"></i>
+                  <span>{{ item.notes }}</span>
+                </div>
+              </div>
+
+              <div class="card-footer">
+                <div class="expiry-badge" :class="{
+                  'expiry-urgent': item.daysUntilExpiration <= 2,
+                  'expiry-warning': item.daysUntilExpiration <= 5 && item.daysUntilExpiration > 2,
+                  'expiry-normal': item.daysUntilExpiration > 5
+                }">
+                  <i class="bi bi-calendar-x me-1"></i>
+                  Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}
+                </div>
+
+                <button v-if="!item.donated" @click="markAsDonated(item)" class="btn-mark-donated">
+                  <i class="bi bi-check-circle-fill me-1"></i>
+                  Mark as Donated
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="glass-card p-4">
-      <h3 class="h5 mb-4">Available Near You</h3>
+  <!-- Available Near You Section -->
+  <div class="section-container">
+    <div class="section-header">
+      <div class="section-header-content">
+        <div class="section-icon-wrapper section-icon-available">
+          <i class="bi bi-geo-alt-fill"></i>
+        </div>
+        <div>
+          <h3 class="section-title mb-1">Available Near You</h3>
+          <p class="section-subtitle mb-0">Food items from your community</p>
+        </div>
+      </div>
+      <div class="items-count-badge">
+        <i class="bi bi-basket3-fill me-2"></i>
+        {{ itemsWithDistance.length }} Items
+      </div>
+    </div>
 
-      <div class="row g-4">
-        <div v-for="item in itemsWithDistance" :key="item.id" class="col-12 col-md-6 col-lg-4">
-          <div class="card h-100">
-            <div class="card-body">
-              <div class="mb-3">
-                <h5 class="card-title mb-2">{{ item.foodName }}</h5>
-                <p class="text-muted mb-0">{{ item.quantity }} {{ item.unit }}</p>
-                <p class="text-muted small mb-2">
-                  <i class="bi bi-geo-alt me-1"></i>
-                  {{ item.location?.address || 'No address' }}
-                </p>
-                <p class="text-muted small mb-2">
-                  <i class="bi bi-clock me-1"></i>
-                  Pickup: {{ item.pickupTime }}
-                </p>
-                <p v-if="item.notes" class="text-muted small mb-2 text-truncate" :title="item.notes">
-                  <i class="bi bi-chat-text me-1"></i>
-                  {{ item.notes }}
-                </p>
+    <div class="section-body">
+      <!-- Empty State -->
+      <div v-if="itemsWithDistance.length === 0" class="empty-state">
+        <div class="empty-state-icon">
+          <i class="bi bi-basket"></i>
+        </div>
+        <h5 class="empty-state-title">No items available</h5>
+        <p class="empty-state-text">Check back later for food donations in your area</p>
+      </div>
+
+      <!-- Items Grid -->
+      <div v-else class="items-grid">
+        <div v-for="item in itemsWithDistance" :key="item.id" class="item-card-wrapper">
+          <div class="item-card item-card-available">
+            <!-- Distance Badge -->
+            <div class="distance-badge" v-if="preferredLocation && item.distance">
+              <i class="bi bi-pin-map-fill me-1"></i>
+              {{ item.distance }}
+            </div>
+
+            <!-- Card Content -->
+            <div class="card-content">
+              <div class="card-image card-image-available">
+                <i class="bi bi-basket2-fill"></i>
               </div>
 
-              <div class="mb-3">
-                <span class="badge badge-warning-orange text-black">
-                  Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}
-                </span>
-
-                <span v-if="preferredLocation && item.distance" class="badge bg-light text-dark ms-2">
-                  <i class="bi bi-geo-alt"></i> {{ item.distance }} away
-                </span>
-
-                <span v-else-if="preferredLocation" class="badge bg-warning text-dark">
-                  Calculating...
-                </span>
-
-                <span v-else class="badge bg-light text-dark ms-2">
-                  Input preferred location to see distance
-                </span>
+              <div class="card-info">
+                <h5 class="card-food-name">{{ item.foodName }}</h5>
+                <div class="card-quantity">
+                  <i class="bi bi-layers-fill me-1"></i>
+                  {{ item.quantity }} {{ item.unit }}
+                </div>
+                <div class="shared-by">
+                  <i class="bi bi-person-circle me-1"></i>
+                  by {{ item.sharedBy || 'Anonymous' }}
+                </div>
               </div>
 
-              <div class="d-flex align-items-center gap-2 mb-3">
-                <small class="text-muted">Shared by {{ item.sharedBy }}</small>
+              <div class="card-details">
+                <div class="detail-item">
+                  <i class="bi bi-geo-alt-fill"></i>
+                  <span>{{ item.location?.address || 'No address' }}</span>
+                </div>
+                <div class="detail-item">
+                  <i class="bi bi-clock-history"></i>
+                  <span>{{ item.pickupTime }}</span>
+                </div>
+                <div class="detail-item" v-if="item.notes">
+                  <i class="bi bi-chat-left-text-fill"></i>
+                  <span class="text-truncate">{{ item.notes }}</span>
+                </div>
               </div>
 
-              <button class="btn btn-primary w-100" @click="handleContact(item)">
-                <i class="bi bi-person-lines-fill me-2"></i>
-                Contact {{ item.sharedBy ? item.sharedBy.split(' ')[0] : 'User' }}
-              </button>
+              <div class="card-footer">
+                <div class="expiry-badge" :class="{
+                  'expiry-urgent': item.daysUntilExpiration <= 2,
+                  'expiry-warning': item.daysUntilExpiration <= 5 && item.daysUntilExpiration > 2,
+                  'expiry-normal': item.daysUntilExpiration > 5
+                }">
+                  <i class="bi bi-calendar-x me-1"></i>
+                  {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }} left
+                </div>
+
+                <button @click="handleContact(item)" class="btn-contact">
+                  <i class="bi bi-telephone-fill me-1"></i>
+                  Contact {{ item.sharedBy?.split(' ')[0] || 'Donor' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Contact Modal -->
-    <div v-if="showContactModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
-      <div class="modal-backdrop fade show" @click="showContactModal = false" style="z-index: 1050;"></div>
-      <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="bi bi-person-circle me-2"></i>
-              Contact {{ selectedContact?.sharedBy }}
-            </h5>
-            <button type="button" class="btn-close" @click="showContactModal = false"></button>
+  <!-- Contact Modal -->
+  <div v-if="showContactModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
+    <div class="modal-backdrop fade show" @click="showContactModal = false" style="z-index: 1050;"></div>
+    <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-person-circle me-2"></i>
+            Contact {{ selectedContact?.sharedBy }}
+          </h5>
+          <button type="button" class="btn-close" @click="showContactModal = false"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="mb-4">
+            <h6 class="fw-semibold">About this item:</h6>
+            <p class="mb-1"><strong>{{ selectedContact?.foodName }}</strong> - {{ selectedContact?.quantity }} {{
+              selectedContact?.unit }}</p>
+            <small class="text-muted">Expires in {{ selectedContact?.daysUntilExpiration }} day(s)</small>
           </div>
 
-          <div class="modal-body">
-            <div class="mb-4">
-              <h6 class="fw-semibold">About this item:</h6>
-              <p class="mb-1"><strong>{{ selectedContact?.foodName }}</strong> - {{ selectedContact?.quantity }}</p>
-              <small class="text-muted">Expires in {{ selectedContact?.daysUntilExpiration }} day(s)</small>
+          <div class="mb-3">
+            <h6 class="fw-semibold mb-3">Contact Information:</h6>
+
+            <div class="mb-3" v-if="selectedContact?.contact?.email">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-envelope text-primary"></i>
+                <strong>Email:</strong>
+              </div>
+              <a :href="`mailto:${selectedContact.contact.email}`" class="text-decoration-none">
+                {{ selectedContact.contact.email }}
+              </a>
+            </div>
+
+            <!-- Fixed phone section -->
+            <div class="mb-3"
+              v-if="selectedContact?.contact?.phone && selectedContact.contact.phone !== 'Not provided'">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-telephone text-success"></i>
+                <strong>Phone:</strong>
+              </div>
+              <a :href="`tel:${selectedContact.contact.phone}`" class="text-decoration-none">
+                {{ selectedContact.contact.phone }}
+              </a>
+            </div>
+            <div class="mb-3" v-else>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-telephone text-muted"></i>
+                <strong>Phone:</strong>
+              </div>
+              <p class="mb-0 text-muted">Not provided</p>
+            </div>
+
+            <!-- Optional: Show handle -->
+            <div class="mb-3" v-if="selectedContact?.contact?.handle">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-at text-info"></i>
+                <strong>Handle:</strong>
+              </div>
+              <p class="mb-0">{{ selectedContact.contact.handle }}</p>
             </div>
 
             <div class="mb-3">
-              <h6 class="fw-semibold mb-3">Contact Information:</h6>
-
-              <div class="mb-3">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                  <i class="bi bi-envelope text-primary"></i>
-                  <strong>Email:</strong>
-                </div>
-                <a :href="`mailto:${selectedContact?.contact.email}`" class="text-decoration-none">
-                  {{ selectedContact?.contact.email }}
-                </a>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-geo-alt text-danger"></i>
+                <strong>Pickup Location:</strong>
               </div>
+              <p class="mb-0">{{ selectedContact?.location?.address || 'Not specified' }}</p>
+            </div>
 
-              <div class="mb-3">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                  <i class="bi bi-telephone text-success"></i>
-                  <strong>Phone:</strong>
-                </div>
-                <a :href="`tel:${selectedContact?.contact.phone}`" class="text-decoration-none">
-                  {{ selectedContact?.contact.phone }}
-                </a>
+            <div class="mb-3" v-if="selectedContact?.pickupTime && selectedContact.pickupTime !== 'Not specified'">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-clock text-info"></i>
+                <strong>Pickup Time:</strong>
               </div>
+              <p class="mb-0">{{ selectedContact.pickupTime }}</p>
+            </div>
 
-              <div class="mb-3">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                  <i class="bi bi-geo-alt text-danger"></i>
-                  <strong>Address:</strong>
-                </div>
-                <p class="mb-0">{{ selectedContact?.contact.address }}</p>
+            <div class="mb-3" v-if="selectedContact?.notes">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-chat-left-text text-warning"></i>
+                <strong>Notes:</strong>
               </div>
+              <p class="mb-0">{{ selectedContact.notes }}</p>
             </div>
           </div>
+        </div>
 
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showContactModal = false">
-              Close
-            </button>
-            <a
-              :href="`mailto:${selectedContact?.contact.email}?subject=Food Request - ${selectedContact?.foodName}&body=Hi ${selectedContact?.sharedBy}, I'm interested in your ${selectedContact?.foodName}. Could we arrange a pickup?`"
-              class="btn btn-primary"
-            >
-              <i class="bi bi-envelope me-2"></i>
-              Send Email
-            </a>
-          </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showContactModal = false">
+            Close
+          </button>
+          <a v-if="selectedContact?.contact?.email"
+            :href="`mailto:${selectedContact.contact.email}?subject=Food Request - ${selectedContact.foodName}&body=Hi ${selectedContact.sharedBy}, I'm interested in your ${selectedContact.foodName}. Could we arrange a pickup?`"
+            class="btn btn-primary">
+            <i class="bi bi-envelope me-2"></i>
+            Send Email
+          </a>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Share Food Modal -->
-    <div v-if="showShareModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
-      <div class="modal-backdrop fade show" @click="showShareModal = false" style="z-index: 1050;"></div>
-      <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="bi bi-share me-2"></i>
-              Share Food Item
-            </h5>
-            <button type="button" class="btn-close" @click="showShareModal = false"></button>
-          </div>
+  <!-- Share Food Modal -->
+  <div v-if="showShareModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
+    <div class="modal-backdrop fade show" @click="showShareModal = false" style="z-index: 1050;"></div>
+    <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-share me-2"></i>
+            Share Food Item
+          </h5>
+          <button type="button" class="btn-close" @click="showShareModal = false"></button>
+        </div>
 
-          <div class="modal-body" style="max-height:70vh; overflow-y:auto">
-            <form @submit.prevent="submitShare">
-              <div class="mb-3">
-                <label class="form-label">Food Name *</label>
-                <select v-model="shareForm.foodName" class="form-select" @change="onSelectFoodItem" required
+        <div class="modal-body" style="max-height:70vh; overflow-y:auto">
+          <form @submit.prevent="submitShare">
+            <div class="mb-3">
+              <label class="form-label">Food Name *</label>
+              <select v-model="shareForm.foodName" class="form-select" @change="onSelectFoodItem" required
                 :key="foodItems.map(i => i.id + ':' + i.quantity).join('|') + '|' + donationActivities.length">
-                  <option value="" disabled>Select a food item...</option>
-                  <option
-                    v-for="item in foodItems"
-                    :key="item.id"
-                    :value="item.name"
-                    :disabled="getRemainingQuantity(item.name) <= 0"
-                    :title="
-                    getRemainingQuantity(item.name) <= 0
-                     ? 'No quantity left to share'
-                     : `Remaining: ${getRemainingQuantity(item.name)} ${item.unit}`
-                    "
-                  >
-                    {{ item.name }}
-                    <small v-if="getRemainingQuantity(item.name) > 0" class="text-success ms-1">
-                      ({{ getRemainingQuantity(item.name) }} left)
-                    </small>
-                    <small v-else class="text-muted ms-1">(none left)</small>
-                  </option>
-                </select>
-              </div>
-
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">Category</label>
-                  <input
-                    v-model="shareForm.category"
-                    type="text"
-                    class="form-control"
-                    readonly
-                    style="background-color: #e9ecef; cursor: not-allowed;"
-                  />
-                </div>
-
-                <div class="col-md-6">
-                  <label class="form-label">Expiration Date *</label>
-                  <input
-                    v-model="shareForm.expirationDate"
-                    type="date"
-                    class="form-control"
-                    readonly
-                    style="background-color: #e9ecef; cursor: not-allowed;"
-                  />
-                </div>
-              </div>
-
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">Quantity</label>
-                  <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="1" required />
-                  <small class="text-muted">
-                    Max: {{ getRemainingQuantity(shareForm.foodName) }} {{ shareForm.unit }}
+                <option value="" disabled>Select a food item...</option>
+                <option v-for="item in foodItems" :key="item.id" :value="item.name"
+                  :disabled="getRemainingQuantity(item.name) <= 0" :title="getRemainingQuantity(item.name) <= 0
+                    ? 'No quantity left to share'
+                    : `Remaining: ${getRemainingQuantity(item.name)} ${item.unit}`
+                    ">
+                  {{ item.name }}
+                  <small v-if="getRemainingQuantity(item.name) > 0" class="text-success ms-1">
+                    ({{ getRemainingQuantity(item.name) }} left)
                   </small>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Unit</label>
-                  <input
-                    v-model="shareForm.unit"
-                    type="text"
-                    class="form-control"
-                    readonly
-                    style="background-color: #e9ecef; cursor: not-allowed;"
-                  />
-                </div>
+                  <small v-else class="text-muted ms-1">(none left)</small>
+                </option>
+              </select>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label">Category</label>
+                <input v-model="shareForm.category" type="text" class="form-control" readonly
+                  style="background-color: #e9ecef; cursor: not-allowed;" />
               </div>
 
-              <div class="mb-3">
-                <label class="form-label">Preferred Pickup Time</label>
-                <input
-                  v-model="shareForm.pickupTime"
-                  type="text"
-                  class="form-control"
-                  placeholder="e.g., Weekdays after 6pm, Weekends anytime"
-                />
+              <div class="col-md-6">
+                <label class="form-label">Expiration Date *</label>
+                <input v-model="shareForm.expirationDate" type="date" class="form-control" readonly
+                  style="background-color: #e9ecef; cursor: not-allowed;" />
               </div>
+            </div>
 
-              <div class="mb-3">
-                <label class="form-label">Preferred Pickup Location</label>
-                <LocationPicker @place-selected="shareForm.location = $event" />
-                <small v-if="shareForm.location" class="text-success d-block mt-1">
-                  Selected: {{ shareForm.location.address }}
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label">Quantity</label>
+                <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="1"
+                  required />
+                <small class="text-muted">
+                  Max: {{ getRemainingQuantity(shareForm.foodName) }} {{ shareForm.unit }}
                 </small>
-
-                <small v-else class="text-danger d-block mt-1">Please select location</small>
               </div>
-
-              <div class="mb-3">
-                <label class="form-label">Additional Notes</label>
-                <textarea
-                  v-model="shareForm.notes"
-                  class="form-control"
-                  rows="3"
-                  placeholder="Any special instructions or notes about the food item..."
-                ></textarea>
+              <div class="col-md-6">
+                <label class="form-label">Unit</label>
+                <input v-model="shareForm.unit" type="text" class="form-control" readonly
+                  style="background-color: #e9ecef; cursor: not-allowed;" />
               </div>
-            </form>
-          </div>
+            </div>
 
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showShareModal = false">
-              Cancel
-            </button>
-            <button type="button" class="btn btn-primary" @click="submitShare">
-              <i class="bi bi-share me-2"></i>
-              Share Food
-            </button>
-          </div>
+            <div class="mb-3">
+              <label class="form-label">Preferred Pickup Time</label>
+              <input v-model="shareForm.pickupTime" type="text" class="form-control"
+                placeholder="e.g., Weekdays after 6pm, Weekends anytime" />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Preferred Pickup Location</label>
+              <LocationPicker @place-selected="shareForm.location = $event" />
+              <small v-if="shareForm.location" class="text-success d-block mt-1">
+                Selected: {{ shareForm.location.address }}
+              </small>
+
+              <small v-else class="text-danger d-block mt-1">Please select location</small>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Additional Notes</label>
+              <textarea v-model="shareForm.notes" class="form-control" rows="3"
+                placeholder="Any special instructions or notes about the food item..."></textarea>
+            </div>
+          </form>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showShareModal = false">
+            Cancel
+          </button>
+          <button type="button" class="btn btn-primary" @click="submitShare">
+            <i class="bi bi-share me-2"></i>
+            Share Food
+          </button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Edit Donation Modal -->
-    <div v-if="showEditModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
-      <div class="modal-backdrop fade show" @click="showEditModal = false" style="z-index: 1050;"></div>
-      <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="bi bi-pencil-square me-2"></i>
-              Edit Donation
-            </h5>
-            <button type="button" class="btn-close" @click="showEditModal = false"></button>
-          </div>
+  <!-- Edit Donation Modal -->
+  <div v-if="showEditModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
+    <div class="modal-backdrop fade show" @click="showEditModal = false" style="z-index: 1050;"></div>
+    <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-pencil-square me-2"></i>
+            Edit Donation
+          </h5>
+          <button type="button" class="btn-close" @click="showEditModal = false"></button>
+        </div>
 
-          <div class="modal-body" style="max-height:70vh; overflow-y:auto">
-            <form @submit.prevent="submitEdit">
-              <div class="mb-3">
-                <label class="form-label">Food Name</label>
-                <input
-                  v-model="editForm.foodName"
-                  type="text"
-                  class="form-control"
-                  readonly
-                  style="background-color: #e9ecef; cursor: not-allowed;"
-                />
+        <div class="modal-body" style="max-height:70vh; overflow-y:auto">
+          <form @submit.prevent="submitEdit">
+            <div class="mb-3">
+              <label class="form-label">Food Name</label>
+              <input v-model="editForm.foodName" type="text" class="form-control" readonly
+                style="background-color: #e9ecef; cursor: not-allowed;" />
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label">Category</label>
+                <input v-model="editForm.category" type="text" class="form-control" readonly
+                  style="background-color: #e9ecef; cursor: not-allowed;" />
               </div>
 
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">Category</label>
-                  <input
-                    v-model="editForm.category"
-                    type="text"
-                    class="form-control"
-                    readonly
-                    style="background-color: #e9ecef; cursor: not-allowed;"
-                  />
-                </div>
-
-                <div class="col-md-6">
-                  <label class="form-label">Expiration Date</label>
-                  <input
-                    v-model="editForm.expirationDate"
-                    type="date"
-                    class="form-control"
-                    readonly
-                    style="background-color: #e9ecef; cursor: not-allowed;"
-                  />
-                </div>
+              <div class="col-md-6">
+                <label class="form-label">Expiration Date</label>
+                <input v-model="editForm.expirationDate" type="date" class="form-control" readonly
+                  style="background-color: #e9ecef; cursor: not-allowed;" />
               </div>
+            </div>
 
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">Quantity *</label>
-                  <input
-                    v-model.number="editForm.quantity"
-                    type="number"
-                    class="form-control"
-                    min="1"
-                    step="1"
-                    required
-                  />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Unit</label>
-                  <input
-                    v-model="editForm.unit"
-                    type="text"
-                    class="form-control"
-                    readonly
-                    style="background-color: #e9ecef; cursor: not-allowed;"
-                  />
-                </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label">Quantity *</label>
+                <input v-model.number="editForm.quantity" type="number" class="form-control" min="1" step="1"
+                  required />
               </div>
-
-              <div class="mb-3">
-                <label class="form-label">Preferred Pickup Time</label>
-                <input
-                  v-model="editForm.pickupTime"
-                  type="text"
-                  class="form-control"
-                  placeholder="e.g., Weekdays after 6pm, Weekends anytime"
-                />
+              <div class="col-md-6">
+                <label class="form-label">Unit</label>
+                <input v-model="editForm.unit" type="text" class="form-control" readonly
+                  style="background-color: #e9ecef; cursor: not-allowed;" />
               </div>
+            </div>
 
-              <div class="mb-3">
-                <label class="form-label">Preferred Pickup Location *</label>
-                <LocationPicker
-                  @place-selected="editForm.location = $event"
-                  :initial-address="editForm.location?.address"
-                />
-                <small v-if="editForm.location" class="text-success d-block mt-1">
-                  Selected: {{ editForm.location.address }}
-                </small>
-                <small v-else class="text-danger d-block mt-1">Please select location</small>
-              </div>
+            <div class="mb-3">
+              <label class="form-label">Preferred Pickup Time</label>
+              <input v-model="editForm.pickupTime" type="text" class="form-control"
+                placeholder="e.g., Weekdays after 6pm, Weekends anytime" />
+            </div>
 
-              <div class="mb-3">
-                <label class="form-label">Additional Notes</label>
-                <textarea
-                  v-model="editForm.notes"
-                  class="form-control"
-                  rows="3"
-                  placeholder="Any special instructions or notes about the food item..."
-                ></textarea>
-              </div>
-            </form>
-          </div>
+            <div class="mb-3">
+              <label class="form-label">Preferred Pickup Location *</label>
+              <LocationPicker @place-selected="editForm.location = $event"
+                :initial-address="editForm.location?.address" />
+              <small v-if="editForm.location" class="text-success d-block mt-1">
+                Selected: {{ editForm.location.address }}
+              </small>
+              <small v-else class="text-danger d-block mt-1">Please select location</small>
+            </div>
 
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showEditModal = false">
-              Cancel
-            </button>
-            <button type="button" class="btn btn-primary" @click="submitEdit">
-              <i class="bi bi-check-circle me-2"></i>
-              Update Listing
-            </button>
-          </div>
+            <div class="mb-3">
+              <label class="form-label">Additional Notes</label>
+              <textarea v-model="editForm.notes" class="form-control" rows="3"
+                placeholder="Any special instructions or notes about the food item..."></textarea>
+            </div>
+          </form>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showEditModal = false">
+            Cancel
+          </button>
+          <button type="button" class="btn btn-primary" @click="submitEdit">
+            <i class="bi bi-check-circle me-2"></i>
+            Update Listing
+          </button>
         </div>
       </div>
     </div>
+  </div>
 </template>
 
 <style scoped>
-
-.card .small i { vertical-align: middle; }
-.card .small {
+/* Hero Section */
+.hero-section {
+  background: linear-gradient(135deg, #667eea 0%, #22aa74 100%);
+  position: relative;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin: -1rem -1rem 2rem -1rem;
+  padding: 2rem 0;
+}
+
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+.icon-wrapper {
+  width: 80px;
+  height: 80px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.icon-wrapper i {
+  font-size: 2.5rem;
+  color: white;
+  animation: heartbeat 2s ease-in-out infinite;
+}
+
+@keyframes heartbeat {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  10%,
+  30% {
+    transform: scale(1.1);
+  }
+
+  20%,
+  40% {
+    transform: scale(1);
+  }
+}
+
+.hero-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: white;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  margin: 0;
+}
+
+.hero-subtitle {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 500;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Stats Row */
+.stats-row {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.stat-item i {
+  font-size: 1.75rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.stat-item strong {
+  display: block;
+  font-size: 1.25rem;
+  color: white;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.stat-item small {
+  display: block;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* Location Card */
+.location-card {
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border: 3px solid rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.location-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.4);
+}
+
+.location-card-header {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  padding: 1.5rem;
+  color: white;
+}
+
+.location-icon {
+  width: 50px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(5px);
+}
+
+.location-icon i {
+  font-size: 1.5rem;
+  color: white;
+}
+
+.location-card-header h5 {
+  font-weight: 700;
+  font-size: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.location-card-body {
+  padding: 1.5rem;
+}
+
+/* Empty Location State */
+.empty-location {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.empty-location i {
+  opacity: 0.3;
+}
+
+/* Selected Location */
+.location-display {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-radius: 12px;
+  border: 2px solid #bbf7d0;
+}
+
+.location-display>i {
+  font-size: 1.5rem;
+  margin-top: 0.25rem;
+  flex-shrink: 0;
+}
+
+.location-display strong {
+  font-size: 0.875rem;
+  color: #166534;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.location-display .text-muted {
+  font-size: 0.95rem;
+  color: #059669 !important;
+  word-break: break-word;
+}
+
+.location-display .btn-outline-danger {
+  border-radius: 8px;
+  padding: 0.375rem 0.75rem;
+  flex-shrink: 0;
+}
+
+.change-location {
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.change-location label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive Design */
+@media (max-width: 991px) {
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .icon-wrapper {
+    width: 60px;
+    height: 60px;
+  }
+
+  .icon-wrapper i {
+    font-size: 2rem;
+  }
+
+  .stats-row {
+    gap: 1rem;
+  }
+
+  .stat-item {
+    padding: 0.5rem 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-section {
+    margin: -1rem -0.5rem 1.5rem -0.5rem;
+    padding: 1.5rem 0;
+  }
+
+  .hero-title {
+    font-size: 1.75rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+  }
+
+  .icon-wrapper {
+    width: 50px;
+    height: 50px;
+  }
+
+  .icon-wrapper i {
+    font-size: 1.5rem;
+  }
+
+  .stats-row {
+    justify-content: space-between;
+  }
+
+  .stat-item {
+    flex: 1;
+    min-width: calc(33.333% - 0.75rem);
+    padding: 0.5rem;
+    flex-direction: column;
+    text-align: center;
+    gap: 0.5rem;
+  }
+
+  .stat-item i {
+    font-size: 1.5rem;
+  }
+
+  .stat-item strong {
+    font-size: 1.1rem;
+  }
+
+  .location-card {
+    border-radius: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 1.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 0.9rem;
+  }
+
+  .stats-row {
+    gap: 0.5rem;
+  }
+
+  .stat-item {
+    min-width: calc(50% - 0.25rem);
+  }
+}
+
+/* Section Container */
+.section-container {
+  background: white;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.section-container:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Section Header */
+.section-header {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  padding: 1.5rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 3px solid #e5e7eb;
+}
+
+.section-header-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.section-icon-wrapper {
+  width: 60px;
+  height: 60px;
+  background: rgb(27, 161, 27);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.section-icon-available {
+  background: orange;
+  box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+}
+
+.section-icon-wrapper i {
+  font-size: 1.75rem;
+  color: white;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+}
+
+.section-subtitle {
+  font-size: 0.95rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.btn-gradient {
+  background: rgb(60, 60, 243);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+}
+
+.btn-gradient:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+.items-count-badge {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 0.625rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* Section Body */
+.section-body {
+  padding: 2rem;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.empty-state-icon {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 1.5rem;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-state-icon i {
+  font-size: 4rem;
+  color: #94a3b8;
+}
+
+.empty-state-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state-text {
+  color: #94a3b8;
+  font-size: 1rem;
+  margin-bottom: 0;
+}
+
+/* Items Grid */
+.items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Item Card */
+.item-card-wrapper {
+  animation: fadeInUp 0.5s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.item-card {
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  position: relative;
+  border: 2px solid #f1f5f9;
+}
+
+.item-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  border-color: #667eea;
+}
+
+.item-card-available {
+  border-color: #fce7f3;
+}
+
+.item-card-available:hover {
+  border-color: #f5576c;
+}
+
+/* Donated Card */
+.item-card-donated {
+  opacity: 0.65;
+  filter: grayscale(50%);
+}
+
+.item-card-donated:hover {
+  transform: translateY(-4px);
+}
+
+/* Status Badge */
+.card-status-badge {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  display: flex;
+  align-items: center;
+}
+
+.status-active {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+/* Distance Badge */
+.distance-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+  display: flex;
+  align-items: center;
+}
+
+/* Action Buttons */
+.card-action-buttons {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  z-index: 10;
+}
+
+.action-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.action-btn-edit {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: white;
+}
+
+.action-btn-edit:hover {
+  transform: translateY(-3px) rotate(5deg);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+}
+
+.action-btn-delete {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+}
+
+.action-btn-delete:hover {
+  transform: translateY(-3px) rotate(-5deg);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+
+.action-btn i {
+  font-size: 1rem;
+}
+
+/* Card Content */
+.card-content {
+  padding: 1.5rem;
+  padding-top: 4rem;
+}
+
+.card-image {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.card-image-available {
+  background: lightgreen;
+  box-shadow: 0 8px 20px rgba(245, 87, 108, 0.3);
+}
+
+.card-image i {
+  font-size: 2.5rem;
+  color: white;
+}
+
+.card-info {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.card-food-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+
+.card-quantity {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.shared-by {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.5rem;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Card Details */
+.card-details {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.detail-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+.detail-item:not(:last-child) {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.detail-item i {
+  color: #667eea;
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.detail-item span {
+  flex: 1;
+  word-break: break-word;
+}
+
+/* Card Footer */
+.card-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Expiry Badge */
+.expiry-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 1rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  width: 100%;
+}
+
+.expiry-urgent {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #dc2626;
+  border: 2px solid #fca5a5;
+}
+
+.expiry-warning {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #d97706;
+  border: 2px solid #fcd34d;
+}
+
+.expiry-normal {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  color: #059669;
+  border: 2px solid #6ee7b7;
+}
+
+/* Action Buttons */
+.btn-mark-donated,
+.btn-contact {
+  width: 100%;
+  padding: 0.875rem;
+  border-radius: 12px;
+  border: none;
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-mark-donated {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.btn-mark-donated:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.btn-contact {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+.btn-contact:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
 }
 
 /* Modal backdrop and positioning fixes */
@@ -1251,7 +2163,8 @@ async function canDonated(item) {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding-top: 3rem; /* Space for buttons */
+  padding-top: 3rem;
+  /* Space for buttons */
 }
 
 /* Content grows to push button to bottom */
@@ -1461,13 +2374,11 @@ async function canDonated(item) {
   left: 0;
   right: 0;
   bottom: 0;
-  background: repeating-linear-gradient(
-    45deg,
-    transparent,
-    transparent 10px,
-    rgba(0, 0, 0, 0.02) 10px,
-    rgba(0, 0, 0, 0.02) 20px
-  );
+  background: repeating-linear-gradient(45deg,
+      transparent,
+      transparent 10px,
+      rgba(0, 0, 0, 0.02) 10px,
+      rgba(0, 0, 0, 0.02) 20px);
   pointer-events: none;
   border-radius: 0.375rem;
   z-index: 1;
@@ -1497,7 +2408,8 @@ async function canDonated(item) {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .card-body {
-    padding-top: 3.5rem; /* More space on mobile */
+    padding-top: 3.5rem;
+    /* More space on mobile */
   }
 
   .action-buttons {
