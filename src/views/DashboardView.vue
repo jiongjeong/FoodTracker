@@ -1699,103 +1699,6 @@ onMounted(() => {
   background: #ede9e8;
   color: #333;
 }
-/* --- Stat Card Alignment Fix --- */
-.stat-card {
-  display: flex;
-  align-items: center; /* vertically align icon + text */
-  justify-content: space-between;
-  min-height: 150px;
-  padding: 20px 24px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, rgba(4, 99, 7, 0.8), rgba(56, 176, 0, 0.5));
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-  color: white;
-}
-
-/* Icon + Label container (fixed width) */
-.left-section {
-  flex: 0 0 90px; /* fixed width for all cards */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Icon Circle */
-.icon-circle {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-size: 24px;
-  background: rgba(255, 255, 255, 0.18);
-}
-
-/* Label under icon */
-.left-section small {
-  margin-top: 6px;
-  margin-left: 0px;
-  font-size: 13px;
-  color: #6b7684;
-  text-align: center;
-  width: 86px; /* consistent width */
-}
-
-/* Text section (dynamic width) */
-.content {
-  flex: 1;
-  text-align: right;
-}
-
-.content h3 {
-  font-size: 28px;
-  font-weight: 700;
-  margin-bottom: 2px;
-  color: #0f1b2d;
-}
-
-.content small {
-  font-size: 13px;
-  color: #6b7684;
-}
-
-/* Optional: Streak badge alignment */
-.streak-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #fff9ea;
-  border: 1px solid #f6e3b5;
-  font-size: 12px;
-  color: #7a6a3a;
-}
-
-/* --- Responsive tweak for mobile --- */
-@media (max-width: 575px) {
-  .stat-card {
-    flex-direction: column;
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  .left-section {
-    flex: unset;
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: 12px;
-    width: 100%;
-  }
-
-  .content {
-    text-align: left;
-    width: 100%;
-  }
-}
 
 .food-header {
   display: flex;
@@ -2089,18 +1992,6 @@ onMounted(() => {
   }
 }
 
-/* Streak badge styling */
-.streak-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  border-radius: 12px;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
 .streak-fire {
   display: inline-block;
   font-size: 1rem;
@@ -2149,13 +2040,5 @@ onMounted(() => {
   font-weight: 600;
 }
 
-/* Make stat-card position relative for absolute positioning */
-.stat-card {
-  position: relative;
-}
 
-.stat-card > * {
-  position: relative;
-  z-index: 1;
-}
 </style>
