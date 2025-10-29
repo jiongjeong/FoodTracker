@@ -4,7 +4,7 @@ import { db } from '../firebase.js';
 import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp, query, where } from 'firebase/firestore';
 import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
-import { Bar, Pie, Line } from 'vue-chartjs'
+import { Bar, Pie, Line, Doughnut  } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   Title,
@@ -538,13 +538,9 @@ const expiringSoon = computed(
     }).length,
 )
 
-const expired = computed(
-  () =>
-    foodItems.value.filter((food) => {
-      const daysLeft = getDaysLeft(food)
-      return daysLeft < 0
-    }).length,
-)
+const expired = computed(() => {
+  return activities.value.filter(a => a.activityType === 'expFood').length
+})
 
 const potentialLoss = computed(() =>
   foodItems.value
@@ -638,53 +634,239 @@ const chartOptions = {
   },
 }
 
-const wasteVsSavingsChart = computed(() => {
-  const waste = analytics.value.totalWaste.items || 0
-  const saved = analytics.value.totalSaved.items || 0
+// Waste vs Savings bar chart data
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+
+const toMonthIndex = (d) => {
+  if (!d) return null
+  const date = (d instanceof Date) ? d : new Date(d)
+  if (isNaN(date)) return null
+  return date.getMonth() // 0..11
+}
+
+const wasteVsSavingsData = computed(() => {
+  // Initialize 12 months to 0
+  const waste = Array(12).fill(0)
+  const saved = Array(12).fill(0)
+  for (const a of activities.value ?? []) {
+    const m = toMonthIndex(a.createdAt)
+    console.log(m)
+    if (m == null) continue
+
+    if (a.activityType === 'expFood') {
+      // count items (use quantity if provided)
+      waste[m] += Number(a.quantity) || 1
+    } else if (a.activityType === 'conFood' && a.note === 'fully consumed') {
+      saved[m] += Number(a.quantity) || 1
+    }
+  }
+
+  // Optional: show only months up to the latest activity, else full year
+  const lastIdx = Math.max(
+    waste.findLastIndex(v => v>0),
+    saved.findLastIndex(v => v>0)
+  )
+  const end = lastIdx >= 0 ? lastIdx + 1 : 12
+  const labels = MONTHS.slice(0, end)
+
   return {
-    labels: ['Waste', 'Saved'],
+    labels,
     datasets: [
       {
-        label: 'Items',
-        backgroundColor: ['#dc2626', '#16a34a'],
-        data: [waste, saved],
+        label: 'Savings',
+        data: saved.slice(0, end),
+        tension: 0.35,
+        fill: true,
+        backgroundColor: 'rgba(123, 97, 255, 0.25)', // purple fill
+        borderColor: '#7B61FF',
+        pointRadius: 0,
+        borderWidth: 2
+      },
+      {
+        label: 'Waste',
+        data: waste.slice(0, end),
+        tension: 0.35,
+        fill: true,
+        backgroundColor: 'rgba(255, 165, 0, 0.25)', // orange fill
+        borderColor: '#FFA449',
+        pointRadius: 0,
+        borderWidth: 2
+      }
+    ]
+  }
+})
+
+const wasteVsSavingsOpts = {
+  maintainAspectRatio: false,
+  responsive: true,
+  plugins: {
+    legend: { display: false }, // keep it clean; set to true if you want
+    tooltip: {
+      backgroundColor: '#111827',
+      titleColor: '#fff',
+      bodyColor: '#e5e7eb',
+      displayColors: false,
+      padding: 10,
+      callbacks: {
+        label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      grid: { display: false },
+      ticks: { color: '#9CA3AF', font: { weight: 600 } }
+    },
+    y: {
+      beginAtZero: true,
+      grid: { color: 'rgba(0,0,0,.06)', drawBorder: false },
+      ticks: { color: '#A3A3B0', precision: 0 } // integers
+    }
+  },
+  layout: { padding: { top: 6, right: 6, left: 6, bottom: 0 } },
+  animation: { duration: 600, easing: 'easeOutCubic' }
+}
+
+// Waste by category pie chart (simple breakdown based on activities)
+
+// tiny helper to add alpha to hex
+const hexA = (hex, a = 1) => {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16)
+  return `rgba(${r},${g},${b},${a})`
+}
+
+// Use local activities state for waste-by-category so logged expFood entries are included
+const wasteByCategoryChart = computed(() => {
+  const wasteActs = (activities.value || []).filter((a) => a.activityType === 'expFood')
+   console.log(wasteActs)
+  // console.log('wasteActs', wasteActs)
+  const counts = {}
+  wasteActs.forEach((a) => {
+    const cat = a.category || 'Unknown'
+    counts[cat] = counts[cat] = (counts[cat] || 0) + 1 
+  })
+  console.log(counts)
+  const labels = Object.keys(counts)
+  const data = labels.map((l) => counts[l])
+  return {
+    labels,
+    datasets: [
+      {
+        data,
+        backgroundColor: ['#eab308', '#f43f5e', '#10b981', '#3b82f6', '#a78bfa'],
       },
     ],
   }
 })
 
-const wasteByCategoryChart = computed(() => {
-  const wasteActs = activities.value.filter((a) => a.activityType === 'expFood')
-  const counts = {}
-  wasteActs.forEach((a) => {
-    const cat = a.category || 'Unknown'
-    counts[cat] = (counts[cat] || 0) + (Number(a.quantity) || 1)
-  })
-  const labels = Object.keys(counts)
-  const data = labels.map((l) => counts[l])
+/* ====== DESIGN BITS (center text like the screenshot) ====== */
+const centerTextPlugin = {
+  id: 'centerText',
+  afterDraw(chart) {
+    const { ctx, chartArea, data } = chart
+    if (!chartArea) return
+    const vals = data.datasets[0]?.data ?? []
+    const total = vals.reduce((a,b)=>a+b,0)
+    if (!total) return
+    const max = Math.max(...vals)
+    const pct = Math.round((max / total) * 100)
+    const x = (chartArea.left + chartArea.right) / 2
+    const y = (chartArea.top + chartArea.bottom) / 2
+
+  }
+}
+
+/* Rounded ring + gaps + thick cutout */
+const wasteRingOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#111827',
+      titleColor: '#fff',
+      bodyColor: '#e5e7eb',
+      displayColors: false,
+      padding: 10,
+      callbacks: {
+        label(ctx) {
+          const total = ctx.dataset.data.reduce((a,b)=>a+b,0) || 0
+          const val = ctx.parsed
+          const pct = total ? ((val/total)*100).toFixed(1) : 0
+          return `${ctx.label}: ${val} (${pct}%)`
+        }
+      }
+    }
+  },
+  animation: { duration: 700, easing: 'easeOutCubic' }
+}
+
+/* Style your dataset for the ring look */
+const chartDataStyled = computed(() => {
+  const base = wasteByCategoryChart.value
+  const ds = base.datasets[0]
   return {
-    labels,
-    datasets: [{ data, backgroundColor: ['#eab308', '#f43f5e', '#10b981', '#3b82f6', '#a78bfa'] }],
+    labels: base.labels,
+    datasets: [{
+      ...ds,
+      borderWidth: 0,
+      borderRadius: 0,
+      cutout: '72%'
+    }]
   }
 })
 
-const monthlySpendingChart = computed(() => {
-  const months = Array.from({ length: 12 }, (_, i) => i + 1)
-  const moneyByMonth = months.map(() => 0)
-  activities.value.forEach((a) => {
-    const d = new Date(a.createdAt)
-    if (!isNaN(d)) {
-      const m = d.getMonth()
-      moneyByMonth[m] += Number(a.price) || 0
+/* Build Top-3 legend underneath (by share) */
+const legendTop3 = computed(() => {
+  const labels = chartDataStyled.value.labels || []
+  const data = (chartDataStyled.value.datasets?.[0]?.data || []).slice()
+  const colors = (chartDataStyled.value.datasets?.[0]?.backgroundColor || []).slice()
+  const total = data.reduce((a,b)=>a+b,0) || 1
+
+  const rows = data.map((v, i) => ({
+    label: labels[i],
+    pct: Math.round((v/total)*100),
+    color: colors[i],
+    v
+  }))
+  return rows.sort((a,b)=>b.v - a.v).slice(0,3)
+})
+
+
+function leaderboardNudge(activities) {
+  // Count how many were wasted vs saved
+  const wasteCount = activities.filter(a => a.activityType === 'expFood').length
+  const saveCount  = activities.filter(a => a.activityType === 'conFood').length
+
+  // Calculate ratio and percentage wasted
+  const total = wasteCount + saveCount
+  const ratio = `${wasteCount}:${saveCount}`
+  const pctWasted = total > 0 ? Math.round((wasteCount / total) * 100) : 0
+
+  // Find top wasted categories
+  const wasteByCat = {}
+  activities.forEach(a => {
+    if (a.activityType === 'expFood') {
+      const cat = a.category || 'Unknown'
+      wasteByCat[cat] = (wasteByCat[cat] || 0) + 1
     }
   })
-  return {
-    labels: months.map((m) => new Date(0, m - 1).toLocaleString('en-US', { month: 'short' })),
-    datasets: [
-      { label: 'Spending', data: moneyByMonth, borderColor: '#0ea5a4', tension: 0.3, fill: false },
-    ],
-  }
-})
+
+  const topCats = Object.entries(wasteByCat)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([cat]) => cat)
+
+  // Build concise message
+  const tail = topCats.length
+    ? ` Try cutting down on ${topCats.join(', ')} to climb the leaderboard.`
+    : ` Keep reducing waste to boost your Food Score.`
+
+  return `Your current waste-to-save ratio is ${ratio} (${pctWasted}% wasted).${tail}`
+}
+const leaderboardMessage = computed(() => leaderboardNudge(activities.value))
 
 const toggleSortDirection = () => {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
@@ -1165,140 +1347,143 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="row g-3 mb-4" v-show="overviewCollapsed">
-        <div class="col-6 col-lg-3">
-          <div
-            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
-          >
-            <!-- Left: Icon + label -->
-            <div
-              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
-            >
-              <div
-                class="icon-circle mb-2"
-                style="background-color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6)"
-              >
-                <i class="bi bi-trash"></i>
-              </div>
-              <small class="text-muted text-center">Total Waste</small>
-            </div>
-
-            <!-- Right: Count -->
-            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0">${{ analytics.totalWaste.money }}</h3>
-              <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div
-            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
-          >
-            <!-- Left: Icon + label -->
-            <div
-              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
-            >
-              <div class="icon-circle mb-2">
-                <i class="bi bi-piggy-bank"></i>
-              </div>
-              <small class="text-muted text-center">Total Saved</small>
-            </div>
-
-            <!-- Right: Count -->
-            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0">{{ analytics.totalSaved.money }}</h3>
-              <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div
-            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
-          >
-            <!-- Left: Icon + label -->
-            <div
-              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
-            >
-              <div
-                class="icon-circle mb-2"
-                style="background-color: #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.6)"
-              >
-                <i class="bi bi-calendar-x"></i>
-              </div>
-              <small class="text-muted text-center">Reduction</small>
-            </div>
-
-            <!-- Right: Count -->
-            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0">{{ analytics.reduction }}%</h3>
-              <small class="text-muted">food used before expiry</small>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div
-            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
-          >
-            <!-- Left: Icon + label -->
-            <div
-              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
-            >
-              <div
-                class="icon-circle mb-2"
-                style="background-color: #5bc0eb; box-shadow: 0 0 15px rgba(91, 192, 235, 0.6)"
-              >
-                <i class="bi bi-box"></i>
-              </div>
-              <small class="text-muted text-center">Inventory</small>
-            </div>
-
-            <!-- Right: Count -->
-            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0">{{ analytics.inventory.value.toFixed(2) }}</h3>
-              <small class="text-muted">{{ analytics.inventory.items }} items</small>
-            </div>
-          </div>
-        </div>
-      </div>
+        
+            
 
       <!-- Charts Section -->
       <div class="row g-4 mb-3" v-show="overviewCollapsed">
-        <!-- Waste vs Savings Bar Chart -->
-        <div class="col-lg-4">
-          <div class="glass-card p-4">
-            <h5 class="mb-4">
-              <i class="bi bi-bar-chart me-2"></i>
-              Waste vs Savings
-            </h5>
-            <div style="height: 300px">
-              <Bar :data="wasteVsSavingsChart" :options="chartOptions" />
+        <div class="col-lg-8">
+          <div class="glass-card p-4 charts-left-card h-100 d-flex flex-column">
+            <div class="row g-0">
+              <!-- Left panel -->
+              <div class="col-md-4">
+  <div class="card border-0 shadow-sm h-100">
+    <div class="card-body">
+      <div class="d-flex align-items-center mb-2">
+        <div class="bg-warning bg-opacity-25 rounded-circle p-2 me-2">
+          <i class="bi bi-trophy text-warning fs-5"></i>
+        </div>
+        <h6 class="card-title fw-semibold mb-0">Leaderboard Insights</h6>
+      </div>
+      <p class="card-text text-secondary small mb-0">
+        {{ leaderboardMessage }}
+      </p>
+    </div>
+  </div>
+</div>
+
+              <!-- Right panel -->
+              <div class="col-md-8 p-3 p-md-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                  <h5 class="mb-0">
+                    <i class="bi bi-activity me-2"></i>
+                    Waste vs Savings
+                  </h5>
+                  <div class="d-flex align-items-center small fw-semibold">
+                    <span class="me-3 d-inline-flex align-items-center">
+                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
+                      Savings
+                    </span>
+                    <span class="d-inline-flex align-items-center">
+                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #FFA449;"></span>
+                      Waste
+                    </span>
+                  </div>
+                </div>
+                <div style="height:220px">
+                  <Line :data="wasteVsSavingsData" :options="wasteVsSavingsOpts" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Bottom KPI row -->
+            <div class="row g-3 mt-3 border-top">
+              <!-- Total Waste -->
+              <div class="col-6 col-xl-3">
+                <div class="d-flex align-items-center">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                    <i class="bi bi-trash fs-5"></i>
+                  </div>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="text-muted small mb-1">Total Waste</div>
+                    <div class="fw-bold h6 mb-0">${{ analytics.totalWaste.money.toFixed(2) }}</div>
+                    <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Total Saved -->
+              <div class="col-6 col-xl-3">
+                <div class="d-flex align-items-center">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
+                    <i class="bi bi-bag-check fs-5"></i>
+                  </div>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="text-muted small mb-1">Total Saved</div>
+                    <div class="fw-bold h6 mb-0">${{ analytics.totalSaved.money.toFixed(2) }}</div>
+                    <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Reduction -->
+              <div class="col-6 col-xl-3">
+                <div class="d-flex align-items-center">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(37, 99, 235, 0.1); color: #2563eb;">
+                    <i class="bi bi-graph-down-arrow fs-5"></i>
+                  </div>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="text-muted small mb-1">Reduction</div>
+                    <div class="fw-bold h6 mb-0">{{ analytics.reduction }}%</div>
+                    <small class="text-muted">waste reduction</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Inventory -->
+              <div class="col-6 col-xl-3">
+                <div class="d-flex align-items-center">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(249, 115, 22, 0.1); color: #f97316;">
+                    <i class="bi bi-box-seam fs-5"></i>
+                  </div>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="text-muted small mb-1">Inventory</div>
+                    <div class="fw-bold h6 mb-0">${{ analytics.inventory.value.toFixed(2) }}</div>
+                    <small class="text-muted">{{ analytics.inventory.items }} items</small>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Waste by Category Pie Chart -->
         <div class="col-lg-4">
           <div class="glass-card p-4">
-            <h5 class="mb-4">
+            <h5 class="mb-3">
               <i class="bi bi-pie-chart me-2"></i>
               Waste by Category
             </h5>
-            <div style="height: 300px">
-              <Pie :data="wasteByCategoryChart" :options="chartOptions" />
+            <div class="mx-auto" style="width:240px;height:300px;" v-if="chartDataStyled.datasets[0].data.length">
+              <Pie :data="chartDataStyled" :options="wasteRingOpts" :plugins="[centerTextPlugin]" />
             </div>
-          </div>
-        </div>
+            <p class="text-secondary small text-center my-4" v-else>No waste data yet</p>
 
-        <!-- Monthly Spending Trend -->
-        <div class="col-lg-4">
-          <div class="glass-card p-4">
-            <h5 class="mb-4">
-              <i class="bi bi-graph-up me-2"></i>
-              Monthly Spending Trend
-            </h5>
-            <div style="height: 300px">
-              <Line :data="monthlySpendingChart" :options="chartOptions" />
+            <div class="row text-center mt-3 g-0" v-if="legendTop3.length">
+              <div class="col" v-for="(item, i) in legendTop3" :key="i">
+                <div class="fw-bold fs-3">
+                  {{ item.pct }}<span class="fs-6">%</span>
+                </div>
+                <div class="d-inline-flex align-items-center gap-1 text-secondary small">
+                  <span class="rounded-circle" :style="{width:'8px',height:'8px',backgroundColor:item.color}"></span>
+                  {{ item.label }}
+                </div>
+              </div>
             </div>
+
+
+      
+
+           
           </div>
         </div>
       </div>
