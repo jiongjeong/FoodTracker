@@ -230,11 +230,11 @@ onMounted(() => {
   if (currentUser.value) loadAccessories()
 })
 
-function isUnlocked(acc) {
-  const userSnap = /* get from your existing user data or use a ref */
-  const monkey = userData.value?.monkey || { accessories: [] }
-  return monkey.accessories.includes(acc.id)
-}
+// function isUnlocked(acc) {
+//   const userSnap = /* get from your existing user data or use a ref */
+//   const monkey = userData.value?.monkey || { accessories: [] }
+//   return monkey.accessories.includes(acc.id)
+// }
 
 </script>
 
