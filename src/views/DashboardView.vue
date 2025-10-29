@@ -4,6 +4,18 @@ import { db } from '../firebase.js';
 import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp, query, where } from 'firebase/firestore';
 import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
+import {
+  chartOptions,
+  wasteVsSavingsOpts,
+  wasteRingOpts,
+  centerTextPlugin,
+  buildWasteVsSavingsData,
+  buildWasteByCategoryChart,
+  styleAsRing,
+  buildTop3Legend,
+  WASTE_COLORS,
+  leaderboardNudge
+} from '@/composables/dashboardDesign'
 import { Bar, Pie, Line, Doughnut  } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -17,7 +29,6 @@ import {
   PointElement,
   LineElement,
 } from 'chart.js'
-
 // Register Chart.js components
 ChartJS.register(
   Title,
@@ -153,7 +164,12 @@ const categoryUnits = {
   'Breakfast & Cereal': ['box(es)', 'bag(s)', 'pack(s)', 'kg(s)', 'gram(s)', 'bottle(s)'],
   Other: ['piece(s)', 'unit(s)', 'pack(s)', 'box(es)', 'kg(s)', 'gram(s)'],
 }
-
+// Build charts and leaderboard from the local `activities` ref using shared builders
+const wasteVsSavingsData = computed(() => buildWasteVsSavingsData(activities.value || []))
+const basePie = computed(() => buildWasteByCategoryChart(activities.value || [], WASTE_COLORS))
+const chartDataStyled = computed(() => styleAsRing(basePie.value))
+const legendTop3 = computed(() => buildTop3Legend(basePie.value.labels, basePie.value.datasets[0]?.data || [], basePie.value.datasets[0]?.backgroundColor || WASTE_COLORS))
+const leaderboardMessage = computed(() => leaderboardNudge(activities.value || []))
 // Functions
 function showToastFor(msg, ms = 2200) {
   toastMessage.value = msg
@@ -624,249 +640,7 @@ watchEffect(async () => {
   }
 });
 
-// Chart data
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: true },
-    title: { display: false },
-  },
-}
 
-// Waste vs Savings bar chart data
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-
-
-const toMonthIndex = (d) => {
-  if (!d) return null
-  const date = (d instanceof Date) ? d : new Date(d)
-  if (isNaN(date)) return null
-  return date.getMonth() // 0..11
-}
-
-const wasteVsSavingsData = computed(() => {
-  // Initialize 12 months to 0
-  const waste = Array(12).fill(0)
-  const saved = Array(12).fill(0)
-  for (const a of activities.value ?? []) {
-    const m = toMonthIndex(a.createdAt)
-    console.log(m)
-    if (m == null) continue
-
-    if (a.activityType === 'expFood') {
-      // count items (use quantity if provided)
-      waste[m] += Number(a.quantity) || 1
-    } else if (a.activityType === 'conFood' && a.note === 'fully consumed') {
-      saved[m] += Number(a.quantity) || 1
-    }
-  }
-
-  // Optional: show only months up to the latest activity, else full year
-  const lastIdx = Math.max(
-    waste.findLastIndex(v => v>0),
-    saved.findLastIndex(v => v>0)
-  )
-  const end = lastIdx >= 0 ? lastIdx + 1 : 12
-  const labels = MONTHS.slice(0, end)
-
-  return {
-    labels,
-    datasets: [
-      {
-        label: 'Savings',
-        data: saved.slice(0, end),
-        tension: 0.35,
-        fill: true,
-        backgroundColor: 'rgba(123, 97, 255, 0.25)', // purple fill
-        borderColor: '#7B61FF',
-        pointRadius: 0,
-        borderWidth: 2
-      },
-      {
-        label: 'Waste',
-        data: waste.slice(0, end),
-        tension: 0.35,
-        fill: true,
-        backgroundColor: 'rgba(255, 165, 0, 0.25)', // orange fill
-        borderColor: '#FFA449',
-        pointRadius: 0,
-        borderWidth: 2
-      }
-    ]
-  }
-})
-
-const wasteVsSavingsOpts = {
-  maintainAspectRatio: false,
-  responsive: true,
-  plugins: {
-    legend: { display: false }, // keep it clean; set to true if you want
-    tooltip: {
-      backgroundColor: '#111827',
-      titleColor: '#fff',
-      bodyColor: '#e5e7eb',
-      displayColors: false,
-      padding: 10,
-      callbacks: {
-        label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}`
-      }
-    }
-  },
-  scales: {
-    x: {
-      grid: { display: false },
-      ticks: { color: '#9CA3AF', font: { weight: 600 } }
-    },
-    y: {
-      beginAtZero: true,
-      grid: { color: 'rgba(0,0,0,.06)', drawBorder: false },
-      ticks: { color: '#A3A3B0', precision: 0 } // integers
-    }
-  },
-  layout: { padding: { top: 6, right: 6, left: 6, bottom: 0 } },
-  animation: { duration: 600, easing: 'easeOutCubic' }
-}
-
-// Waste by category pie chart (simple breakdown based on activities)
-
-// tiny helper to add alpha to hex
-const hexA = (hex, a = 1) => {
-  const h = hex.replace('#', '')
-  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16)
-  return `rgba(${r},${g},${b},${a})`
-}
-
-// Use local activities state for waste-by-category so logged expFood entries are included
-const wasteByCategoryChart = computed(() => {
-  const wasteActs = (activities.value || []).filter((a) => a.activityType === 'expFood')
-   console.log(wasteActs)
-  // console.log('wasteActs', wasteActs)
-  const counts = {}
-  wasteActs.forEach((a) => {
-    const cat = a.category || 'Unknown'
-    counts[cat] = counts[cat] = (counts[cat] || 0) + 1 
-  })
-  console.log(counts)
-  const labels = Object.keys(counts)
-  const data = labels.map((l) => counts[l])
-  return {
-    labels,
-    datasets: [
-      {
-        data,
-        backgroundColor: ['#eab308', '#f43f5e', '#10b981', '#3b82f6', '#a78bfa'],
-      },
-    ],
-  }
-})
-
-/* ====== DESIGN BITS (center text like the screenshot) ====== */
-const centerTextPlugin = {
-  id: 'centerText',
-  afterDraw(chart) {
-    const { ctx, chartArea, data } = chart
-    if (!chartArea) return
-    const vals = data.datasets[0]?.data ?? []
-    const total = vals.reduce((a,b)=>a+b,0)
-    if (!total) return
-    const max = Math.max(...vals)
-    const pct = Math.round((max / total) * 100)
-    const x = (chartArea.left + chartArea.right) / 2
-    const y = (chartArea.top + chartArea.bottom) / 2
-
-  }
-}
-
-/* Rounded ring + gaps + thick cutout */
-const wasteRingOpts = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      backgroundColor: '#111827',
-      titleColor: '#fff',
-      bodyColor: '#e5e7eb',
-      displayColors: false,
-      padding: 10,
-      callbacks: {
-        label(ctx) {
-          const total = ctx.dataset.data.reduce((a,b)=>a+b,0) || 0
-          const val = ctx.parsed
-          const pct = total ? ((val/total)*100).toFixed(1) : 0
-          return `${ctx.label}: ${val} (${pct}%)`
-        }
-      }
-    }
-  },
-  animation: { duration: 700, easing: 'easeOutCubic' }
-}
-
-/* Style your dataset for the ring look */
-const chartDataStyled = computed(() => {
-  const base = wasteByCategoryChart.value
-  const ds = base.datasets[0]
-  return {
-    labels: base.labels,
-    datasets: [{
-      ...ds,
-      borderWidth: 0,
-      borderRadius: 0,
-      cutout: '72%'
-    }]
-  }
-})
-
-/* Build Top-3 legend underneath (by share) */
-const legendTop3 = computed(() => {
-  const labels = chartDataStyled.value.labels || []
-  const data = (chartDataStyled.value.datasets?.[0]?.data || []).slice()
-  const colors = (chartDataStyled.value.datasets?.[0]?.backgroundColor || []).slice()
-  const total = data.reduce((a,b)=>a+b,0) || 1
-
-  const rows = data.map((v, i) => ({
-    label: labels[i],
-    pct: Math.round((v/total)*100),
-    color: colors[i],
-    v
-  }))
-  return rows.sort((a,b)=>b.v - a.v).slice(0,3)
-})
-
-
-function leaderboardNudge(activities) {
-  // Count how many were wasted vs saved
-  const wasteCount = activities.filter(a => a.activityType === 'expFood').length
-  const saveCount  = activities.filter(a => a.activityType === 'conFood').length
-
-  // Calculate ratio and percentage wasted
-  const total = wasteCount + saveCount
-  const ratio = `${wasteCount}:${saveCount}`
-  const pctWasted = total > 0 ? Math.round((wasteCount / total) * 100) : 0
-
-  // Find top wasted categories
-  const wasteByCat = {}
-  activities.forEach(a => {
-    if (a.activityType === 'expFood') {
-      const cat = a.category || 'Unknown'
-      wasteByCat[cat] = (wasteByCat[cat] || 0) + 1
-    }
-  })
-
-  const topCats = Object.entries(wasteByCat)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 2)
-    .map(([cat]) => cat)
-
-  // Build concise message
-  const tail = topCats.length
-    ? ` Try cutting down on ${topCats.join(', ')} to climb the leaderboard.`
-    : ` Keep reducing waste to boost your Food Score.`
-
-  return `Your current waste-to-save ratio is ${ratio} (${pctWasted}% wasted).${tail}`
-}
-const leaderboardMessage = computed(() => leaderboardNudge(activities.value))
 
 const toggleSortDirection = () => {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
