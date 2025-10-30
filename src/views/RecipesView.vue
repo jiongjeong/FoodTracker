@@ -396,272 +396,334 @@ onAuthStateChanged(auth, async (u) => {
 </script>
 
 <template>
+ 
+<div class="recipe-discovery-page" style="background: linear-gradient(180deg, #e8f5e9 0%, #ffffff 100%); min-height: 100vh;">
   <div class="container-fluid p-4">
-    <div class="mb-4">
-      <h1 class="h2 mb-2">Recipe Discovery</h1>
-      <p class="text-muted">Search recipes and discover delicious meals</p>
-    </div>
+    <!-- Hero Section -->
+   <div class="hero-card position-relative p-4 p-md-5 mb-4 overflow-hidden">
+    <p class="lead text-green-muted mb-0">
+      Discover fresh recipes to cut waste and boost flavor 🌿
+    </p>
 
-    <!-- Search Section -->
-    <div class="glass-card p-4 mb-4">
-      <!-- Error Message -->
-      <div v-if="errorMessage" class="alert alert-danger d-flex align-items-center mb-3">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-        <span>{{ errorMessage }}</span>
-        <button type="button" class="btn-close ms-auto" @click="errorMessage = ''"></button>
+
+
+      <div class="mb-4">
+        <h1 class="display-6 fw-bold mb-2">Feeling hungry?</h1>
+        <h2 class="h3 text-muted">What are we cookin' today?</h2>
       </div>
-      
-      <div class="row g-3 align-items-end">
-        <div class="col-md-8">
-          <label class="form-label">Search for recipes</label>
+
+      <!-- Search Bar -->
+      <div class="search-bar-container mb-4">
+        <div class="input-group shadow-sm" style="border-radius: 50px; overflow: hidden; background: white;">
+          <span class="input-group-text border-0 bg-white ps-4">
+            <i class="bi bi-search text-muted"></i>
+          </span>
           <input
             v-model="searchQuery"
             type="text"
-            class="form-control"
-            placeholder="Enter recipe name, ingredient, or cuisine..."
+            class="form-control border-0"
+            placeholder="Search any recipe..."
             @keyup.enter="handleSearch"
+            style="padding: 15px 10px;"
           />
-        </div>
-        <div class="col-md-4">
-          <button @click="handleSearch" class="btn btn-primary w-100" :disabled="isLoading">
-            <i class="bi bi-search me-2"></i>
-            {{ isLoading ? 'Searching...' : 'Search Recipes' }}
+          <button class="btn border-0 bg-white pe-4">
+            <i class="bi bi-sliders text-muted fs-5"></i>
           </button>
         </div>
+      </div>
+
+      <!-- Category Pills -->
+      <div 
+          class="category-pills d-flex gap-2 overflow-auto pb-2 mb-3"
+          style="scrollbar-width: none; -ms-overflow-style: none;"
+        >
+        <button 
+          @click="activeTab = 'search'; searchQuery = ''"
+          class="btn rounded-pill flex-shrink-0 px-4 py-2"
+          :class="activeTab === 'search' ? 'btn-success text-white shadow-active' : 'btn-light shadow-soft'"
+          style="white-space: nowrap;"
+        >
+          See All
+        </button>
+
+        <button 
+          @click="activeTab = 'suggested'"
+          class="btn rounded-pill flex-shrink-0 px-4 py-2"
+          :class="activeTab === 'suggested' ? 'btn-success text-white shadow-active' : 'btn-light shadow-soft'"
+          style="white-space: nowrap;"
+        >
+          <span class="me-2">💡</span>
+          Recommended
+      </button>
+        <button 
+          @click="activeTab = 'bookmarked'"
+          class="btn rounded-pill flex-shrink-0 px-4 py-2"
+          :class="activeTab === 'bookmarked' ? 'btn-success text-white shadow-active' : 'btn-light shadow-soft'"
+          style="white-space: nowrap;"
+        >
+          <span class="me-2">❤️</span>
+          Bookmarked
+        </button>
       </div>
     </div>
 
-    <!-- Navigation Tabs -->
-    <div class="glass-card p-4 mb-4">
-      <ul class="nav nav-tabs border-0 mb-4">
-        <li class="nav-item">
-          <button
-            class="nav-link"
-            :class="{ active: activeTab === 'search' }"
-            @click="activeTab = 'search'"
-          >
-            <i class="bi bi-search me-2"></i>
-            Search Results
-            <span v-if="searchResults.length" class="badge bg-primary ms-2">{{ searchResults.length }}</span>
-          </button>
-        </li>
-        <li class="nav-item">
-          <button
-            class="nav-link"
-            :class="{ active: activeTab === 'suggested' }"
-            @click="activeTab = 'suggested'"
-          >
-            <i class="bi bi-lightbulb me-2"></i>
-            Suggested Recipes
-            <span v-if="suggestedRecipes.length" class="badge bg-success ms-2">{{ suggestedRecipes.length }}</span>
-          </button>
-        </li>
-        <li class="nav-item">
-          <button
-            class="nav-link"
-            :class="{ active: activeTab === 'bookmarked' }"
-            @click="activeTab = 'bookmarked'"
-          >
-            <i class="bi bi-bookmark-heart me-2"></i>
-            Bookmarked
-            <span v-if="bookmarkedRecipes.length" class="badge bg-warning ms-2">{{ bookmarkedRecipes.length }}</span>
-          </button>
-        </li>
-      </ul>
+    <!-- Error Message -->
+    <div v-if="errorMessage" class="alert alert-danger d-flex align-items-center mb-4 rounded-4">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      <span>{{ errorMessage }}</span>
+      <button type="button" class="btn-close ms-auto" @click="errorMessage = ''"></button>
+    </div>
 
-      <!-- Loading State -->
-      <div v-if="isLoading" class="text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Loading...</span>
+    <!-- Loading State -->
+    <div v-if="isLoading" class="text-center py-5">
+      <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="text-muted mt-3 fw-semibold">Finding delicious recipes...</p>
+    </div>
+
+    <!-- Content based on active tab -->
+    <div v-else>
+      <!-- Search Results Tab -->
+      <div v-if="activeTab === 'search'">
+        <div v-if="searchResults.length === 0" class="text-center py-5">
+          <i class="bi bi-search display-1 text-muted opacity-25"></i>
+          <h5 class="mt-3">Search for recipes</h5>
+          <p class="text-muted">Enter a recipe name, ingredient, or cuisine type to get started</p>
         </div>
-        <p class="text-muted mt-3">Finding delicious recipes...</p>
+        <div v-else>
+          <div class="d-flex align-items-center mb-3">
+            <h4 class="fw-bold mb-0">Search Results</h4>
+            <span class="badge bg-primary mx-2">{{ searchResults.length }} recipes</span>
+          </div>
+          <div class="row g-3">
+            <div v-for="recipe in searchResults" :key="recipe.id" class="col-12 col-md-6 col-lg-4">
+              <div class="recipe-card position-relative shadow-sm" style="border-radius: 20px; overflow: hidden; background: white; cursor: pointer;" @click="viewRecipe(recipe)">
+                <div class="recipe-image-container position-relative" style="height: 250px;">
+                  <img :src="recipe.image" :alt="recipe.name" class="w-100 h-100" style="object-fit: cover;" />
+                  
+                  <button 
+                    @click.stop="toggleBookmark(recipe)"
+                    class="position-absolute top-0 end-0 m-3 btn btn-light rounded-circle p-0"
+                    style="width: 40px; height: 40px;"
+                    :class="{ 'btn-warning': isRecipeBookmarked(recipe.id) }"
+                  >
+                    <i :class="isRecipeBookmarked(recipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'"></i>
+                  </button>
+                </div>
+
+                <div class="recipe-info p-3">
+                  <h6 class="fw-bold mb-2 text-truncate">{{ recipe.name }}</h6>
+                  <p class="text-muted small mb-2">{{ recipe.category }} • {{ recipe.area }}</p>
+                  <div class="mb-0">
+                    <small class="text-info">
+                      <i class="bi bi-check-circle me-1"></i>
+                      You have {{ countUserIngredients(recipe) }} of {{ recipe.ingredients.length }} ingredients
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Empty States -->
-      <div v-else-if="displayedRecipes.length === 0" class="text-center py-5">
-        <div v-if="activeTab === 'search'">
-          <i class="bi bi-search display-1 text-muted mb-3"></i>
-          <template v-if="searchQuery && searchQuery.trim()">
-            <h5>No recipes found</h5>
-            <p class="text-muted">Try a different ingredient or recipe name</p>
-          </template>
-          <template v-else>
-            <h5>Search for recipes</h5>
-            <p class="text-muted">Enter a recipe name, ingredient, or cuisine type to get started</p>
-          </template>
-        </div>
-        <div v-else-if="activeTab === 'suggested'">
-          <i class="bi bi-lightbulb display-1 text-muted mb-3"></i>
-          <h5>No suggested recipes</h5>
+      <!-- Suggested Recipes Tab -->
+      <div v-else-if="activeTab === 'suggested'">
+        <div v-if="suggestedRecipes.length === 0" class="text-center py-5">
+          <i class="bi bi-lightbulb display-1 text-muted opacity-25"></i>
+          <h5 class="mt-3">No suggested recipes</h5>
           <p class="text-muted">No food items expiring soon, or no recipes found for your ingredients</p>
         </div>
-        <div v-else-if="activeTab === 'bookmarked'">
-          <i class="bi bi-bookmark display-1 text-muted mb-3"></i>
-          <h5>No bookmarked recipes</h5>
-          <p class="text-muted">Bookmark recipes you like to save them for later</p>
+        <div v-else>
+          <div class="d-flex align-items-center mb-3">
+            <h4 class="fw-bold mb-0">Recommended For You</h4>
+            <span class="badge bg-success mx-2">{{ suggestedRecipes.length }} recipes</span>
+          </div>
+          <div class="row g-3">
+            <div v-for="recipe in suggestedRecipes" :key="recipe.id" class="col-12 col-md-6 col-lg-4">
+              <div class="recipe-card position-relative shadow-sm" style="border-radius: 20px; overflow: hidden; background: white; cursor: pointer;" @click="viewRecipe(recipe)">
+                <div class="recipe-image-container position-relative" style="height: 250px;">
+                  <img :src="recipe.image" :alt="recipe.name" class="w-100 h-100" style="object-fit: cover;" />
+                  
+                  <div class="position-absolute top-0 start-0 m-3 px-3 py-2 rounded-pill" style="background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px);">
+                    <span class="text-white small fw-semibold">
+                      <i class="bi bi-clock me-1"></i>30 mins
+                    </span>
+                  </div>
+
+                  <button 
+                    @click.stop="toggleBookmark(recipe)"
+                    class="position-absolute top-0 end-0 m-3 btn btn-light rounded-circle p-0"
+                    style="width: 40px; height: 40px; backdrop-filter: blur(10px);"
+                    :class="{ 'btn-warning': isRecipeBookmarked(recipe.id) }"
+                  >
+                    <i :class="isRecipeBookmarked(recipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'"></i>
+                  </button>
+                </div>
+
+                <div class="recipe-info p-3">
+                  <h6 class="fw-bold mb-2 text-truncate">{{ recipe.name }}</h6>
+                  <p class="text-muted small mb-2 text-truncate">{{ recipe.category }} • {{ recipe.area }}</p>
+                  <div v-if="recipe.suggestedBy && recipe.suggestedBy.length" class="mb-0">
+                    <small class="text-danger">
+                      <i class="bi bi-lightbulb-fill me-1"></i>
+                      Expiring: {{ recipe.suggestedBy.slice(0, 2).join(', ') }}
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Recipe Grid -->
-      <div v-else class="row g-4">
-        <div v-for="recipe in displayedRecipes" :key="recipe.id" class="col-md-6 col-lg-4">
-          <div class="card h-100 shadow-sm recipe-card">
-            <div class="position-relative" style="height: 200px; overflow: hidden;">
-              <img :src="recipe.image" :alt="recipe.name" class="card-img-top recipe-image" style="object-fit: cover; height: 100%;" />
-              <button 
-                @click="toggleBookmark(recipe)"
-                class="btn btn-light position-absolute top-0 end-0 m-2 rounded-circle bookmark-btn"
-                :class="{ bookmarked: isRecipeBookmarked(recipe.id) }"
-                style="width: 40px; height: 40px;"
-              >
-                <i :class="isRecipeBookmarked(recipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'"></i>
-              </button>
-            </div>
-            <div class="card-body d-flex flex-column recipe-content">
-              <h6 class="card-title recipe-title mb-2">{{ recipe.name }}</h6>
-              <div class="mb-3 recipe-meta">
-                <span class="badge bg-light text-dark me-2">{{ recipe.category }}</span>
-                <span class="badge bg-secondary">{{ recipe.area }}</span>
-              </div>
-              <div class="mb-2 recipe-ingredients">
-                <small class="text-muted">
-                  <strong>Ingredients: </strong>
-                  <span v-if="recipe.ingredients && recipe.ingredients.length">You have {{ countUserIngredients(recipe) }} of {{ recipe.ingredients.length }} ingredients</span>
-                  <span v-else>—</span>
-                </small>
-              </div>
-              <div v-if="recipe.suggestedBy && recipe.suggestedBy.length" class="mb-2 recipe-suggestion">
-                <small class="text-danger">
-                  <i class="bi bi-lightbulb me-1"></i>
-                  Expiring Soon: {{ recipe.suggestedBy.join(', ') }}
-                </small>
-              </div>
-              <div class="mt-auto recipe-button-container">
-                <button @click="viewRecipe(recipe)" class="btn btn-primary btn-sm w-100">
-                  <i class="bi bi-eye me-2"></i>
-                  View Recipe
-                </button>
+      <!-- Bookmarked Recipes Tab -->
+      <div v-else-if="activeTab === 'bookmarked'">
+        <div v-if="bookmarkedRecipeObjects.length === 0" class="text-center py-5">
+          <i class="bi bi-bookmark-heart display-1 text-muted opacity-25"></i>
+          <h5 class="mt-3">No bookmarked recipes</h5>
+          <p class="text-muted">Bookmark recipes you like to save them for later</p>
+        </div>
+        <div v-else>
+          <div class="d-flex align-items-center mb-3">
+            <h4 class="fw-bold mb-0">Your Bookmarks</h4>
+            <span class="badge bg-warning mx-2">{{ bookmarkedRecipeObjects.length }} recipes</span>
+          </div>
+          <div class="row g-3">
+            <div v-for="recipe in bookmarkedRecipeObjects" :key="recipe.id" class="col-12 col-md-6 col-lg-4">
+              <div class="recipe-card position-relative shadow-sm" style="border-radius: 20px; overflow: hidden; background: white; cursor: pointer;" @click="viewRecipe(recipe)">
+                <div class="recipe-image-container position-relative" style="height: 250px;">
+                  <img :src="recipe.image" :alt="recipe.name" class="w-100 h-100" style="object-fit: cover;" />
+                  
+                  <button 
+                    @click.stop="toggleBookmark(recipe)"
+                    class="position-absolute top-0 end-0 m-3 btn btn-warning rounded-circle p-0"
+                    style="width: 40px; height: 40px;"
+                  >
+                    <i class="bi bi-bookmark-heart-fill"></i>
+                  </button>
+                </div>
+
+                <div class="recipe-info p-3">
+                  <h6 class="fw-bold mb-2 text-truncate">{{ recipe.name }}</h6>
+                  <p class="text-muted small mb-0 text-truncate">{{ recipe.category }} • {{ recipe.area }}</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Recipe Detail Modal -->
-    <div v-if="showRecipeModal && selectedRecipe" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
-      <div class="modal-backdrop fade show" @click="showRecipeModal = false" style="z-index: 1050;"></div>
-      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style="z-index: 1060;">
-        <div class="modal-content">
-          <div class="modal-body p-0">
-            <button type="button" class="modal-close-btn" @click="showRecipeModal = false">
-              <i class="bi bi-x-lg"></i>
-            </button>
-            <div class="row g-0 flex-column flex-md-row">
-              <div class="col-md-5 order-1 order-md-0 d-flex flex-grow">
-                <div class="modal-image-section p-4 d-flex flex-column">
-                  <img :src="selectedRecipe.image" :alt="selectedRecipe.name" class="img-fluid rounded-3 mb-4 w-100" style="aspect-ratio: 1; object-fit: cover;" />
-                  
-                  <div class="card mb-4">
-                    <div class="card-body">
-                      <h6 class="card-title mb-3"><i class="bi bi-info-circle me-2"></i>Recipe Info</h6>
-                      <div class="row g-2">
-                        <div class="col-6">
-                          <small class="text-muted d-block">Category</small>
-                          <span class="badge bg-primary">{{ selectedRecipe.category }}</span>
-                        </div>
-                        <div class="col-6">
-                          <small class="text-muted d-block">Origin</small>
-                          <span class="badge bg-success">{{ selectedRecipe.area }}</span>
-                        </div>
-                      </div>
-                    </div>
+  <!-- Recipe Detail Modal -->
+  <div v-if="showRecipeModal && selectedRecipe" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
+    <div class="modal-backdrop fade show" @click="showRecipeModal = false" style="z-index: 1050;"></div>
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style="z-index: 1060;">
+      <div class="modal-content rounded-4">
+        <div class="modal-body p-0">
+          <button type="button" class="btn-close position-absolute top-0 end-0 m-3" style="z-index: 10;" @click="showRecipeModal = false"></button>
+          
+          <div class="row g-0">
+            <div class="col-md-5">
+              <div class="p-4">
+                <img :src="selectedRecipe.image" :alt="selectedRecipe.name" class="img-fluid rounded-3 mb-3 w-100" style="aspect-ratio: 1; object-fit: cover;" />
+                
+                <div class="mb-3">
+                  <h6 class="fw-bold mb-2"><i class="bi bi-info-circle me-2"></i>Recipe Info</h6>
+                  <div class="d-flex gap-2 mb-2">
+                    <span class="badge bg-primary">{{ selectedRecipe.category }}</span>
+                    <span class="badge bg-success">{{ selectedRecipe.area }}</span>
                   </div>
+                </div>
 
-                  <div class="card flex-grow-1">
-                    <div class="card-body">
-                      <h6 class="card-title mb-3 "><i class="bi bi-list-ul me-2"></i>Ingredients</h6>
-                      <div class="ingredients-list flex-grow-1 overflow-y-auto" style="max-height:250px; ">
-                        <div v-for="ingredient in selectedRecipe.ingredients" :key="ingredient" class="d-flex align-items-center mb-2">
-                            <i class="bi bi-dot text-primary me-2"></i>
-                            <span>{{ ingredient }}</span>
-                          </div>
-                        </div>
-                      </div>
+                <div>
+                  <h6 class="fw-bold mb-2"><i class="bi bi-list-ul me-2"></i>Ingredients</h6>
+                  <div style="max-height: 250px; overflow-y: auto;">
+                    <div v-for="ingredient in selectedRecipe.ingredients" :key="ingredient" class="d-flex align-items-center mb-2">
+                      <i class="bi bi-dot text-primary me-2"></i>
+                      <span class="small">{{ ingredient }}</span>
                     </div>
                   </div>
                 </div>
-                <div class="col-md-7 order-0 order-md-1 d-flex flex-column">
-                  <div class="modal-content-section p-4 d-flex flex-column flex-grow-1">
-                    <div class="recipe-name-section mb-4">
-                      <h3 class="recipe-name">{{ selectedRecipe.name }}</h3>
-                      <p class="text-muted mb-0">Follow these step-by-step instructions</p>
-                    </div>
-                    <div class="instructions-section mb-4 flex-grow-1 d-flex flex-column">
-                      <h6 class="mb-3"><i class="bi bi-clipboard-check me-2"></i>Instructions</h6>
-                      <div class="instructions-content flex-grow-1">
-                        <div class="instructions-text">
-                          <p class="formatted-instructions">{{ selectedRecipe.instructions }}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="action-buttons-section mt-auto">
-                      <div class="d-flex gap-2 justify-content-center">
-                        <button 
-                          @click="toggleBookmark(selectedRecipe)"
-                          class="btn btn-sm flex-fill"
-                          :class="isRecipeBookmarked(selectedRecipe.id) ? 'btn-warning' : 'btn-outline-warning'"
-                        >
-                          <i :class="isRecipeBookmarked(selectedRecipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'" class="me-1"></i>
-                          {{ isRecipeBookmarked(selectedRecipe.id) ? 'Saved' : 'Save' }}
-                        </button>
-                        <a v-if="selectedRecipe.video" :href="selectedRecipe.video" target="_blank" class="btn btn-outline-danger btn-sm flex-fill">
-                          <i class="bi bi-play-circle me-1"></i>
-                          Video
-                        </a>
-                        <a v-if="selectedRecipe.source" :href="selectedRecipe.source" target="_blank" class="btn btn-outline-primary btn-sm flex-fill">
-                          <i class="bi bi-link-45deg me-1"></i>
-                          Source
-                        </a>
-                      </div>
-                    </div>
-                  </div>
+              </div>
+            </div>
+            
+            <div class="col-md-7 d-flex flex-column">
+              <div class="p-4 flex-grow-1 d-flex flex-column">
+                <div class="mb-3">
+                  <h3 class="fw-bold">{{ selectedRecipe.name }}</h3>
+                  <p class="text-muted">Follow these step-by-step instructions</p>
+                </div>
+                
+                <div class="flex-grow-1 mb-3" style="overflow-y: auto;">
+                  <h6 class="fw-bold mb-2"><i class="bi bi-clipboard-check me-2"></i>Instructions</h6>
+                  <p class="text-secondary" style="white-space: pre-line;">{{ selectedRecipe.instructions }}</p>
+                </div>
+                
+                <div class="d-flex gap-2">
+                  <button 
+                    @click="toggleBookmark(selectedRecipe)"
+                    class="btn btn-sm flex-fill"
+                    :class="isRecipeBookmarked(selectedRecipe.id) ? 'btn-warning' : 'btn-outline-warning'"
+                  >
+                    <i :class="isRecipeBookmarked(selectedRecipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'" class="me-1"></i>
+                    {{ isRecipeBookmarked(selectedRecipe.id) ? 'Saved' : 'Save' }}
+                  </button>
+                  <a v-if="selectedRecipe.video" :href="selectedRecipe.video" target="_blank" class="btn btn-outline-danger btn-sm flex-fill">
+                    <i class="bi bi-play-circle me-1"></i>Video
+                  </a>
+                  <a v-if="selectedRecipe.source" :href="selectedRecipe.source" target="_blank" class="btn btn-outline-primary btn-sm flex-fill">
+                    <i class="bi bi-link-45deg me-1"></i>Source
+                  </a>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+    </div>
   </div>
+</div>
 </template>
 
 <style scoped>
+.shadow-soft {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s ease-in-out;
+}
+
+/* Slightly lifted shadow + glow for active tab */
+.shadow-active {
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3), 0 0 4px rgba(34, 197, 94, 0.4);
+  transition: all 0.25s ease-in-out;
+}
+
+/* Subtle lift on hover */
+.category-pills .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
 .recipe-card {
-  background: white;
-  border-radius: 0.75rem;
-  overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .recipe-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15) !important;
 }
 
-.recipe-image-container {
-  position: relative;
-  height: 200px;
-  overflow: hidden;
-}
-
-.recipe-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.recipe-card .recipe-image-container::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.3), transparent);
+  pointer-events: none;
 }
 
 .bookmark-btn {
@@ -693,25 +755,6 @@ onAuthStateChanged(auth, async (u) => {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-}
-
-.nav-tabs .nav-link {
-  border: none;
-  background: none;
-  color: #6c757d;
-  border-radius: 0.5rem;
-  margin-right: 0.5rem;
-  padding: 0.75rem 1rem;
-}
-
-.nav-tabs .nav-link.active {
-  background: var(--primary-green);
-  color: white;
-}
-
-.nav-tabs .nav-link:hover:not(.active) {
-  background: rgba(5, 150, 105, 0.1);
-  color: #059669;
 }
 
 .modal {

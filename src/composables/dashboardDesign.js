@@ -72,16 +72,6 @@ export const centerTextPlugin = {
     const x = (chartArea.left + chartArea.right) / 2
     const y = (chartArea.top + chartArea.bottom) / 2
 
-    ctx.save()
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillStyle = '#111827'
-    ctx.font = '700 24px ui-sans-serif, system-ui'
-    ctx.fillText(`${pct}%`, x, y - 6)
-    ctx.fillStyle = '#6b7280'
-    ctx.font = '600 12px ui-sans-serif, system-ui'
-    ctx.fillText('Total Waste', x, y + 14)
-    ctx.restore()
   }
 }
 
@@ -177,8 +167,7 @@ export function styleAsRing(basePie) {
       data: Array.isArray(ds.data) ? ds.data : [],
       backgroundColor: Array.isArray(ds.backgroundColor) ? ds.backgroundColor : [],
       borderWidth: 0,
-      borderRadius: 18,
-      spacing: 6,
+      borderRadius: 0,
       cutout: '72%'
     }]
   }
