@@ -384,7 +384,36 @@ const getBadgeClass = (food) => {
     return 'badge-transparent'
   }
 }
-
+const getActivityIcon = (type) => {
+  const icons = {
+    'donFood': 'bi bi-heart-fill',
+    'pendingDonFood': 'bi bi-clock-history',
+    'addFood': 'bi bi-plus-circle-fill',
+    'conFood': 'bi bi-check-circle-fill',
+    'expFood': 'bi bi-x-circle-fill'
+  }
+  return icons[type] || 'bi bi-circle-fill'
+}
+const getActivityTitle = (type) => {
+  const titles = {
+    'donFood': 'Food Donated',
+    'pendingDonFood': 'Donation Pending',
+    'addFood': 'Food Added',
+    'conFood': 'Food Consumed',
+    'expFood': 'Food Expired'
+  }
+  return titles[type] || 'Activity'
+}
+const getActivityGradient = (type) => {
+  const gradients = {
+    'donFood': 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+    'pendingDonFood': 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+    'addFood': 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+    'conFood': 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    'expFood': 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+  }
+  return gradients[type] || 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
+}
 const calculateActivityStreak = () => {
   if (!activitiesLoaded.value || activities.value.length === 0) return 0
 
@@ -1370,105 +1399,121 @@ onMounted(() => {
 
       <!-- Activities -->
       <div class="col-lg-4 d-none d-lg-block d-flex flex-column h-100">
-        <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0">
-          <h3 class="h5 mb-2">Recent Activity</h3>
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <div class="d-flex gap-2 w-100">
-              <select
-                v-model="activityTypeFilter"
-                class="form-select form-select-sm"
-                style="width: auto; min-width: 110px"
+  <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0">
+    <h3 class="h5 mb-3 fw-bold">Recent Activity</h3>
+    
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div class="d-flex gap-2 w-100">
+        <select
+          v-model="activityTypeFilter"
+          class="form-select form-select-sm"
+          style="width: auto; min-width: 110px"
+        >
+          <option disabled value="">Activity</option>
+          <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+        <select
+          v-model="activityTimeFrame"
+          class="form-select form-select-sm"
+          style="width: auto; min-width: 90px"
+        >
+          <option disabled value="">Time</option>
+          <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+        <button
+          class="btn btn-outline-secondary btn-sm"
+          :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'"
+          @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'"
+        >
+          <i
+            :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"
+          ></i>
+        </button>
+      </div>
+    </div>
+    
+    <div class="flex-grow-1 d-flex flex-column min-h-0">
+      <div v-if="filteredSortedActivities.length === 0" class="text-center py-5 flex-grow-1">
+        <i class="bi bi-activity display-1 text-muted opacity-25"></i>
+        <p class="text-muted mt-3">No recent activity</p>
+      </div>
+      
+      <div v-else class="d-flex flex-column gap-3 activity-scroll flex-grow-1" style="overflow-y: auto; padding-right: 8px;">
+        <div
+          v-for="activity in filteredSortedActivities"
+          :key="activity.id"
+          class="activity-item"
+        >
+          <div class="d-flex align-items-start gap-3">
+            <!-- Icon Circle -->
+            <div class="flex-shrink-0">
+              <div 
+                class="rounded-circle d-flex align-items-center justify-content-center"
+                :style="{
+                  width: '48px',
+                  height: '48px',
+                  background: getActivityGradient(activity.activityType)
+                }"
               >
-                <option disabled value="">Activity</option>
-                <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">
-                  {{ opt.label }}
-                </option>
-              </select>
-              <select
-                v-model="activityTimeFrame"
-                class="form-select form-select-sm"
-                style="width: auto; min-width: 90px"
-              >
-                <option disabled value="">Time</option>
-                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">
-                  {{ opt.label }}
-                </option>
-              </select>
-              <button
-                class="btn btn-outline-secondary btn-sm"
-                :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'"
-                @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'"
-              >
-                <i
-                  :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"
-                ></i>
-              </button>
-            </div>
-          </div>
-          <div class="flex-grow-1 d-flex flex-column min-h-0">
-            <div v-if="filteredSortedActivities.length === 0" class="text-center py-4 flex-grow-1">
-              <p class="text-muted">No recent activity</p>
-            </div>
-            <div v-else class="d-flex flex-column gap-3 activity-scroll flex-grow-1">
-              <div
-                v-for="activity in filteredSortedActivities"
-                :key="activity.id"
-                class="pb-3 border-bottom"
-              >
-              <div v-if="activity.activityType === 'donFood'">
-                  <p class="mb-1 small">
-                    <strong
-                      >{{ activity.quantity }} {{ activity.unit }} of
-                      {{ activity.foodName }} donated</strong
-                    >
-                  </p>
-                </div>
-                <div v-if="activity.activityType === 'pendingDonFood'">
-                  <p class="mb-1 small">
-                    <strong
-                      >{{ activity.quantity }} {{ activity.unit }} of
-                      {{ activity.foodName}} pending donation</strong
-                    >
-                  </p>
-                </div>
-                <div v-if="activity.activityType === 'addFood'">
-                  <p class="mb-1 small">
-                    <strong
-                      >{{ activity.quantity }} {{ activity.unit }} of
-                      {{ activity.foodName }} added</strong
-                    >
-                  </p>
-                </div>
-                <div v-else-if="activity.activityType === 'conFood'">
-                  <p class="mb-1 small">
-                    <strong v-if="activity.note === 'fully consumed'" class="text-success">
-                      All of {{ activity.foodName }} fully consumed
-                    </strong>
-                    <strong v-else>
-                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} consumed
-                    </strong>
-                  </p>
-                </div>
-                <div v-else-if="activity.activityType === 'expFood'">
-                  <p class="mb-1 small">
-                    <strong :class="{ 'text-danger': activity.note === 'expired' }">
-                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
-                    </strong>
-                  </p>
-                </div>
-                <!-- <div v-else>
-                  <p class="mb-1 small">
-                    <strong>{{ activity.foodName }} — {{ activity.activityType }}</strong>
-                  </p>
-                </div> -->
-                <small class="text-muted">
-                  {{ getRelativeTime(activity.createdAt) }}
-                </small>
+                <i :class="getActivityIcon(activity.activityType)" class="text-white fs-5"></i>
               </div>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-grow-1 min-w-0">
+              <h6 class="mb-1 fw-bold small">{{ getActivityTitle(activity.activityType) }}</h6>
+              
+              <!-- Activity Details -->
+              <div v-if="activity.activityType === 'donFood'" class="mb-1">
+                <p class="mb-0 small text-secondary">
+                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} donated
+                </p>
+              </div>
+              
+              <div v-else-if="activity.activityType === 'pendingDonFood'" class="mb-1">
+                <p class="mb-0 small text-secondary">
+                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} pending donation
+                </p>
+              </div>
+              
+              <div v-else-if="activity.activityType === 'addFood'" class="mb-1">
+                <p class="mb-0 small text-secondary">
+                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added
+                </p>
+              </div>
+              
+              <div v-else-if="activity.activityType === 'conFood'" class="mb-1">
+                <p class="mb-0 small" :class="activity.note === 'fully consumed' ? 'text-success fw-semibold' : 'text-secondary'">
+                  <span v-if="activity.note === 'fully consumed'">
+                    All of {{ activity.foodName }} fully consumed
+                  </span>
+                  <span v-else>
+                    {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} consumed
+                  </span>
+                </p>
+              </div>
+              
+              <div v-else-if="activity.activityType === 'expFood'" class="mb-1">
+                <p class="mb-0 small text-danger fw-semibold">
+                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
+                </p>
+              </div>
+
+              <!-- Timestamp -->
+              <small class="text-muted d-block" style="font-size: 0.75rem;">
+                <i class="bi bi-clock me-1"></i>{{ getRelativeTime(activity.createdAt) }}
+              </small>
             </div>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
     </div>
 
     <!-- Edit Food Modal -->
@@ -1641,7 +1686,36 @@ onMounted(() => {
   padding: 1.5rem;
   margin-bottom: 1.5rem;
 }
+.activity-item {
+  padding: 12px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  transition: all 0.2s ease;
+}
 
+.activity-item:hover {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.activity-item {
+  animation: slideIn 0.3s ease-out;
+}
 .food-scroll-container {
   max-width: 100%;
   margin: 0 auto;
