@@ -260,28 +260,12 @@ watchEffect(async () => {
     }
   }
 
-  // Handle completed donations (donFood)
-  const donatedActivities = activities.value.filter(a => a.activityType === 'donFood')
+  // NOTE: Do NOT process donFood activities here!
+  // When food is shared (pendingDonFood), the quantity is already deducted from foodItems.
+  // When marked as donated (donFood), it just confirms the donation was completed.
+  // Processing donFood here would cause DOUBLE deduction of the food quantity.
+  // The food quantity management is handled in CommunityView during the sharing process.
 
-  for (const donActivity of donatedActivities) {
-    const foodIndex = foodItems.value.findIndex(f => f.name === donActivity.foodName)
-
-    if (foodIndex !== -1) {
-      const food = foodItems.value[foodIndex]
-      const donatedQty = Number(donActivity.quantity) || 0
-
-      if (donatedQty >= food.quantity) {
-        const refDoc = doc(db, 'user', uid, 'foodItems', food.id)
-        await deleteDoc(refDoc)
-        foodItems.value.splice(foodIndex, 1)
-      } else {
-        const newQty = food.quantity - donatedQty
-        const refDoc = doc(db, 'user', uid, 'foodItems', food.id)
-        await updateDoc(refDoc, { quantity: newQty })
-        foodItems.value[foodIndex].quantity = newQty
-      }
-    }
-  }
 })
 
 // Utility functions
@@ -1150,8 +1134,8 @@ onMounted(() => {
         </div>
       </div>
 
-        
-            
+
+
 
       <!-- Charts Section -->
       <div class="row g-4 mb-3" v-show="overviewCollapsed">
@@ -1284,9 +1268,9 @@ onMounted(() => {
             </div>
 
 
-      
 
-           
+
+
           </div>
         </div>
       </div>
@@ -1401,7 +1385,7 @@ onMounted(() => {
       <div class="col-lg-4 d-none d-lg-block d-flex flex-column h-100">
   <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0">
     <h3 class="h5 mb-3 fw-bold">Recent Activity</h3>
-    
+
     <div class="d-flex align-items-center justify-content-between mb-3">
       <div class="d-flex gap-2 w-100">
         <select
@@ -1435,13 +1419,13 @@ onMounted(() => {
         </button>
       </div>
     </div>
-    
+
     <div class="flex-grow-1 d-flex flex-column min-h-0">
       <div v-if="filteredSortedActivities.length === 0" class="text-center py-5 flex-grow-1">
         <i class="bi bi-activity display-1 text-muted opacity-25"></i>
         <p class="text-muted mt-3">No recent activity</p>
       </div>
-      
+
       <div v-else class="d-flex flex-column gap-3 activity-scroll flex-grow-1" style="overflow-y: auto; padding-right: 8px;">
         <div
           v-for="activity in filteredSortedActivities"
@@ -1451,7 +1435,7 @@ onMounted(() => {
           <div class="d-flex align-items-start gap-3">
             <!-- Icon Circle -->
             <div class="flex-shrink-0">
-              <div 
+              <div
                 class="rounded-circle d-flex align-items-center justify-content-center"
                 :style="{
                   width: '48px',
@@ -1466,26 +1450,26 @@ onMounted(() => {
             <!-- Content -->
             <div class="flex-grow-1 min-w-0">
               <h6 class="mb-1 fw-bold small">{{ getActivityTitle(activity.activityType) }}</h6>
-              
+
               <!-- Activity Details -->
               <div v-if="activity.activityType === 'donFood'" class="mb-1">
                 <p class="mb-0 small text-secondary">
                   {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} donated
                 </p>
               </div>
-              
+
               <div v-else-if="activity.activityType === 'pendingDonFood'" class="mb-1">
                 <p class="mb-0 small text-secondary">
                   {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} pending donation
                 </p>
               </div>
-              
+
               <div v-else-if="activity.activityType === 'addFood'" class="mb-1">
                 <p class="mb-0 small text-secondary">
                   {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added
                 </p>
               </div>
-              
+
               <div v-else-if="activity.activityType === 'conFood'" class="mb-1">
                 <p class="mb-0 small" :class="activity.note === 'fully consumed' ? 'text-success fw-semibold' : 'text-secondary'">
                   <span v-if="activity.note === 'fully consumed'">
@@ -1496,7 +1480,7 @@ onMounted(() => {
                   </span>
                 </p>
               </div>
-              
+
               <div v-else-if="activity.activityType === 'expFood'" class="mb-1">
                 <p class="mb-0 small text-danger fw-semibold">
                   {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
