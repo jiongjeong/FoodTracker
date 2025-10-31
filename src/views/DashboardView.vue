@@ -4,7 +4,19 @@ import { db } from '../firebase.js';
 import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp, query, where } from 'firebase/firestore';
 import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
-import { Bar, Pie, Line } from 'vue-chartjs'
+import {
+  chartOptions,
+  wasteVsSavingsOpts,
+  wasteRingOpts,
+  centerTextPlugin,
+  buildWasteVsSavingsData,
+  buildWasteByCategoryChart,
+  styleAsRing,
+  buildTop3Legend,
+  WASTE_COLORS,
+  leaderboardNudge
+} from '@/composables/dashboardDesign'
+import { Bar, Pie, Line, Doughnut  } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   Title,
@@ -17,7 +29,6 @@ import {
   PointElement,
   LineElement,
 } from 'chart.js'
-
 // Register Chart.js components
 ChartJS.register(
   Title,
@@ -153,7 +164,12 @@ const categoryUnits = {
   'Breakfast & Cereal': ['box(es)', 'bag(s)', 'pack(s)', 'kg(s)', 'gram(s)', 'bottle(s)'],
   Other: ['piece(s)', 'unit(s)', 'pack(s)', 'box(es)', 'kg(s)', 'gram(s)'],
 }
-
+// Build charts and leaderboard from the local `activities` ref using shared builders
+const wasteVsSavingsData = computed(() => buildWasteVsSavingsData(activities.value || []))
+const basePie = computed(() => buildWasteByCategoryChart(activities.value || [], WASTE_COLORS))
+const chartDataStyled = computed(() => styleAsRing(basePie.value))
+const legendTop3 = computed(() => buildTop3Legend(basePie.value.labels, basePie.value.datasets[0]?.data || [], basePie.value.datasets[0]?.backgroundColor || WASTE_COLORS))
+const leaderboardMessage = computed(() => leaderboardNudge(activities.value || []))
 // Functions
 function showToastFor(msg, ms = 2200) {
   toastMessage.value = msg
@@ -368,7 +384,36 @@ const getBadgeClass = (food) => {
     return 'badge-transparent'
   }
 }
-
+const getActivityIcon = (type) => {
+  const icons = {
+    'donFood': 'bi bi-heart-fill',
+    'pendingDonFood': 'bi bi-clock-history',
+    'addFood': 'bi bi-plus-circle-fill',
+    'conFood': 'bi bi-check-circle-fill',
+    'expFood': 'bi bi-x-circle-fill'
+  }
+  return icons[type] || 'bi bi-circle-fill'
+}
+const getActivityTitle = (type) => {
+  const titles = {
+    'donFood': 'Food Donated',
+    'pendingDonFood': 'Donation Pending',
+    'addFood': 'Food Added',
+    'conFood': 'Food Consumed',
+    'expFood': 'Food Expired'
+  }
+  return titles[type] || 'Activity'
+}
+const getActivityGradient = (type) => {
+  const gradients = {
+    'donFood': 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+    'pendingDonFood': 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+    'addFood': 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+    'conFood': 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    'expFood': 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+  }
+  return gradients[type] || 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
+}
 const calculateActivityStreak = () => {
   if (!activitiesLoaded.value || activities.value.length === 0) return 0
 
@@ -538,13 +583,9 @@ const expiringSoon = computed(
     }).length,
 )
 
-const expired = computed(
-  () =>
-    foodItems.value.filter((food) => {
-      const daysLeft = getDaysLeft(food)
-      return daysLeft < 0
-    }).length,
-)
+const expired = computed(() => {
+  return activities.value.filter(a => a.activityType === 'expFood').length
+})
 
 const potentialLoss = computed(() =>
   foodItems.value
@@ -628,63 +669,7 @@ watchEffect(async () => {
   }
 });
 
-// Chart data
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: true },
-    title: { display: false },
-  },
-}
 
-const wasteVsSavingsChart = computed(() => {
-  const waste = analytics.value.totalWaste.items || 0
-  const saved = analytics.value.totalSaved.items || 0
-  return {
-    labels: ['Waste', 'Saved'],
-    datasets: [
-      {
-        label: 'Items',
-        backgroundColor: ['#dc2626', '#16a34a'],
-        data: [waste, saved],
-      },
-    ],
-  }
-})
-
-const wasteByCategoryChart = computed(() => {
-  const wasteActs = activities.value.filter((a) => a.activityType === 'expFood')
-  const counts = {}
-  wasteActs.forEach((a) => {
-    const cat = a.category || 'Unknown'
-    counts[cat] = (counts[cat] || 0) + (Number(a.quantity) || 1)
-  })
-  const labels = Object.keys(counts)
-  const data = labels.map((l) => counts[l])
-  return {
-    labels,
-    datasets: [{ data, backgroundColor: ['#eab308', '#f43f5e', '#10b981', '#3b82f6', '#a78bfa'] }],
-  }
-})
-
-const monthlySpendingChart = computed(() => {
-  const months = Array.from({ length: 12 }, (_, i) => i + 1)
-  const moneyByMonth = months.map(() => 0)
-  activities.value.forEach((a) => {
-    const d = new Date(a.createdAt)
-    if (!isNaN(d)) {
-      const m = d.getMonth()
-      moneyByMonth[m] += Number(a.price) || 0
-    }
-  })
-  return {
-    labels: months.map((m) => new Date(0, m - 1).toLocaleString('en-US', { month: 'short' })),
-    datasets: [
-      { label: 'Spending', data: moneyByMonth, borderColor: '#0ea5a4', tension: 0.3, fill: false },
-    ],
-  }
-})
 
 const toggleSortDirection = () => {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
@@ -1165,140 +1150,143 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="row g-3 mb-4" v-show="overviewCollapsed">
-        <div class="col-6 col-lg-3">
-          <div
-            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
-          >
-            <!-- Left: Icon + label -->
-            <div
-              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
-            >
-              <div
-                class="icon-circle mb-2"
-                style="background-color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6)"
-              >
-                <i class="bi bi-trash"></i>
-              </div>
-              <small class="text-muted text-center">Total Waste</small>
-            </div>
-
-            <!-- Right: Count -->
-            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0">${{ analytics.totalWaste.money }}</h3>
-              <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div
-            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
-          >
-            <!-- Left: Icon + label -->
-            <div
-              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
-            >
-              <div class="icon-circle mb-2">
-                <i class="bi bi-piggy-bank"></i>
-              </div>
-              <small class="text-muted text-center">Total Saved</small>
-            </div>
-
-            <!-- Right: Count -->
-            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0">{{ analytics.totalSaved.money }}</h3>
-              <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div
-            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
-          >
-            <!-- Left: Icon + label -->
-            <div
-              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
-            >
-              <div
-                class="icon-circle mb-2"
-                style="background-color: #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.6)"
-              >
-                <i class="bi bi-calendar-x"></i>
-              </div>
-              <small class="text-muted text-center">Reduction</small>
-            </div>
-
-            <!-- Right: Count -->
-            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0">{{ analytics.reduction }}%</h3>
-              <small class="text-muted">food used before expiry</small>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div
-            class="glass-card stat-card p-3 d-flex flex-column justify-content-between position-relative"
-          >
-            <!-- Left: Icon + label -->
-            <div
-              class="left-section d-flex flex-column align-items-center position-absolute top-50 start-0 translate-middle-y ms-3"
-            >
-              <div
-                class="icon-circle mb-2"
-                style="background-color: #5bc0eb; box-shadow: 0 0 15px rgba(91, 192, 235, 0.6)"
-              >
-                <i class="bi bi-box"></i>
-              </div>
-              <small class="text-muted text-center">Inventory</small>
-            </div>
-
-            <!-- Right: Count -->
-            <div class="content text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0">{{ analytics.inventory.value.toFixed(2) }}</h3>
-              <small class="text-muted">{{ analytics.inventory.items }} items</small>
-            </div>
-          </div>
-        </div>
-      </div>
+        
+            
 
       <!-- Charts Section -->
       <div class="row g-4 mb-3" v-show="overviewCollapsed">
-        <!-- Waste vs Savings Bar Chart -->
-        <div class="col-lg-4">
-          <div class="glass-card p-4">
-            <h5 class="mb-4">
-              <i class="bi bi-bar-chart me-2"></i>
-              Waste vs Savings
-            </h5>
-            <div style="height: 300px">
-              <Bar :data="wasteVsSavingsChart" :options="chartOptions" />
+        <div class="col-lg-8">
+          <div class="glass-card p-4 charts-left-card h-100 d-flex flex-column">
+            <div class="row g-0">
+              <!-- Left panel -->
+              <div class="col-md-4">
+  <div class="card border-0 shadow-sm h-100">
+    <div class="card-body">
+      <div class="d-flex align-items-center mb-2">
+        <div class="bg-warning bg-opacity-25 rounded-circle p-2 me-2">
+          <i class="bi bi-trophy text-warning fs-5"></i>
+        </div>
+        <h6 class="card-title fw-semibold mb-0">Leaderboard Insights</h6>
+      </div>
+      <p class="card-text text-secondary small mb-0">
+        {{ leaderboardMessage }}
+      </p>
+    </div>
+  </div>
+</div>
+
+              <!-- Right panel -->
+              <div class="col-md-8 p-3 p-md-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                  <h5 class="mb-0">
+                    <i class="bi bi-activity me-2"></i>
+                    Waste vs Savings
+                  </h5>
+                  <div class="d-flex align-items-center small fw-semibold">
+                    <span class="me-3 d-inline-flex align-items-center">
+                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
+                      Savings
+                    </span>
+                    <span class="d-inline-flex align-items-center">
+                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #FFA449;"></span>
+                      Waste
+                    </span>
+                  </div>
+                </div>
+                <div style="height:220px">
+                  <Line :data="wasteVsSavingsData" :options="wasteVsSavingsOpts" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Bottom KPI row -->
+            <div class="row g-3 mt-3 border-top">
+              <!-- Total Waste -->
+              <div class="col-6 col-xl-3">
+                <div class="d-flex align-items-center">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                    <i class="bi bi-trash fs-5"></i>
+                  </div>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="text-muted small mb-1">Total Waste</div>
+                    <div class="fw-bold h6 mb-0">${{ analytics.totalWaste.money.toFixed(2) }}</div>
+                    <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Total Saved -->
+              <div class="col-6 col-xl-3">
+                <div class="d-flex align-items-center">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
+                    <i class="bi bi-bag-check fs-5"></i>
+                  </div>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="text-muted small mb-1">Total Saved</div>
+                    <div class="fw-bold h6 mb-0">${{ analytics.totalSaved.money.toFixed(2) }}</div>
+                    <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Reduction -->
+              <div class="col-6 col-xl-3">
+                <div class="d-flex align-items-center">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(37, 99, 235, 0.1); color: #2563eb;">
+                    <i class="bi bi-graph-down-arrow fs-5"></i>
+                  </div>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="text-muted small mb-1">Reduction</div>
+                    <div class="fw-bold h6 mb-0">{{ analytics.reduction }}%</div>
+                    <small class="text-muted">waste reduction</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Inventory -->
+              <div class="col-6 col-xl-3">
+                <div class="d-flex align-items-center">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(249, 115, 22, 0.1); color: #f97316;">
+                    <i class="bi bi-box-seam fs-5"></i>
+                  </div>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="text-muted small mb-1">Inventory</div>
+                    <div class="fw-bold h6 mb-0">${{ analytics.inventory.value.toFixed(2) }}</div>
+                    <small class="text-muted">{{ analytics.inventory.items }} items</small>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Waste by Category Pie Chart -->
         <div class="col-lg-4">
           <div class="glass-card p-4">
-            <h5 class="mb-4">
+            <h5 class="mb-3">
               <i class="bi bi-pie-chart me-2"></i>
               Waste by Category
             </h5>
-            <div style="height: 300px">
-              <Pie :data="wasteByCategoryChart" :options="chartOptions" />
+            <div class="mx-auto" style="width:240px;height:300px;" v-if="chartDataStyled.datasets[0].data.length">
+              <Pie :data="chartDataStyled" :options="wasteRingOpts" :plugins="[centerTextPlugin]" />
             </div>
-          </div>
-        </div>
+            <p class="text-secondary small text-center my-4" v-else>No waste data yet</p>
 
-        <!-- Monthly Spending Trend -->
-        <div class="col-lg-4">
-          <div class="glass-card p-4">
-            <h5 class="mb-4">
-              <i class="bi bi-graph-up me-2"></i>
-              Monthly Spending Trend
-            </h5>
-            <div style="height: 300px">
-              <Line :data="monthlySpendingChart" :options="chartOptions" />
+            <div class="row text-center mt-3 g-0" v-if="legendTop3.length">
+              <div class="col" v-for="(item, i) in legendTop3" :key="i">
+                <div class="fw-bold fs-3">
+                  {{ item.pct }}<span class="fs-6">%</span>
+                </div>
+                <div class="d-inline-flex align-items-center gap-1 text-secondary small">
+                  <span class="rounded-circle" :style="{width:'8px',height:'8px',backgroundColor:item.color}"></span>
+                  {{ item.label }}
+                </div>
+              </div>
             </div>
+
+
+      
+
+           
           </div>
         </div>
       </div>
@@ -1411,105 +1399,121 @@ onMounted(() => {
 
       <!-- Activities -->
       <div class="col-lg-4 d-none d-lg-block d-flex flex-column h-100">
-        <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0">
-          <h3 class="h5 mb-2">Recent Activity</h3>
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <div class="d-flex gap-2 w-100">
-              <select
-                v-model="activityTypeFilter"
-                class="form-select form-select-sm"
-                style="width: auto; min-width: 110px"
+  <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0">
+    <h3 class="h5 mb-3 fw-bold">Recent Activity</h3>
+    
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div class="d-flex gap-2 w-100">
+        <select
+          v-model="activityTypeFilter"
+          class="form-select form-select-sm"
+          style="width: auto; min-width: 110px"
+        >
+          <option disabled value="">Activity</option>
+          <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+        <select
+          v-model="activityTimeFrame"
+          class="form-select form-select-sm"
+          style="width: auto; min-width: 90px"
+        >
+          <option disabled value="">Time</option>
+          <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+        <button
+          class="btn btn-outline-secondary btn-sm"
+          :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'"
+          @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'"
+        >
+          <i
+            :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"
+          ></i>
+        </button>
+      </div>
+    </div>
+    
+    <div class="flex-grow-1 d-flex flex-column min-h-0">
+      <div v-if="filteredSortedActivities.length === 0" class="text-center py-5 flex-grow-1">
+        <i class="bi bi-activity display-1 text-muted opacity-25"></i>
+        <p class="text-muted mt-3">No recent activity</p>
+      </div>
+      
+      <div v-else class="d-flex flex-column gap-3 activity-scroll flex-grow-1" style="overflow-y: auto; padding-right: 8px;">
+        <div
+          v-for="activity in filteredSortedActivities"
+          :key="activity.id"
+          class="activity-item"
+        >
+          <div class="d-flex align-items-start gap-3">
+            <!-- Icon Circle -->
+            <div class="flex-shrink-0">
+              <div 
+                class="rounded-circle d-flex align-items-center justify-content-center"
+                :style="{
+                  width: '48px',
+                  height: '48px',
+                  background: getActivityGradient(activity.activityType)
+                }"
               >
-                <option disabled value="">Activity</option>
-                <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">
-                  {{ opt.label }}
-                </option>
-              </select>
-              <select
-                v-model="activityTimeFrame"
-                class="form-select form-select-sm"
-                style="width: auto; min-width: 90px"
-              >
-                <option disabled value="">Time</option>
-                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">
-                  {{ opt.label }}
-                </option>
-              </select>
-              <button
-                class="btn btn-outline-secondary btn-sm"
-                :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'"
-                @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'"
-              >
-                <i
-                  :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"
-                ></i>
-              </button>
-            </div>
-          </div>
-          <div class="flex-grow-1 d-flex flex-column min-h-0">
-            <div v-if="filteredSortedActivities.length === 0" class="text-center py-4 flex-grow-1">
-              <p class="text-muted">No recent activity</p>
-            </div>
-            <div v-else class="d-flex flex-column gap-3 activity-scroll flex-grow-1">
-              <div
-                v-for="activity in filteredSortedActivities"
-                :key="activity.id"
-                class="pb-3 border-bottom"
-              >
-              <div v-if="activity.activityType === 'donFood'">
-                  <p class="mb-1 small">
-                    <strong
-                      >{{ activity.quantity }} {{ activity.unit }} of
-                      {{ activity.foodName }} donated</strong
-                    >
-                  </p>
-                </div>
-                <div v-if="activity.activityType === 'pendingDonFood'">
-                  <p class="mb-1 small">
-                    <strong
-                      >{{ activity.quantity }} {{ activity.unit }} of
-                      {{ activity.foodName}} pending donation</strong
-                    >
-                  </p>
-                </div>
-                <div v-if="activity.activityType === 'addFood'">
-                  <p class="mb-1 small">
-                    <strong
-                      >{{ activity.quantity }} {{ activity.unit }} of
-                      {{ activity.foodName }} added</strong
-                    >
-                  </p>
-                </div>
-                <div v-else-if="activity.activityType === 'conFood'">
-                  <p class="mb-1 small">
-                    <strong v-if="activity.note === 'fully consumed'" class="text-success">
-                      All of {{ activity.foodName }} fully consumed
-                    </strong>
-                    <strong v-else>
-                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} consumed
-                    </strong>
-                  </p>
-                </div>
-                <div v-else-if="activity.activityType === 'expFood'">
-                  <p class="mb-1 small">
-                    <strong :class="{ 'text-danger': activity.note === 'expired' }">
-                      {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
-                    </strong>
-                  </p>
-                </div>
-                <!-- <div v-else>
-                  <p class="mb-1 small">
-                    <strong>{{ activity.foodName }} — {{ activity.activityType }}</strong>
-                  </p>
-                </div> -->
-                <small class="text-muted">
-                  {{ getRelativeTime(activity.createdAt) }}
-                </small>
+                <i :class="getActivityIcon(activity.activityType)" class="text-white fs-5"></i>
               </div>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-grow-1 min-w-0">
+              <h6 class="mb-1 fw-bold small">{{ getActivityTitle(activity.activityType) }}</h6>
+              
+              <!-- Activity Details -->
+              <div v-if="activity.activityType === 'donFood'" class="mb-1">
+                <p class="mb-0 small text-secondary">
+                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} donated
+                </p>
+              </div>
+              
+              <div v-else-if="activity.activityType === 'pendingDonFood'" class="mb-1">
+                <p class="mb-0 small text-secondary">
+                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} pending donation
+                </p>
+              </div>
+              
+              <div v-else-if="activity.activityType === 'addFood'" class="mb-1">
+                <p class="mb-0 small text-secondary">
+                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added
+                </p>
+              </div>
+              
+              <div v-else-if="activity.activityType === 'conFood'" class="mb-1">
+                <p class="mb-0 small" :class="activity.note === 'fully consumed' ? 'text-success fw-semibold' : 'text-secondary'">
+                  <span v-if="activity.note === 'fully consumed'">
+                    All of {{ activity.foodName }} fully consumed
+                  </span>
+                  <span v-else>
+                    {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} consumed
+                  </span>
+                </p>
+              </div>
+              
+              <div v-else-if="activity.activityType === 'expFood'" class="mb-1">
+                <p class="mb-0 small text-danger fw-semibold">
+                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
+                </p>
+              </div>
+
+              <!-- Timestamp -->
+              <small class="text-muted d-block" style="font-size: 0.75rem;">
+                <i class="bi bi-clock me-1"></i>{{ getRelativeTime(activity.createdAt) }}
+              </small>
             </div>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
     </div>
 
     <!-- Edit Food Modal -->
@@ -1682,7 +1686,36 @@ onMounted(() => {
   padding: 1.5rem;
   margin-bottom: 1.5rem;
 }
+.activity-item {
+  padding: 12px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  transition: all 0.2s ease;
+}
 
+.activity-item:hover {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.activity-item {
+  animation: slideIn 0.3s ease-out;
+}
 .food-scroll-container {
   max-width: 100%;
   margin: 0 auto;
@@ -1739,103 +1772,6 @@ onMounted(() => {
 .badge-transparent {
   background: #ede9e8;
   color: #333;
-}
-/* --- Stat Card Alignment Fix --- */
-.stat-card {
-  display: flex;
-  align-items: center; /* vertically align icon + text */
-  justify-content: space-between;
-  min-height: 150px;
-  padding: 20px 24px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, rgba(4, 99, 7, 0.8), rgba(56, 176, 0, 0.5));
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-  color: white;
-}
-
-/* Icon + Label container (fixed width) */
-.left-section {
-  flex: 0 0 90px; /* fixed width for all cards */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Icon Circle */
-.icon-circle {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-size: 24px;
-  background: rgba(255, 255, 255, 0.18);
-}
-
-/* Label under icon */
-.left-section small {
-  margin-top: 6px;
-  margin-left: 0px;
-  font-size: 13px;
-  color: #6b7684;
-  text-align: center;
-  width: 86px; /* consistent width */
-}
-
-/* Text section (dynamic width) */
-.content {
-  flex: 1;
-  text-align: right;
-}
-
-.content h3 {
-  font-size: 28px;
-  font-weight: 700;
-  margin-bottom: 2px;
-  color: #0f1b2d;
-}
-
-.content small {
-  font-size: 13px;
-  color: #6b7684;
-}
-
-/* Optional: Streak badge alignment */
-.streak-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #fff9ea;
-  border: 1px solid #f6e3b5;
-  font-size: 12px;
-  color: #7a6a3a;
-}
-
-/* --- Responsive tweak for mobile --- */
-@media (max-width: 575px) {
-  .stat-card {
-    flex-direction: column;
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  .left-section {
-    flex: unset;
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: 12px;
-    width: 100%;
-  }
-
-  .content {
-    text-align: left;
-    width: 100%;
-  }
 }
 
 .food-header {
@@ -2130,18 +2066,6 @@ onMounted(() => {
   }
 }
 
-/* Streak badge styling */
-.streak-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  border-radius: 12px;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
 .streak-fire {
   display: inline-block;
   font-size: 1rem;
@@ -2190,13 +2114,5 @@ onMounted(() => {
   font-weight: 600;
 }
 
-/* Make stat-card position relative for absolute positioning */
-.stat-card {
-  position: relative;
-}
 
-.stat-card > * {
-  position: relative;
-  z-index: 1;
-}
 </style>
