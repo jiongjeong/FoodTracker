@@ -976,56 +976,96 @@ const confirmDelete = async () => {
 
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
-          <div
-            class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-            style="
-              background: linear-gradient(
-                135deg,
-                rgba(0, 102, 60, 0.85) 0%,
-                rgba(50, 200, 120, 0.6) 100%
-              );
-              box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-              height: 130px;
-            "
-          >
-            <!-- Left: Icon + label -->
-            <div
-              class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-              style="width: 90px"
-            >
+          <div class="flip-card" style="height: 130px;">
+            <div class="flip-card-inner">
+              <!-- Front Side (Your Original Card) -->
               <div
-                class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                style="width: 56px; height: 56px"
+                class="flip-card-front position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
+                style="
+                  background: linear-gradient(
+                        135deg,
+                        rgba(0, 102, 60, 0.85) 0%,
+                        rgba(50, 200, 120, 0.6) 100%
+                      );
+                  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+                  height: 130px;
+                "
               >
-                <i class="bi bi-graph-up-arrow fs-5 text-white"></i>
+                <!-- Left: Icon + label -->
+                <div
+                      class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+                      style="width: 90px"
+                    >
+                      <div
+                        class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
+                        style="width: 56px; height: 56px"
+                      >
+                        <i class="bi bi-graph-up-arrow fs-5 text-white"></i>
+                      </div>
+                      <small class="text-white text-center">Food Score</small>
+                    </div>
+
+                <!-- Right: Count -->
+                <div class="text-end align-self-end pe-2 mt-2 position-relative">
+                      <h3 class="fw-bold mb-0 text-white">{{ analytics.foodScore }}</h3>
+                      <small class="text-white">points</small>
+
+                      <!-- Streak badge -->
+                      <div v-if="analytics.streakDays > 0" class="mt-2">
+                        <span
+                          class="streak-fire"
+                          :class="{
+                            'fire-small': analytics.streakDays < 7,
+                            'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
+                            'fire-large': analytics.streakDays >= 14,
+                          }"
+                          >🔥</span
+                        >
+                        <span class="streak-text text-white">
+                          {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
+                        </span>
+                      </div>
+                    </div>
               </div>
-              <small class="text-white text-center">Food Score</small>
-            </div>
 
-            <!-- Right: Score + Streak -->
-            <div class="text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0 text-white">{{ analytics.foodScore }}</h3>
-              <small class="text-white">points</small>
-
-              <!-- Streak badge -->
-              <div v-if="analytics.streakDays > 0" class="mt-2">
-                <span
-                  class="streak-fire"
-                  :class="{
-                    'fire-small': analytics.streakDays < 7,
-                    'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
-                    'fire-large': analytics.streakDays >= 14,
-                  }"
-                  >🔥</span
+              <!-- Back Side (Food Score Information) -->
+              <div 
+                class="flip-card-back position-absolute p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
+                style="
+                  background: linear-gradient(
+                        135deg,
+                        rgba(0, 102, 60, 0.85) 0%,
+                        rgba(50, 200, 120, 0.6) 100%
+                      );
+                  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+                  height: 130px;
+                "
+              >
+                <!-- Left: Icon + label -->
+                <div
+                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+                  style="width: 90px"
                 >
-                <span class="streak-text text-white">
-                  {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
-                </span>
+                  <div
+                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
+                    style="width: 56px; height: 56px"
+                  >
+                    <i class="bi bi-info-circle fs-5 text-white"></i>
+                  </div>
+                  <small class="text-white text-center">Food Score</small>
+                </div>
+
+                <!-- Right: Information -->
+                <div class="text-end align-self-end pe-2 position-relative" style="max-width: 55%;">
+                  <p class="mb-0 text-white small text-center" style="font-size:10px">
+                    Measures how effectively you save food, money, and help others. It rewards items and money saved, penalizes waste, and adds bonus points for food donations
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-        <div class="col-6 col-lg-3">
+      <div class="col-6 col-lg-3">
           <div
             class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
             style="
@@ -1059,41 +1099,81 @@ const confirmDelete = async () => {
             </div>
           </div>
         </div>
-
         <div class="col-6 col-lg-3">
-          <div
-            class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-            style="
-              background: linear-gradient(
-                135deg,
-                rgba(153, 27, 27, 0.9) 0%,
-                rgba(239, 68, 68, 0.65) 100%
-              );
-              box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-              height: 130px;
-            "
-          >
-            <!-- Left: Icon + label -->
+          <div class="flip-card" style="height: 130px;">
+            <div class="flip-card-inner">
+      <!-- Front Side (Your Original Card) -->
             <div
-              class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-              style="width: 90px"
+              class="flip-card-front position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
+              style="
+                background: linear-gradient(
+                      135deg,
+                      rgba(153, 27, 27, 0.9) 0%,
+                      rgba(239, 68, 68, 0.65) 100%
+                    );
+                box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+                height: 130px;
+              "
             >
+              <!-- Left: Icon + label -->
               <div
-                class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-2"
-                style="width: 56px; height: 56px"
-              >
-                <i class="bi bi-currency-dollar fs-5 text-white"></i>
-              </div>
-              <small class="text-white text-center">Potential Loss</small>
+                    class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+                    style="width: 90px"
+                  >
+                    <div
+                      class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-2"
+                      style="width: 56px; height: 56px"
+                    >
+                      <i class="bi bi-currency-dollar fs-5 text-white"></i>
+                    </div>
+                    <small class="text-white text-center">Potential Loss</small>
+                  </div>
+
+
+              <!-- Right: Count -->
+              <div class="text-end align-self-end pe-2 mt-2 position-relative">
+                    <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
+                    <small class="text-white">if expired</small>
+                  </div>
             </div>
 
-            <!-- Right: Count -->
-            <div class="text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
-              <small class="text-white">if expired</small>
+            <!-- Back Side (Food Score Information) -->
+            <div 
+              class="flip-card-back position-absolute p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
+              style="
+                background: linear-gradient(
+                      135deg,
+                      rgba(153, 27, 27, 0.9) 0%,
+                      rgba(239, 68, 68, 0.65) 100%
+                    );
+                box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+                height: 130px;
+              "
+            >
+              <!-- Left: Icon + label -->
+              <div
+                class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+                style="width: 90px"
+              >
+                <div
+                  class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
+                  style="width: 56px; height: 56px"
+                >
+                  <i class="bi bi-info-circle fs-5 text-white"></i>
+                </div>
+                <small class="text-white text-center">Potential Loss</small>
+              </div>
+
+              <!-- Right: Information -->
+              <div class=" pe-2 d-flex flex-column align-self-end align-items-center mt-3" style="max-width: 55%;">
+                <p class="mb-0 text-white small text-center" style="font-size:10px">
+                  Measures the total value of food that’s at risk of expiring within the next 7 days.
+                </p>
+              </div>
             </div>
           </div>
         </div>
+      </div>
         <div class="col-6 col-lg-3">
           <div
             class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
@@ -1140,20 +1220,20 @@ const confirmDelete = async () => {
             <div class="row g-0">
               <!-- Left panel -->
               <div class="col-md-4">
-  <div class="card border-0 shadow-sm h-100">
-    <div class="card-body">
-      <div class="d-flex align-items-center mb-2">
-        <div class="bg-warning bg-opacity-25 rounded-circle p-2 me-2">
-          <i class="bi bi-trophy text-warning fs-5"></i>
-        </div>
-        <h6 class="card-title fw-semibold mb-0">Leaderboard Insights</h6>
-      </div>
-      <p class="card-text text-secondary small mb-0">
-        {{ leaderboardMessage }}
-      </p>
-    </div>
-  </div>
-</div>
+              <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                  <div class="d-flex align-items-center mb-2">
+                    <div class="bg-warning bg-opacity-25 rounded-circle p-2 me-2">
+                      <i class="bi bi-trophy text-warning fs-5"></i>
+                    </div>
+                    <h6 class="card-title fw-semibold mb-0">Leaderboard Insights</h6>
+                  </div>
+                  <p class="card-text text-secondary small mb-0">
+                    {{ leaderboardMessage }}
+                  </p>
+                </div>
+              </div>
+            </div>
 
               <!-- Right panel -->
               <div class="col-md-8 p-3 p-md-4">
@@ -1754,6 +1834,35 @@ const confirmDelete = async () => {
 .badge-transparent {
   background: #ede9e8;
   color: #333;
+}
+.flip-card-front,
+.flip-card-back {
+  position: absolute;
+  height: 100%;
+  top: 0;
+  left: 0;
+  backface-visibility: hidden;
+}
+.flip-card {
+  cursor: pointer;
+  width: 100%;
+  height: 130px;
+}
+
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+
+.flip-card-inner:hover {
+  transform: rotateY(180deg);
+}
+
+.flip-card-back {
+  transform: rotateY(180deg);
 }
 
 .food-header {
