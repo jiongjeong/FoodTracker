@@ -79,6 +79,16 @@
               <i class="bi bi-trophy me-1"></i>Leaderboard
             </RouterLink>
           </li>
+          <li class="nav-item">
+            <RouterLink
+              to="/village"
+              class="nav-link"
+              exact-active-class="active"
+              @click="closeNavbar"
+            >
+              <i class="bi bi-trophy me-1"></i>Monkey Village
+            </RouterLink>
+          </li>
         </ul>
 
         <!-- User section -->
