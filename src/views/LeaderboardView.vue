@@ -1,9 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { db } from '../firebase.js'
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore'
+import { collection, getDocs, getDoc, setDoc, query, orderBy, limit, doc, updateDoc, arrayUnion } from 'firebase/firestore'
 import { getAuth } from 'firebase/auth'
-
+import MonkeyAvatar from '@/components/monkeyAvatar.vue'
 
 const leaderboard = ref([])
 const loading = ref(true)
@@ -72,10 +72,170 @@ const getRankBadgeClass = (rank) => {
   return ''
 }
 console.log(leaderboard)
+
+// monkey avatar
+const allMonkeys = ref([])
+const userMonkey = ref({ selected: 'basic-monkey', unlocked: [] })
+const carouselRef = ref(null)
+
+const loadMonkeys = async () => {
+  if (!currentUser.value) return
+
+  const userRef = doc(db, 'user', currentUser.value.uid)
+
+  try {
+    // 1. Load all monkeys
+    const snap = await getDocs(collection(db, 'monkeys'))
+    allMonkeys.value = snap.docs.map(d => ({
+      id: d.id,
+      name: d.data().name || d.id,
+      requiredPoints: d.data().requiredPoints ?? 0
+    }))
+
+    console.log('All monkeys:', allMonkeys.value) // DEBUG
+
+    // 2. Load user doc
+    const userSnap = await getDoc(userRef)
+    const data = userSnap.data() || {}
+
+    const score = data.foodScore || 0
+    console.log('User score:', score) // DEBUG
+
+    // 3. Initialize monkey if missing
+    if (!data.monkey) {
+      const init = { selected: 'monkey1', unlocked: ['monkey1'] }
+      await setDoc(userRef, { monkey: init }, { merge: true })
+      userMonkey.value = init
+      console.log('Initialized monkey:', init)
+    } else {
+      userMonkey.value = {
+        selected: data.monkey.selected || 'monkey1',
+        unlocked: Array.isArray(data.monkey.unlocked) ? data.monkey.unlocked : []
+      }
+      console.log('Loaded monkey:', userMonkey.value)
+    }
+
+    // 4. FORCE UNLOCK ALL ELIGIBLE
+    const eligible = allMonkeys.value
+      .filter(m => m.requiredPoints <= score)
+      .map(m => m.id)
+
+    console.log('Eligible to unlock:', eligible) // DEBUG
+
+    const currentlyUnlocked = userMonkey.value.unlocked
+    const toUnlock = eligible.filter(id => !currentlyUnlocked.includes(id))
+
+    if (toUnlock.length > 0) {
+      console.log('UNLOCKING NOW:', toUnlock) // ← THIS MUST SHOW
+      await setDoc(userRef, {
+        'monkey.unlocked': arrayUnion(...toUnlock)
+      }, { merge: true })
+
+      userMonkey.value.unlocked = [...currentlyUnlocked, ...toUnlock]
+      console.log('Updated unlocked:', userMonkey.value.unlocked)
+    }
+
+    // 5. Force monkey1
+    if (!userMonkey.value.unlocked.includes('monkey1')) {
+      await setDoc(userRef, { 'monkey.unlocked': arrayUnion('monkey1') }, { merge: true })
+      userMonkey.value.unlocked.push('monkey1')
+    }
+
+  } catch (err) {
+    console.error('Monkey load error:', err)
+  }
+}
+
+const selectMonkey = async (id) => {
+  if (!userMonkey.value.unlocked.includes(id)) return
+
+  const userRef = doc(db, 'user', currentUser.value.uid)
+  await setDoc(userRef, { 'monkey.selected': id }, { merge: true })
+  userMonkey.value.selected = id
+}
+
+const scrollLeft = () => {
+  carouselRef.value?.scrollBy({ left: -140, behavior: 'smooth' })
+}
+const scrollRight = () => {
+  carouselRef.value?.scrollBy({ left: 140, behavior: 'smooth' })
+}
+
+onMounted(() => {
+  const unsubscribe = auth.onAuthStateChanged(async (user) => {
+    currentUser.value = user
+    if (user) {
+      await Promise.all([fetchLeaderboard(), loadMonkeys()])
+    }
+  })
+  onUnmounted(() => unsubscribe())
+})
+
+
 </script>
 
 <template>
+
+  
   <div class="container-fluid p-4">
+
+    <!-- Monkey Avatar Carousel -->
+     <!-- Monkey Carousel -->
+      <!-- Monkey Carousel -->
+<div class="glass-card p-4 mt-5">
+  <h3 class="h5 mb-3 text-center">
+    Choose Your Monkey
+    <span class="badge bg-success ms-2">
+      {{ userMonkey.unlocked.length }} / {{ allMonkeys.length }}
+    </span>
+    <div class="alert alert-info small mt-2">
+      Score: {{ currentUser.value?.foodScore || 0 }} | 
+      Unlocked: {{ userMonkey.unlocked.join(', ') }}
+    </div>
+  </h3>
+
+  <div class="monkey-carousel-container">
+    <!-- Left Arrow -->
+    <button @click="scrollLeft" class="carousel-arrow left">
+      <i class="bi bi-chevron-left"></i>
+    </button>
+
+    <!-- Carousel -->
+    <div ref="carouselRef" class="monkey-carousel">
+      <div
+        v-for="m in allMonkeys"
+        :key="m.id"
+        class="monkey-item"
+        :class="{ locked: !userMonkey.unlocked.includes(m.id), selected: userMonkey.selected === m.id }"
+        @click="selectMonkey(m.id)"
+      >
+        <div class="avatar-wrapper">
+          <MonkeyAvatar :monkey-id="m.id" size="100px" />
+          <div v-if="!userMonkey.unlocked.includes(m.id)" class="lock-overlay">
+            <i class="bi bi-lock-fill"></i>
+          </div>
+        </div>
+
+        <p v-if="userMonkey.unlocked.includes(m.id)" class="monkey-name mt-2 mb-0">
+          {{ m.name }}
+        </p>
+        <small v-else class="text-muted d-block">
+          Need {{ m.requiredPoints }} pts
+        </small>
+
+        <i v-if="userMonkey.selected === m.id" class="bi bi-check-circle-fill text-success mt-1"></i>
+      </div>
+    </div>
+
+    <!-- Right Arrow -->
+    <button @click="scrollRight" class="carousel-arrow right">
+      <i class="bi bi-chevron-right"></i>
+    </button>
+  </div>
+</div>
+
+
+
 
 
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
@@ -186,6 +346,7 @@ console.log(leaderboard)
           </div>
         </div>
       </div>
+
 
       <!-- Rest of Leaderboard -->
       <div class="glass-card p-4">
@@ -521,5 +682,126 @@ console.log(leaderboard)
     font-size: 0.65rem;
     padding: 0.2rem 0.5rem;
   }
+}
+
+.monkey-carousel-container {
+  position: relative;
+  max-width: 280px;
+  margin: 0 auto;
+  padding: 0 40px;
+}
+
+.monkey-carousel {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  gap: 1rem;
+  padding: 1rem 0;
+  scrollbar-width: none;
+}
+
+.monkey-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.monkey-item {
+  min-width: 200px;
+  max-width: 200px;
+  flex: 0 0 auto;
+  text-align: center;
+  padding: 1rem;
+  background: white;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 3px solid transparent;
+  scroll-snap-align: center;
+}
+
+.monkey-item:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+}
+
+.monkey-item.locked {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: grayscale(80%);
+}
+
+.monkey-item.selected {
+  border-color: #28a745;
+  background: #f8fff9;
+  box-shadow: 0 8px 20px rgba(40, 167, 69, 0.2);
+}
+
+.avatar-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100px;
+  height: 100px;
+}
+
+.lock-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.monkey-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 0.5rem 0 0;
+}
+
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  width: 40px;
+  height: 40px;
+  color: #555;
+  font-size: 1.8rem;
+  cursor: pointer;
+  z-index: 20;
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carousel-arrow:hover {
+  color: #28a745;
+}
+
+.carousel-arrow.left { left: 0; }
+.carousel-arrow.right { right: 0; }
+
+/* Responsive */
+@media (max-width: 480px) {
+  .monkey-carousel-container {
+    max-width: 220px;
+    padding: 0 30px;
+  }
+  .monkey-item {
+    min-width: 160px;
+    max-width: 160px;
+  }
+  .avatar-wrapper { width: 80px; height: 80px; }
 }
 </style>
