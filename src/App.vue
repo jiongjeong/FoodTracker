@@ -8,6 +8,20 @@
       <navbar v-if="showNavbar" />
       <router-view />
     </template>
+
+    <!-- Custom Alert Box -->
+    <CustomAlert
+      v-model:show="alertState.show"
+      :type="alertState.type"
+      :title="alertState.title"
+      :message="alertState.message"
+      :confirm-text="alertState.confirmText"
+      :cancel-text="alertState.cancelText"
+      :show-cancel="alertState.showCancel"
+      :close-on-overlay-click="alertState.closeOnOverlayClick"
+      @confirm="alertState.onConfirm"
+      @cancel="alertState.onCancel"
+    />
   </div>
 </template>
 
@@ -16,9 +30,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { auth } from '@/firebase'
 import navbar from '@/components/navbar/navbar.vue'
+import CustomAlert from '@/components/CustomAlert.vue'
+import { useAlert } from '@/composables/useAlert'
 
 const route = useRoute()
 const authLoading = ref(true)
+const { alertState } = useAlert()
 
 // Show navbar on all routes except login/signup/landing
 const showNavbar = computed(() => {

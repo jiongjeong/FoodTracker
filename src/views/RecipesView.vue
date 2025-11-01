@@ -141,13 +141,13 @@ const searchRecipes = async (query) => {
 
   isLoading.value = true
   errorMessage.value = ''
-  
+
   try {
     const response = await axios.get(`${API_BASE_URL}/search.php`, {
       params: { s: query },
       timeout: REQUEST_TIMEOUT
     })
-    
+
     if (response.data.meals) {
       searchResults.value = response.data.meals.map(meal => ({
         id: meal.idMeal,
@@ -178,7 +178,7 @@ const getSuggestedRecipes = async () => {
 
   isLoading.value = true
   errorMessage.value = ''
-  
+
   try {
     // Fetch food items from Firestore
     const q = query(collection(db, 'user', userId.value, 'foodItems'))
@@ -225,7 +225,7 @@ const getSuggestedRecipes = async () => {
     const allMeals = recipeResults.flat()
 
     // Remove duplicates and limit
-    const uniqueMeals = allMeals.filter((meal, index, self) => 
+    const uniqueMeals = allMeals.filter((meal, index, self) =>
       index === self.findIndex(m => m.idMeal === meal.idMeal)
     ).slice(0, MAX_SUGGESTED_RECIPES)
 
@@ -245,7 +245,7 @@ const getSuggestedRecipes = async () => {
             const ingredient = words[words.length - 1];
             return mealIngredients.some(ing => ing.includes(ingredient))
           }).map(food => food.name)
-          
+
           return {
             id: fullMeal.idMeal,
             name: fullMeal.strMeal,
@@ -379,12 +379,12 @@ watch(
   { immediate: true }
 )
 
-// Initialize on component mount
-onMounted(() => {
-  initializeRecipes()
+
+onMounted(async () => {
+
 })
 
-// Auth state change listener
+
 onAuthStateChanged(auth, async (u) => {
   user.value = u
   if (u) {
@@ -396,7 +396,7 @@ onAuthStateChanged(auth, async (u) => {
 </script>
 
 <template>
- 
+
 <div class="recipe-discovery-page" style="background: linear-gradient(180deg, #e8f5e9 0%, #ffffff 100%); min-height: 100vh;">
   <div class="container-fluid p-4">
     <!-- Hero Section -->
@@ -433,11 +433,11 @@ onAuthStateChanged(auth, async (u) => {
       </div>
 
       <!-- Category Pills -->
-      <div 
+      <div
           class="category-pills d-flex gap-2 overflow-auto pb-2 mb-3"
           style="scrollbar-width: none; -ms-overflow-style: none;"
         >
-        <button 
+        <button
           @click="activeTab = 'search'; searchQuery = ''"
           class="btn rounded-pill flex-shrink-0 px-4 py-2"
           :class="activeTab === 'search' ? 'btn-success text-white shadow-active' : 'btn-light shadow-soft'"
@@ -446,7 +446,7 @@ onAuthStateChanged(auth, async (u) => {
           See All
         </button>
 
-        <button 
+        <button
           @click="activeTab = 'suggested'"
           class="btn rounded-pill flex-shrink-0 px-4 py-2"
           :class="activeTab === 'suggested' ? 'btn-success text-white shadow-active' : 'btn-light shadow-soft'"
@@ -455,7 +455,7 @@ onAuthStateChanged(auth, async (u) => {
           <span class="me-2">💡</span>
           Recommended
       </button>
-        <button 
+        <button
           @click="activeTab = 'bookmarked'"
           class="btn rounded-pill flex-shrink-0 px-4 py-2"
           :class="activeTab === 'bookmarked' ? 'btn-success text-white shadow-active' : 'btn-light shadow-soft'"
@@ -501,8 +501,8 @@ onAuthStateChanged(auth, async (u) => {
               <div class="recipe-card position-relative shadow-sm" style="border-radius: 20px; overflow: hidden; background: white; cursor: pointer;" @click="viewRecipe(recipe)">
                 <div class="recipe-image-container position-relative" style="height: 250px;">
                   <img :src="recipe.image" :alt="recipe.name" class="w-100 h-100" style="object-fit: cover;" />
-                  
-                  <button 
+
+                  <button
                     @click.stop="toggleBookmark(recipe)"
                     class="position-absolute top-0 end-0 m-3 btn btn-light rounded-circle p-0"
                     style="width: 40px; height: 40px;"
@@ -545,14 +545,14 @@ onAuthStateChanged(auth, async (u) => {
               <div class="recipe-card position-relative shadow-sm" style="border-radius: 20px; overflow: hidden; background: white; cursor: pointer;" @click="viewRecipe(recipe)">
                 <div class="recipe-image-container position-relative" style="height: 250px;">
                   <img :src="recipe.image" :alt="recipe.name" class="w-100 h-100" style="object-fit: cover;" />
-                  
+
                   <div class="position-absolute top-0 start-0 m-3 px-3 py-2 rounded-pill" style="background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px);">
                     <span class="text-white small fw-semibold">
                       <i class="bi bi-clock me-1"></i>30 mins
                     </span>
                   </div>
 
-                  <button 
+                  <button
                     @click.stop="toggleBookmark(recipe)"
                     class="position-absolute top-0 end-0 m-3 btn btn-light rounded-circle p-0"
                     style="width: 40px; height: 40px; backdrop-filter: blur(10px);"
@@ -595,8 +595,8 @@ onAuthStateChanged(auth, async (u) => {
               <div class="recipe-card position-relative shadow-sm" style="border-radius: 20px; overflow: hidden; background: white; cursor: pointer;" @click="viewRecipe(recipe)">
                 <div class="recipe-image-container position-relative" style="height: 250px;">
                   <img :src="recipe.image" :alt="recipe.name" class="w-100 h-100" style="object-fit: cover;" />
-                  
-                  <button 
+
+                  <button
                     @click.stop="toggleBookmark(recipe)"
                     class="position-absolute top-0 end-0 m-3 btn btn-warning rounded-circle p-0"
                     style="width: 40px; height: 40px;"
@@ -624,12 +624,12 @@ onAuthStateChanged(auth, async (u) => {
       <div class="modal-content rounded-4">
         <div class="modal-body p-0">
           <button type="button" class="btn-close position-absolute top-0 end-0 m-3" style="z-index: 10;" @click="showRecipeModal = false"></button>
-          
+
           <div class="row g-0">
             <div class="col-md-5">
               <div class="p-4">
                 <img :src="selectedRecipe.image" :alt="selectedRecipe.name" class="img-fluid rounded-3 mb-3 w-100" style="aspect-ratio: 1; object-fit: cover;" />
-                
+
                 <div class="mb-3">
                   <h6 class="fw-bold mb-2"><i class="bi bi-info-circle me-2"></i>Recipe Info</h6>
                   <div class="d-flex gap-2 mb-2">
@@ -649,21 +649,21 @@ onAuthStateChanged(auth, async (u) => {
                 </div>
               </div>
             </div>
-            
+
             <div class="col-md-7 d-flex flex-column">
               <div class="p-4 flex-grow-1 d-flex flex-column">
                 <div class="mb-3">
                   <h3 class="fw-bold">{{ selectedRecipe.name }}</h3>
                   <p class="text-muted">Follow these step-by-step instructions</p>
                 </div>
-                
+
                 <div class="flex-grow-1 mb-3" style="overflow-y: auto;">
                   <h6 class="fw-bold mb-2"><i class="bi bi-clipboard-check me-2"></i>Instructions</h6>
                   <p class="text-secondary" style="white-space: pre-line;">{{ selectedRecipe.instructions }}</p>
                 </div>
-                
+
                 <div class="d-flex gap-2">
-                  <button 
+                  <button
                     @click="toggleBookmark(selectedRecipe)"
                     class="btn btn-sm flex-fill"
                     :class="isRecipeBookmarked(selectedRecipe.id) ? 'btn-warning' : 'btn-outline-warning'"
@@ -831,11 +831,11 @@ onAuthStateChanged(auth, async (u) => {
     border-right: none;
     border-bottom: 1px solid #dee2e6;
   }
-  
+
   .modal-content-section {
     min-height: auto;
   }
-  
+
   .recipe-name {
     font-size: 1.5rem;
   }

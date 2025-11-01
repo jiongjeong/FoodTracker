@@ -2,8 +2,11 @@
 import { useRouter } from 'vue-router';
 import { db } from '../firebase.js';
 import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp, query, where } from 'firebase/firestore';
-import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue';
+import { ref, computed, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
+import { useAlert} from '@/composables/useAlert.js';
+
+const { success, error, confirm } = useAlert();
 import {
   chartOptions,
   wasteVsSavingsOpts,
@@ -218,7 +221,7 @@ watch(userId, async (val) => {
     recipes.value = []
     activities.value = []
   }
-})
+}, { immediate: true })
 
 // Watch for expired foods and donations
 watchEffect(async () => {
@@ -260,28 +263,6 @@ watchEffect(async () => {
     }
   }
 
-  // Handle completed donations (donFood)
-  const donatedActivities = activities.value.filter(a => a.activityType === 'donFood')
-
-  for (const donActivity of donatedActivities) {
-    const foodIndex = foodItems.value.findIndex(f => f.name === donActivity.foodName)
-
-    if (foodIndex !== -1) {
-      const food = foodItems.value[foodIndex]
-      const donatedQty = Number(donActivity.quantity) || 0
-
-      if (donatedQty >= food.quantity) {
-        const refDoc = doc(db, 'user', uid, 'foodItems', food.id)
-        await deleteDoc(refDoc)
-        foodItems.value.splice(foodIndex, 1)
-      } else {
-        const newQty = food.quantity - donatedQty
-        const refDoc = doc(db, 'user', uid, 'foodItems', food.id)
-        await updateDoc(refDoc, { quantity: newQty })
-        foodItems.value[foodIndex].quantity = newQty
-      }
-    }
-  }
 })
 
 // Utility functions
@@ -758,11 +739,13 @@ const saveUse = async () => {
     } else {
       await updateDoc(refDoc, { quantity: newQty })
       foodItems.value[foodIndex].quantity = newQty
+      await success(`Consumed ${usedQty} ${food.unit} of ${food.name}`)
       showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`)
     }
     closeUse()
   } catch (err) {
     console.error('Failed to log used food:', err)
+    await error('Failed to update food usage.')
     showToastFor('Failed to update food usage.')
   }
 }
@@ -837,9 +820,11 @@ const saveAdd = async () => {
 
     showToastFor('Food item added and activity logged!')
     closeAdd()
+    await success('Food Added Successfully')
   } catch (error) {
     console.error('Error adding food item or activity:', error)
     showToastFor('Failed to add food item.')
+    await error('Failed to add food')
   }
 }
 
@@ -905,6 +890,7 @@ const saveEdit = async () => {
   if (idx !== -1) {
     foodItems.value[idx] = { ...foodItems.value[idx], ...payload }
   }
+  await success('Successfully Edited')
   closeEdit()
 }
 
@@ -939,7 +925,7 @@ const deleteFood = async (food) => {
     activities.value = activities.value.filter(
       (a) => !(a.foodName === food.name && a.activityType === 'addFood'),
     )
-
+    await success('Successfully Deleted')
     return true
   } catch (err) {
     console.error('Failed to delete food and its activity log:', err)
@@ -964,12 +950,6 @@ const confirmDelete = async () => {
   if (ok) showToastFor('Item deleted')
   else showToastFor('Failed to delete')
 }
-
-// On mounted
-onMounted(() => {
-  loadFoodItems()
-  loadActivities()
-})
 </script>
 
 <template>
@@ -1150,8 +1130,8 @@ onMounted(() => {
         </div>
       </div>
 
-        
-            
+
+
 
       <!-- Charts Section -->
       <div class="row g-4 mb-3" v-show="overviewCollapsed">
@@ -1284,9 +1264,9 @@ onMounted(() => {
             </div>
 
 
-      
 
-           
+
+
           </div>
         </div>
       </div>
@@ -1401,7 +1381,7 @@ onMounted(() => {
       <div class="col-lg-4 d-none d-lg-block d-flex flex-column h-100">
   <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0">
     <h3 class="h5 mb-3 fw-bold">Recent Activity</h3>
-    
+
     <div class="d-flex align-items-center justify-content-between mb-3">
       <div class="d-flex gap-2 w-100">
         <select
@@ -1435,13 +1415,13 @@ onMounted(() => {
         </button>
       </div>
     </div>
-    
+
     <div class="flex-grow-1 d-flex flex-column min-h-0">
       <div v-if="filteredSortedActivities.length === 0" class="text-center py-5 flex-grow-1">
         <i class="bi bi-activity display-1 text-muted opacity-25"></i>
         <p class="text-muted mt-3">No recent activity</p>
       </div>
-      
+
       <div v-else class="d-flex flex-column gap-3 activity-scroll flex-grow-1" style="overflow-y: auto; padding-right: 8px;">
         <div
           v-for="activity in filteredSortedActivities"
@@ -1451,7 +1431,7 @@ onMounted(() => {
           <div class="d-flex align-items-start gap-3">
             <!-- Icon Circle -->
             <div class="flex-shrink-0">
-              <div 
+              <div
                 class="rounded-circle d-flex align-items-center justify-content-center"
                 :style="{
                   width: '48px',
@@ -1466,26 +1446,26 @@ onMounted(() => {
             <!-- Content -->
             <div class="flex-grow-1 min-w-0">
               <h6 class="mb-1 fw-bold small">{{ getActivityTitle(activity.activityType) }}</h6>
-              
+
               <!-- Activity Details -->
               <div v-if="activity.activityType === 'donFood'" class="mb-1">
                 <p class="mb-0 small text-secondary">
                   {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} donated
                 </p>
               </div>
-              
+
               <div v-else-if="activity.activityType === 'pendingDonFood'" class="mb-1">
                 <p class="mb-0 small text-secondary">
                   {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} pending donation
                 </p>
               </div>
-              
+
               <div v-else-if="activity.activityType === 'addFood'" class="mb-1">
                 <p class="mb-0 small text-secondary">
                   {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added
                 </p>
               </div>
-              
+
               <div v-else-if="activity.activityType === 'conFood'" class="mb-1">
                 <p class="mb-0 small" :class="activity.note === 'fully consumed' ? 'text-success fw-semibold' : 'text-secondary'">
                   <span v-if="activity.note === 'fully consumed'">
@@ -1496,7 +1476,7 @@ onMounted(() => {
                   </span>
                 </p>
               </div>
-              
+
               <div v-else-if="activity.activityType === 'expFood'" class="mb-1">
                 <p class="mb-0 small text-danger fw-semibold">
                   {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
@@ -1677,6 +1657,8 @@ onMounted(() => {
 </template>
 
 <style scoped>
+
+
 .dashboard-overview {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.08) 100%);
   border: 1px solid rgba(16, 185, 129, 0.1);

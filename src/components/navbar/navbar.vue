@@ -135,6 +135,9 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { getAuth, signOut } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
+import { useAlert } from '@/composables/useAlert'
+
+const { error } = useAlert()
 
 const $route = useRoute()
 const router = useRouter()
@@ -195,9 +198,9 @@ async function logout() {
     sessionStorage.removeItem('user')
     window.dispatchEvent(new Event('userChange'))
     router.push('/login')
-  } catch (error) {
-    console.error('Logout error:', error)
-    alert('Error logging out: ' + error.message)
+  } catch (err) {
+    console.error('Logout error:', err)
+    await error('Error logging out: ' + err.message)
   }
 }
 const userInitials = computed(() => {

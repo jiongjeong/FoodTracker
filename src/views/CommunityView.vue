@@ -1,17 +1,20 @@
 <script setup>
-import { ref, onMounted, watch, computed, nextTick } from 'vue';
-import { db, auth } from '../firebase.js';
+import { ref, onMounted, watch, computed, nextTick } from 'vue'
+import { db, auth } from '../firebase.js'
 import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
-import LocationPicker from '@/components/LocationPicker.vue';
+import LocationPicker from '@/components/LocationPicker.vue'
 import { loadGoogleMaps } from '@/composables/loadGoogleMap.js'
+import { useAlert } from '@/composables/useAlert'
+
+const { success, error, warning, confirm } = useAlert()
 
 
 const mySharedItems = ref([])
 const sharedItems = ref([])
 const showContactModal = ref(false)
 const showShareModal = ref(false)
-const showEditModal = ref(false) // ← New modal for editing
+const showEditModal = ref(false)
 const selectedContact = ref(null)
 const currentUser = ref(null)
 const itemsWithDistance = ref([])
@@ -19,15 +22,22 @@ const preferredLocation = ref(null)
 const geometry = ref(null)
 const PREFERRED_LOC_KEY = 'foodshare_preferred_location'
 
-// Computed property to sort shared items
-const sortedMySharedItems = computed(() => {
-  return [...mySharedItems.value].sort((a, b) => {
-    // Non-donated items first (donated = false or undefined)
+const showDonatedItems = ref(false)
+
+// Show my shared items
+const displayedMySharedItems = computed(() => {
+  const sorted = [...mySharedItems.value].sort((a, b) => {
     if (!a.donated && b.donated) return -1
     if (a.donated && !b.donated) return 1
-    // If both have same donated status, maintain original order
     return 0
   })
+
+  // Filter based on toggle
+  if (showDonatedItems.value) {
+    return sorted
+  } else {
+    return sorted.filter(item => !item.donated)
+  }
 })
 
 const handleContact = (item) => {
@@ -35,7 +45,7 @@ const handleContact = (item) => {
   showContactModal.value = true
 }
 
-
+// Share Form ref
 const shareForm = ref({
   foodName: '',
   category: '',
@@ -48,7 +58,7 @@ const shareForm = ref({
   foodItemId: ''
 })
 
-// New edit form ref
+// Edit form ref
 const editForm = ref({
   id: '',
   foodName: '',
@@ -63,7 +73,6 @@ const editForm = ref({
 })
 
 const handleShareFood = async () => {
-  // DO NOT replace shareForm.value
   Object.assign(shareForm.value, {
     foodName: '',
     category: '',
@@ -75,16 +84,15 @@ const handleShareFood = async () => {
     location: null
   })
   showShareModal.value = true
-  await nextTick() // Wait for foodItems to be loaded
+  await nextTick()
   if (foodItems.value.length === 1) {
     const item = foodItems.value[0]
     shareForm.value.foodName = item.name
-    onSelectFoodItem() // ← Force populate foodItemId
+    onSelectFoodItem()
   }
 }
 
-
-// function to calculate days left until expiration
+// calculate days left until expiration
 const getDaysLeft = (food) => {
   const now = new Date()
   let expDate
@@ -108,6 +116,7 @@ const getDaysLeft = (food) => {
 
 const foodItems = ref([])
 
+// Load Food Items based on user
 async function loadFoodItems() {
   if (!currentUser.value) return;
   const foodItemsRef = collection(db, "user", currentUser.value.uid, "foodItems");
@@ -151,6 +160,7 @@ function onSelectFoodItem() {
   }
 }
 
+// Load user listings
 async function loadMyListings() {
   if (!currentUser.value) return;
   const q = query(
@@ -165,7 +175,7 @@ async function loadMyListings() {
     return {
       id: doc.id,
       foodId: data.foodId,
-      foodName,  // ← Use resolved name
+      foodName,
       ...data,
       daysUntilExpiration: getDaysLeft(data.expirationDate),
       pickupTime: data.pickupTime || 'Not specified',
@@ -174,7 +184,7 @@ async function loadMyListings() {
   })
 }
 
-
+// Load all Listings
 async function loadAvailableListings() {
   const sharedItemsRef = collection(db, "communityListings")
   const sharedItemsSnapshot = await getDocs(sharedItemsRef)
@@ -194,7 +204,7 @@ async function loadAvailableListings() {
         ownersMap[ownerId] = {
           name: userData.name || 'Anonymous',
           email: userData.email || '',
-          phone: userData.contactNo || 'Not provided',  // ← Fixed: contactNo instead of phone
+          phone: userData.contactNo || 'Not provided',
           handle: userData.handle || ''
         }
       } else {
@@ -216,6 +226,43 @@ async function loadAvailableListings() {
     }
   }
 
+  const ownerFoodIds = {}
+  sharedItemsSnapshot.docs.forEach(docSnap => {
+    const d = docSnap.data()
+    if (!d) return
+    const owner = d.ownerId
+    const fid = d.foodId
+    if (!owner || !fid) return
+    ownerFoodIds[owner] = ownerFoodIds[owner] || new Set()
+    ownerFoodIds[owner].add(fid)
+  })
+
+
+  const ownerFoodNameMap = {}
+  const fetchPromises = []
+  Object.keys(ownerFoodIds).forEach(ownerId => {
+    ownerFoodNameMap[ownerId] = {}
+    ownerFoodIds[ownerId].forEach(foodId => {
+      const p = (async () => {
+        try {
+          const foodDocRef = doc(db, 'user', ownerId, 'foodItems', foodId)
+          const foodSnap = await getDoc(foodDocRef)
+          if (foodSnap.exists()) {
+            ownerFoodNameMap[ownerId][foodId] = foodSnap.data().name || 'Unknown Item'
+          } else {
+            ownerFoodNameMap[ownerId][foodId] = 'Unknown Item'
+          }
+        } catch (e) {
+          console.warn(`Failed to fetch food item ${foodId} for owner ${ownerId}:`, e)
+          ownerFoodNameMap[ownerId][foodId] = 'Unknown Item'
+        }
+      })()
+      fetchPromises.push(p)
+    })
+  })
+
+  await Promise.all(fetchPromises)
+
   sharedItems.value = sharedItemsSnapshot.docs.map(doc => {
     const data = doc.data()
     const owner = ownersMap[data.ownerId] || {
@@ -225,15 +272,21 @@ async function loadAvailableListings() {
       handle: ''
     }
 
+
+    let resolvedFoodName = data.foodName || 'Unknown Item'
+    if ((!resolvedFoodName || resolvedFoodName === 'Unknown Item') && data.foodId && ownerFoodNameMap[data.ownerId]) {
+      resolvedFoodName = ownerFoodNameMap[data.ownerId][data.foodId] || resolvedFoodName
+    }
+
     return {
       id: doc.id,
       foodId: data.foodId,
-      foodName: data.foodName || 'Unknown Item',
+      foodName: resolvedFoodName,
       ...data,
       sharedBy: owner.name,
       contact: {
         email: owner.email,
-        phone: owner.phone,  // ← This now contains contactNo
+        phone: owner.phone,
         handle: owner.handle
       },
       daysUntilExpiration: getDaysLeft(data.expirationDate),
@@ -246,21 +299,50 @@ async function loadAvailableListings() {
 }
 
 
-
+// Share Food
 async function submitShare() {
-  if (!currentUser.value) return alert("Please log in first")
-  if (!shareForm.value.location?.lat || !shareForm.value.location?.lng) {
-    return alert('Please select a pickup location')
+  if (!currentUser.value) {
+    await error('Please log in first')
+    return
   }
+  if (!shareForm.value.location?.lat || !shareForm.value.location?.lng) {
+    await warning('Please select a pickup location')
+    return
+  }
+
+
+  if (!shareForm.value.foodItemId) {
+    await warning('Please select a valid food item')
+    return
+  }
+  const qtyToShare = Number(shareForm.value.quantity || 0)
+  if (!qtyToShare || qtyToShare <= 0) {
+    await warning('Please enter a valid quantity')
+    return
+  }
+
   try {
+
+    const remaining = getRemainingQuantity(shareForm.value.foodName)
+    if (qtyToShare > remaining) {
+      await warning(`You only have ${remaining} ${shareForm.value.unit} left to share.`)
+      return
+    }
+
+    // Prevent sharing expired items
+    if (shareForm.value.expirationDate && getDaysLeft(shareForm.value.expirationDate) === 0) {
+      await error('This item is expired and cannot be shared.')
+      return
+    }
+
     const expDate = new Date(shareForm.value.expirationDate)
 
     const data = {
       ownerId: currentUser.value.uid,
-      foodName: shareForm.value.foodName,
+      foodName: shareForm.value.foodName || '',
       foodId: shareForm.value.foodItemId,
       category: shareForm.value.category,
-      quantity: shareForm.value.quantity,
+      quantity: qtyToShare,
       unit: shareForm.value.unit,
       expirationDate: expDate,
       pickupTime: shareForm.value.pickupTime || 'Anytime',
@@ -274,29 +356,27 @@ async function submitShare() {
     }
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
+
+    // Decrement user's foodItem quantity once
     const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', shareForm.value.foodItemId)
     const currentItem = foodItems.value.find(f => f.id === shareForm.value.foodItemId)
     const currentQty = Number(currentItem?.quantity || 0)
-    const newQty = currentQty - Number(shareForm.value.quantity)
+    const newQty = Math.max(0, currentQty - qtyToShare)
 
-    if (newQty < 0) {
-      return alert('Insufficient quantity')
+    if (currentQty < qtyToShare) {
+      // Rollback created listing
+      try {
+        await deleteDoc(doc(db, 'communityListings', docRef.id))
+      } catch (rollbackErr) {
+        console.warn('Failed to rollback listing after insufficient qty:', rollbackErr)
+      }
+      await error('Insufficient quantity')
+      return
     }
 
-    await updateDoc(foodItemRef, {
-      quantity: newQty
-    })
+    await updateDoc(foodItemRef, { quantity: newQty })
 
-    await loadFoodItems()
-
-    await updateDoc(foodItemRef, {
-      quantity: Math.max(0, newQty)
-    })
-    const remaining = getRemainingQuantity(shareForm.value.foodName)
-    if (shareForm.value.quantity > remaining) {
-      return alert(`You only have ${remaining} ${shareForm.value.unit} left to share.`)
-    }
-
+    // Log pending donation activity
     await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
       activityType: 'pendingDonFood',
       createdAt: new Date().toISOString(),
@@ -308,16 +388,16 @@ async function submitShare() {
       unit: data.unit,
     })
 
-
     const savedDoc = await getDoc(docRef)
     console.log("Verified Firestore document:", savedDoc.data())
 
-    alert("Food shared successfully!")
+    await success("Food shared successfully!")
     showShareModal.value = false
     await loadMyListings()
     await loadFoodItems()
   } catch (err) {
     console.error("Error adding listing:", err)
+    await error('Failed to share food: ' + (err.message || err))
   }
 }
 
@@ -326,12 +406,13 @@ async function markAsDonated(item) {
   if (!confirm(`Mark "${item.foodName}" as donated?`)) return
 
   try {
-    // Update listing
+    // Update listing as donated
     await updateDoc(doc(db, 'communityListings', item.id), {
       donated: true,
       donatedAt: serverTimestamp()
     })
-    // Delete the pending donation activity first
+
+
     try {
       const pendingActivitiesQuery = query(
         collection(db, 'user', currentUser.value.uid, 'activities'),
@@ -361,12 +442,12 @@ async function markAsDonated(item) {
       unit: item.unit
     })
 
-    alert('Marked as donated!')
+    await success('Marked as donated!')
     await loadMyListings()
     await loadFoodItems()
   } catch (err) {
     console.error(err)
-    alert('Failed to mark as donated')
+    await error('Failed to mark as donated')
   }
 }
 
@@ -396,36 +477,43 @@ const getRemainingQuantity = (foodName) => {
   return Math.max(0, total - shared)
 }
 
+
+const isExpiredItem = (item) => {
+  if (!item || !item.expirationDate) return false
+
+  return getDaysLeft(item.expirationDate) === 0
+}
+
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser.value = user
     await loadFoodItems()
-    await buildFoodNameMap() // Add this
+    await buildFoodNameMap()
+    await loadMyListings()
     await loadAvailableListings()
     await loadDonationActivities()
+
+
+    if (geometry.value) {
+      calculateDistances()
+    }
   } else {
     currentUser.value = null
   }
 })
 
 
-// google maps and distance
 onMounted(async () => {
   const google = await loadGoogleMaps()
   geometry.value = google.maps.geometry
-
-  await loadAvailableListings()
-  await loadMyListings()
-  await loadFoodItems()
-  loadDonationActivities()
-
   loadPreferredLocation()
-  calculateDistances()
 
+  if (sharedItems.value.length > 0) {
+    calculateDistances()
+  }
 })
 
 function setPreferredLocation(place) {
-  // ENSURE plain object
   preferredLocation.value = {
     lat: Number(place.lat),
     lng: Number(place.lng),
@@ -472,7 +560,20 @@ function calculateDistances() {
     itemCount: sharedItems.value.length
   })
 
-  if (!preferredLocation.value || !geometry.value || sharedItems.value.length === 0) {
+  // If no items, clear the list
+  if (sharedItems.value.length === 0) {
+    itemsWithDistance.value = []
+    return
+  }
+
+  // If no preferred location, show all items without distance
+  if (!preferredLocation.value) {
+    itemsWithDistance.value = sharedItems.value.map(i => ({ ...i, distance: null }))
+    return
+  }
+
+  // If no geometry loaded yet, show items without distance
+  if (!geometry.value) {
     itemsWithDistance.value = sharedItems.value.map(i => ({ ...i, distance: null }))
     return
   }
@@ -487,8 +588,8 @@ function calculateDistances() {
     const itemLng = Number(item.location.lng)
 
     try {
-      const p1 = new google.maps.LatLng(userLat, userLng)
-      const p2 = new google.maps.LatLng(itemLat, itemLng)
+  const p1 = new window.google.maps.LatLng(userLat, userLng)
+  const p2 = new window.google.maps.LatLng(itemLat, itemLng)
       const meters = geometry.value.spherical.computeDistanceBetween(p1, p2)
       const km = (meters / 1000).toFixed(1)
       return { ...item, distance: `${km}km` + " Away" }
@@ -523,7 +624,7 @@ watch(foodItems, async () => {
 watch(
   [sharedItems, preferredLocation, geometry],
   () => {
-    if (sharedItems.value.length && preferredLocation.value && geometry.value) {
+    if (sharedItems.value.length && geometry.value) {
       console.log('Watcher triggered → calculating distances')
       calculateDistances()
     }
@@ -560,9 +661,13 @@ async function editDonated(item) {
 
 // Submit edit function - with proper error handling and rollback
 async function submitEdit() {
-  if (!currentUser.value) return alert("Please log in first")
+  if (!currentUser.value) {
+    await error('Please log in first')
+    return
+  }
   if (!editForm.value.location?.lat || !editForm.value.location?.lng) {
-    return alert('Please select a pickup location')
+    await warning('Please select a pickup location')
+    return
   }
 
   try {
@@ -573,7 +678,8 @@ async function submitEdit() {
     const listingSnap = await getDoc(listingRef)
 
     if (!listingSnap.exists()) {
-      return alert("Listing not found")
+      await error("Listing not found")
+      return
     }
 
     const originalListing = listingSnap.data()
@@ -590,10 +696,12 @@ async function submitEdit() {
         const currentFoodQty = Number(foodItemSnap.data().quantity || 0)
 
         if (currentFoodQty < qtyDifference) {
-          return alert(`Insufficient quantity. You only have ${currentFoodQty} ${editForm.value.unit} available.`)
+          await warning(`Insufficient quantity. You only have ${currentFoodQty} ${editForm.value.unit} available.`)
+          return
         }
       } else {
-        return alert('Food item not found')
+        await error('Food item not found')
+        return
       }
     }
 
@@ -634,6 +742,7 @@ async function submitEdit() {
         await updateDoc(listingRef, {
           quantity: originalQty
         })
+        console.warn('Failed to update food item quantity during edit:', foodItemError)
         throw new Error('Failed to update food item quantity. Changes rolled back.')
       }
     }
@@ -660,20 +769,22 @@ async function submitEdit() {
       // Don't rollback for activity errors as they're not critical
     }
 
-    alert("Listing updated successfully!")
+    await success("Listing updated successfully!")
     showEditModal.value = false
     await loadMyListings()
     await loadFoodItems()
     await loadDonationActivities()
   } catch (err) {
     console.error("Error updating listing:", err)
-    alert("Failed to update listing: " + err.message)
+    await error("Failed to update listing: " + err.message)
   }
 }
 
 // Cancel donated function - with proper error handling and rollback
 async function canDonated(item) {
-  if (!confirm(`Are you sure you want to cancel "${item.foodName}"? This will remove it from community listings.`)) {
+  const confirmed = await confirm(`Are you sure you want to cancel "${item.foodName}"? This will remove it from community listings.`, 'Cancel Donation')
+
+  if (!confirmed) {
     return
   }
 
@@ -687,7 +798,8 @@ async function canDonated(item) {
     const listingSnap = await getDoc(listingRef)
 
     if (!listingSnap.exists()) {
-      return alert("Listing not found")
+      await error("Listing not found")
+      return
     }
 
     deletedListing = { id: item.id, ...listingSnap.data() }
@@ -698,7 +810,8 @@ async function canDonated(item) {
     const foodItemSnap = await getDoc(foodItemRef)
 
     if (!foodItemSnap.exists()) {
-      return alert('Food item not found. Cannot cancel donation.')
+      await error('Food item not found. Cannot cancel donation.')
+      return
     }
 
     originalFoodQty = Number(foodItemSnap.data().quantity || 0)
@@ -715,6 +828,7 @@ async function canDonated(item) {
     } catch (foodItemError) {
       // Rollback: Recreate the listing
       await addDoc(collection(db, 'communityListings'), deletedListing)
+      console.warn('Failed to return quantity to food item during cancel:', foodItemError)
       throw new Error('Failed to update food item quantity. Listing restored.')
     }
 
@@ -737,7 +851,7 @@ async function canDonated(item) {
       // Don't rollback for activity errors as they're not critical
     }
 
-    alert('Donation cancelled successfully!')
+    await success('Donation cancelled successfully!')
 
     // Reload all data to reflect changes
     await loadMyListings()
@@ -745,7 +859,7 @@ async function canDonated(item) {
     await loadDonationActivities()
   } catch (err) {
     console.error('Error canceling donation:', err)
-    alert('Failed to cancel donation: ' + err.message)
+    await error('Failed to cancel donation: ' + err.message)
 
     // Reload to show current state
     await loadMyListings()
@@ -872,10 +986,23 @@ async function canDonated(item) {
           <p class="section-subtitle mb-0">Manage your food donations</p>
         </div>
       </div>
-      <button class="btn btn-gradient" @click="handleShareFood">
-        <i class="bi bi-plus-circle-fill me-2"></i>
-        Share Food
-      </button>
+      <div class="d-flex gap-2 align-items-center">
+        <!-- Toggle Donated Items Button -->
+        <button
+          v-if="mySharedItems.some(item => item.donated)"
+          class="btn btn-outline-secondary"
+          @click="showDonatedItems = !showDonatedItems"
+        >
+          <i :class="showDonatedItems ? 'bi bi-eye-slash' : 'bi bi-eye'" class="me-2"></i>
+          {{ showDonatedItems ? 'Hide' : 'Show' }} Donated ({{ mySharedItems.filter(i => i.donated).length }})
+        </button>
+
+        <!-- Share Food Button -->
+        <button class="btn btn-gradient" @click="handleShareFood">
+          <i class="bi bi-plus-circle-fill me-2"></i>
+          Share Food
+        </button>
+      </div>
     </div>
 
     <div class="section-body">
@@ -892,9 +1019,18 @@ async function canDonated(item) {
         </button>
       </div>
 
+      <!-- No Active Items State -->
+      <div v-else-if="displayedMySharedItems.length === 0" class="empty-state">
+        <div class="empty-state-icon">
+          <i class="bi bi-check-circle"></i>
+        </div>
+        <h5 class="empty-state-title">All items donated!</h5>
+        <p class="empty-state-text">Great job! Click "Show Donated" to see your donation history</p>
+      </div>
+
       <!-- Items Grid -->
       <div v-else class="items-grid">
-        <div v-for="item in sortedMySharedItems" :key="item.id" class="item-card-wrapper">
+        <div v-for="item in displayedMySharedItems" :key="item.id" class="item-card-wrapper">
           <div class="item-card" :class="{ 'item-card-donated': item.donated }">
             <!-- Status Badge -->
             <div class="card-status-badge" v-if="item.donated">
@@ -952,7 +1088,8 @@ async function canDonated(item) {
                   'expiry-normal': item.daysUntilExpiration > 5
                 }">
                   <i class="bi bi-calendar-x me-1"></i>
-                  Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}
+                  <span v-if="item.donated">Was expiring in {{ item.daysUntilExpiration }} days</span>
+                  <span v-else>Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}</span>
                 </div>
 
                 <button v-if="!item.donated" @click="markAsDonated(item)" class="btn-mark-donated">
@@ -1063,101 +1200,134 @@ async function canDonated(item) {
   <!-- Contact Modal -->
   <div v-if="showContactModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
     <div class="modal-backdrop fade show" @click="showContactModal = false" style="z-index: 1050;"></div>
-    <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">
-            <i class="bi bi-person-circle me-2"></i>
-            Contact {{ selectedContact?.sharedBy }}
-          </h5>
-          <button type="button" class="btn-close" @click="showContactModal = false"></button>
+    <div class="modal-dialog modal-dialog-centered contact-modal-dialog" style="z-index: 1060;">
+      <div class="modal-content contact-modal-content">
+        <!-- Header with gradient -->
+        <div class="contact-modal-header">
+          <div class="contact-avatar">
+            <i class="bi bi-person-fill"></i>
+          </div>
+          <div class="contact-header-info">
+            <h5 class="contact-name">{{ selectedContact?.sharedBy }}</h5>
+            <p class="contact-subtitle">Community Member</p>
+          </div>
+          <button type="button" class="btn-close btn-close-white" @click="showContactModal = false"></button>
         </div>
 
-        <div class="modal-body">
-          <div class="mb-4">
-            <h6 class="fw-semibold">About this item:</h6>
-            <p class="mb-1"><strong>{{ selectedContact?.foodName }}</strong> - {{ selectedContact?.quantity }} {{
-              selectedContact?.unit }}</p>
-            <small class="text-muted">Expires in {{ selectedContact?.daysUntilExpiration }} day(s)</small>
+        <!-- Food Item Card -->
+        <div class="contact-food-card">
+          <div class="food-card-icon">
+            <i class="bi bi-basket2-fill"></i>
           </div>
-
-          <div class="mb-3">
-            <h6 class="fw-semibold mb-3">Contact Information:</h6>
-
-            <div class="mb-3" v-if="selectedContact?.contact?.email">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <i class="bi bi-envelope text-primary"></i>
-                <strong>Email:</strong>
-              </div>
-              <a :href="`mailto:${selectedContact.contact.email}`" class="text-decoration-none">
-                {{ selectedContact.contact.email }}
-              </a>
-            </div>
-
-            <!-- Fixed phone section -->
-            <div class="mb-3"
-              v-if="selectedContact?.contact?.phone && selectedContact.contact.phone !== 'Not provided'">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <i class="bi bi-telephone text-success"></i>
-                <strong>Phone:</strong>
-              </div>
-              <a :href="`tel:${selectedContact.contact.phone}`" class="text-decoration-none">
-                {{ selectedContact.contact.phone }}
-              </a>
-            </div>
-            <div class="mb-3" v-else>
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <i class="bi bi-telephone text-muted"></i>
-                <strong>Phone:</strong>
-              </div>
-              <p class="mb-0 text-muted">Not provided</p>
-            </div>
-
-            <!-- Optional: Show handle -->
-            <div class="mb-3" v-if="selectedContact?.contact?.handle">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <i class="bi bi-at text-info"></i>
-                <strong>Handle:</strong>
-              </div>
-              <p class="mb-0">{{ selectedContact.contact.handle }}</p>
-            </div>
-
-            <div class="mb-3">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <i class="bi bi-geo-alt text-danger"></i>
-                <strong>Pickup Location:</strong>
-              </div>
-              <p class="mb-0">{{ selectedContact?.location?.address || 'Not specified' }}</p>
-            </div>
-
-            <div class="mb-3" v-if="selectedContact?.pickupTime && selectedContact.pickupTime !== 'Not specified'">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <i class="bi bi-clock text-info"></i>
-                <strong>Pickup Time:</strong>
-              </div>
-              <p class="mb-0">{{ selectedContact.pickupTime }}</p>
-            </div>
-
-            <div class="mb-3" v-if="selectedContact?.notes">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <i class="bi bi-chat-left-text text-warning"></i>
-                <strong>Notes:</strong>
-              </div>
-              <p class="mb-0">{{ selectedContact.notes }}</p>
+          <div class="food-card-details">
+            <h6 class="food-card-title">{{ selectedContact?.foodName }}</h6>
+            <div class="food-card-meta">
+              <span class="food-quantity">
+                <i class="bi bi-layers-fill me-1"></i>
+                {{ selectedContact?.quantity }} {{ selectedContact?.unit }}
+              </span>
+              <span class="food-expiry" :class="{
+                'expiry-urgent': selectedContact?.daysUntilExpiration <= 2,
+                'expiry-warning': selectedContact?.daysUntilExpiration <= 5 && selectedContact?.daysUntilExpiration > 2,
+                'expiry-normal': selectedContact?.daysUntilExpiration > 5
+              }">
+                <i class="bi bi-calendar-check me-1"></i>
+                {{ selectedContact?.daysUntilExpiration }} day{{ selectedContact?.daysUntilExpiration !== 1 ? 's' : '' }} left
+              </span>
             </div>
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showContactModal = false">
-            Close
+        <div class="modal-body contact-modal-body">
+          <!-- Contact Information Grid -->
+          <div class="contact-info-grid">
+            <!-- Email -->
+            <div class="contact-info-card" v-if="selectedContact?.contact?.email">
+              <div class="contact-info-icon email-icon">
+                <i class="bi bi-envelope-fill"></i>
+              </div>
+              <div class="contact-info-content">
+                <label class="contact-info-label">Email Address</label>
+                <a :href="`mailto:${selectedContact.contact.email}`" class="contact-info-value contact-link">
+                  {{ selectedContact.contact.email }}
+                </a>
+              </div>
+            </div>
+
+            <!-- Phone -->
+            <div class="contact-info-card" v-if="selectedContact?.contact?.phone && selectedContact.contact.phone !== 'Not provided'">
+              <div class="contact-info-icon phone-icon">
+                <i class="bi bi-telephone-fill"></i>
+              </div>
+              <div class="contact-info-content">
+                <label class="contact-info-label">Phone Number</label>
+                <a :href="`tel:${selectedContact.contact.phone}`" class="contact-info-value contact-link">
+                  {{ selectedContact.contact.phone }}
+                </a>
+              </div>
+            </div>
+            <div class="contact-info-card" v-else>
+              <div class="contact-info-icon phone-icon disabled">
+                <i class="bi bi-telephone-x-fill"></i>
+              </div>
+              <div class="contact-info-content">
+                <label class="contact-info-label">Phone Number</label>
+                <span class="contact-info-value text-muted">Not provided</span>
+              </div>
+            </div>
+
+            <!-- Handle -->
+            <div class="contact-info-card" v-if="selectedContact?.contact?.handle">
+              <div class="contact-info-icon handle-icon">
+                <i class="bi bi-at"></i>
+              </div>
+              <div class="contact-info-content">
+                <label class="contact-info-label">Telegram Handle</label>
+                <span class="contact-info-value">{{ selectedContact.contact.handle }}</span>
+              </div>
+            </div>
+
+            <!-- Location -->
+            <div class="contact-info-card contact-location-card">
+              <div class="contact-info-icon location-icon-cc">
+                <i class="bi bi-geo-alt-fill"></i>
+              </div>
+              <div class="contact-info-content">
+                <label class="contact-info-label">Pickup Location</label>
+                <span class="contact-info-value">{{ selectedContact?.location?.address || 'Not specified' }}</span>
+              </div>
+            </div>
+
+            <!-- Pickup Time -->
+            <div class="contact-info-card" v-if="selectedContact?.pickupTime && selectedContact.pickupTime !== 'Not specified'">
+              <div class="contact-info-icon time-icon">
+                <i class="bi bi-clock-fill"></i>
+              </div>
+              <div class="contact-info-content">
+                <label class="contact-info-label">Pickup Time</label>
+                <span class="contact-info-value">{{ selectedContact.pickupTime }}</span>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="contact-info-card contact-notes-card" v-if="selectedContact?.notes">
+              <div class="contact-info-icon notes-icon">
+                <i class="bi bi-chat-left-text-fill"></i>
+              </div>
+              <div class="contact-info-content">
+                <label class="contact-info-label">Additional Notes</label>
+                <span class="contact-info-value">{{ selectedContact.notes }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer with action buttons -->
+        <div class="contact-modal-footer">
+          <button type="button" class="btn btn-primary contact-btn-close-primary" @click="showContactModal = false">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            Got It
           </button>
-          <a v-if="selectedContact?.contact?.email"
-            :href="`mailto:${selectedContact.contact.email}?subject=Food Request - ${selectedContact.foodName}&body=Hi ${selectedContact.sharedBy}, I'm interested in your ${selectedContact.foodName}. Could we arrange a pickup?`"
-            class="btn btn-primary">
-            <i class="bi bi-envelope me-2"></i>
-            Send Email
-          </a>
         </div>
       </div>
     </div>
@@ -1184,14 +1354,18 @@ async function canDonated(item) {
                 :key="foodItems.map(i => i.id + ':' + i.quantity).join('|') + '|' + donationActivities.length">
                 <option value="" disabled>Select a food item...</option>
                 <option v-for="item in foodItems" :key="item.id" :value="item.name"
-                  :disabled="getRemainingQuantity(item.name) <= 0" :title="getRemainingQuantity(item.name) <= 0
+                  :disabled="getRemainingQuantity(item.name) <= 0 || isExpiredItem(item)"
+                  :title="getRemainingQuantity(item.name) <= 0
                     ? 'No quantity left to share'
-                    : `Remaining: ${getRemainingQuantity(item.name)} ${item.unit}`
+                    : isExpiredItem(item)
+                      ? 'Item expired'
+                      : `Remaining: ${getRemainingQuantity(item.name)} ${item.unit}`
                     ">
                   {{ item.name }}
-                  <small v-if="getRemainingQuantity(item.name) > 0" class="text-success ms-1">
+                  <small v-if="getRemainingQuantity(item.name) > 0 && !isExpiredItem(item)" class="text-success ms-1">
                     ({{ getRemainingQuantity(item.name) }} left)
                   </small>
+                  <small v-else-if="isExpiredItem(item)" class="text-danger ms-1">(expired)</small>
                   <small v-else class="text-muted ms-1">(none left)</small>
                 </option>
               </select>
@@ -1353,11 +1527,14 @@ async function canDonated(item) {
 <style scoped>
 /* Hero Section */
 .hero-section {
-  background: linear-gradient(135deg, #667eea 0%, #22aa74 100%);
+  background: url('community.jpg');
+  background-size: cover;
+  background-position: 10% 40%;
+  background-repeat: no-repeat;
   position: relative;
   overflow: hidden;
-  margin: -1rem -1rem 2rem -1rem;
-  padding: 2rem 0;
+  margin: -1rem 0 2rem 0;
+  padding: 2rem 1rem;
 }
 
 .hero-section::before {
@@ -1608,8 +1785,8 @@ async function canDonated(item) {
 
 @media (max-width: 768px) {
   .hero-section {
-    margin: -1rem -0.5rem 1.5rem -0.5rem;
-    padding: 1.5rem 0;
+    margin: -1rem 0 1.5rem 0;
+    padding: 1.5rem 1;
   }
 
   .hero-title {
@@ -1656,6 +1833,9 @@ async function canDonated(item) {
 }
 
 @media (max-width: 480px) {
+  .hero-section{
+    padding: 1.5rem 0.75rem;
+  }
   .hero-title {
     font-size: 1.5rem;
   }
@@ -1806,8 +1986,8 @@ async function canDonated(item) {
 /* Items Grid */
 .items-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); /* Changed from 320px to 240px */
+  gap: 1.25rem; /* Slightly reduced gap */
 }
 
 /* Item Card */
@@ -1829,7 +2009,7 @@ async function canDonated(item) {
 
 .item-card {
   background: white;
-  border-radius: 20px;
+  border-radius: 16px; /* Reduced from 20px */
   overflow: hidden;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
@@ -1864,13 +2044,13 @@ async function canDonated(item) {
 /* Status Badge */
 .card-status-badge {
   position: absolute;
-  top: 1rem;
-  left: 1rem;
+  top: 0.75rem;
+  left: 0.75rem;
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 10px;
-  font-size: 0.8rem;
+  padding: 0.4rem 0.8rem; /* Reduced from 0.5rem 1rem */
+  border-radius: 8px;
+  font-size: 0.75rem; /* Reduced from 0.8rem */
   font-weight: 700;
   z-index: 10;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
@@ -1886,13 +2066,13 @@ async function canDonated(item) {
 /* Distance Badge */
 .distance-badge {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 0.75rem;
+  right: 0.75rem;
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 10px;
-  font-size: 0.8rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
   font-weight: 700;
   z-index: 10;
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
@@ -1903,17 +2083,17 @@ async function canDonated(item) {
 /* Action Buttons */
 .card-action-buttons {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 0.75rem;
+  right: 0.75rem;
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
   z-index: 10;
 }
 
 .action-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 36px; /* Reduced from 40px */
+  height: 36px;
+  border-radius: 10px;
   border: none;
   display: flex;
   align-items: center;
@@ -2052,9 +2232,9 @@ async function canDonated(item) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.625rem 1rem;
-  border-radius: 10px;
-  font-size: 0.875rem;
+  padding: 0.5rem 0.8rem; /* Reduced from 0.625rem 1rem */
+  border-radius: 8px;
+  font-size: 0.8rem; /* Reduced from 0.875rem */
   font-weight: 700;
   width: 100%;
 }
@@ -2081,11 +2261,11 @@ async function canDonated(item) {
 .btn-mark-donated,
 .btn-contact {
   width: 100%;
-  padding: 0.875rem;
-  border-radius: 12px;
+  padding: 0.75rem; /* Reduced from 0.875rem */
+  border-radius: 10px;
   border: none;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.85rem; /* Reduced from 0.95rem */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2197,8 +2377,6 @@ async function canDonated(item) {
   border-radius: 0.5rem;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
   white-space: nowrap;
   border: none;
   transition: all 0.2s ease;
@@ -2220,7 +2398,7 @@ async function canDonated(item) {
 .action-buttons .btn-secondary:hover {
   background-color: #5a6268;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
 }
 
 .action-buttons .btn-secondary:active {
@@ -2433,6 +2611,502 @@ async function canDonated(item) {
   .action-buttons .btn {
     min-width: 40px;
     min-height: 40px;
+  }
+}
+
+/* ============================================
+   CONTACT MODAL BEAUTIFICATION
+   ============================================ */
+
+/* Contact Modal Dialog */
+.contact-modal-dialog {
+  max-width: 600px;
+  margin: 1rem auto;
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  align-items: center;
+}
+
+.contact-modal-content {
+  border-radius: 24px;
+  overflow: hidden;
+  border: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Contact Modal Header with Gradient */
+.contact-modal-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 1.5rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  position: relative;
+  border: none;
+  flex-shrink: 0;
+}
+
+.contact-avatar {
+  width: 70px;
+  height: 70px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.contact-avatar i {
+  font-size: 2rem;
+  color: white;
+}
+
+.contact-header-info {
+  flex: 1;
+}
+
+.contact-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.contact-subtitle {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0.25rem 0 0 0;
+  font-weight: 500;
+}
+
+.btn-close-white {
+  filter: brightness(0) invert(1);
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+.btn-close-white:hover {
+  opacity: 1;
+  transform: rotate(90deg);
+}
+
+/* Food Item Card */
+.contact-food-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #e5e7eb 100%);
+  padding: 1.25rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  border-bottom: 3px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.food-card-icon {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
+  flex-shrink: 0;
+}
+
+.food-card-icon i {
+  font-size: 1.75rem;
+  color: white;
+}
+
+.food-card-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.food-card-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 0.5rem 0;
+}
+
+.food-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.food-quantity {
+  display: inline-flex;
+  align-items: center;
+  background: white;
+  padding: 0.375rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.food-expiry {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.375rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.food-expiry.expiry-urgent {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #991b1b;
+}
+
+.food-expiry.expiry-warning {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+}
+
+.food-expiry.expiry-normal {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  color: #065f46;
+}
+
+/* Contact Modal Body */
+.contact-modal-body {
+  padding: 1.5rem 2rem;
+  background: white;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Contact Info Grid */
+.contact-info-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+.contact-info-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 16px;
+  border: 2px solid #e5e7eb;
+  transition: all 0.3s ease;
+}
+
+.contact-info-card:hover {
+  border-color: #667eea;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.15);
+  transform: translateY(-2px);
+}
+
+.contact-info-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.email-icon {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+.phone-icon {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.phone-icon.disabled {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+}
+
+.handle-icon {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+}
+
+.location-icon-cc{
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+}
+
+.time-icon {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+}
+
+.notes-icon {
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+  color: white;
+}
+
+.contact-info-icon i {
+  font-size: 1.25rem;
+}
+
+.contact-info-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-info-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 0.375rem;
+}
+
+.contact-info-value {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  word-break: break-word;
+}
+
+.contact-link {
+  color: #3b82f6;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.contact-link:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+/* Special cards that span full width */
+.contact-location-card,
+.contact-notes-card {
+  grid-column: 1 / -1;
+}
+
+/* Contact Modal Footer */
+.contact-modal-footer {
+  padding: 1.25rem 2rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #e5e7eb 100%);
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  border-top: 2px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.contact-btn-close-primary {
+  padding: 0.75rem 2rem;
+  border-radius: 12px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+  min-width: 140px;
+}
+
+.contact-btn-close-primary:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+/* Responsive Design for Contact Modal */
+@media (max-width: 768px) {
+  .contact-modal-dialog {
+    margin: 0.5rem;
+    max-height: calc(100vh - 1rem);
+  }
+
+  .contact-modal-content {
+    max-height: calc(100vh - 1rem);
+    border-radius: 16px;
+  }
+
+  .contact-modal-header {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .contact-avatar {
+    width: 55px;
+    height: 55px;
+  }
+
+  .contact-avatar i {
+    font-size: 1.5rem;
+  }
+
+  .contact-name {
+    font-size: 1.15rem;
+  }
+
+  .contact-subtitle {
+    font-size: 0.825rem;
+  }
+
+  .contact-food-card {
+    padding: 1rem 1.5rem;
+  }
+
+  .food-card-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .food-card-icon i {
+    font-size: 1.4rem;
+  }
+
+  .food-card-title {
+    font-size: 1rem;
+  }
+
+  .contact-modal-body {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .contact-info-card {
+    padding: 1rem;
+  }
+
+  .contact-info-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .contact-info-icon i {
+    font-size: 1rem;
+  }
+
+  .contact-modal-footer {
+    padding: 1rem 1.5rem;
+  }
+
+  .contact-btn-close-primary {
+    width: 100%;
+    justify-content: center;
+    padding: 0.625rem 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .contact-modal-dialog {
+    margin: 0.5rem;
+    max-height: calc(100vh - 1rem);
+  }
+
+  .contact-modal-content {
+    max-height: calc(100vh - 1rem);
+    border-radius: 12px;
+  }
+
+  .contact-modal-header {
+    flex-direction: row;
+    text-align: left;
+    padding: 1rem 1.25rem;
+    gap: 1rem;
+  }
+
+  .contact-avatar {
+    width: 50px;
+    height: 50px;
+  }
+
+  .contact-avatar i {
+    font-size: 1.25rem;
+  }
+
+  .contact-name {
+    font-size: 1rem;
+  }
+
+  .contact-subtitle {
+    font-size: 0.75rem;
+  }
+
+  .contact-food-card {
+    padding: 1rem 1.25rem;
+  }
+
+  .food-card-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .food-card-icon i {
+    font-size: 1.25rem;
+  }
+
+  .food-card-title {
+    font-size: 0.95rem;
+  }
+
+  .food-card-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .food-quantity,
+  .food-expiry {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .contact-modal-body {
+    padding: 1rem 1.25rem;
+  }
+
+  .contact-info-card {
+    padding: 0.875rem;
+    gap: 0.75rem;
+  }
+
+  .contact-info-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .contact-info-icon i {
+    font-size: 0.95rem;
+  }
+
+  .contact-info-label {
+    font-size: 0.7rem;
+  }
+
+  .contact-info-value {
+    font-size: 0.9rem;
+  }
+
+  .contact-modal-footer {
+    padding: 0.875rem 1.25rem;
+  }
+
+  .contact-btn-close-primary {
+    padding: 0.625rem 1rem;
+    font-size: 0.9rem;
+    width: 100%;
   }
 }
 </style>
