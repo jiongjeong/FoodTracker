@@ -127,14 +127,20 @@ const startWalking = () => {
 
 /* ---------- PANNING ---------- */
 const startPan = e => {
+  // don't start panning when the pointer started inside a monkey element
+  // handle both mouse and touch events
+  const target = (e.touches && e.touches[0] && document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY)) || e.target
+  if (target && target.closest && target.closest('.monkey')) return
+
   if (e.button && e.button !== 0) return
   isPanning.value = true
   const clientX = e.touches ? e.touches[0].clientX : e.clientX
   const clientY = e.touches ? e.touches[0].clientY : e.clientY
   startX.value = clientX - translateX.value
   startY.value = clientY - translateY.value
-  panContainer.value.style.cursor = 'grabbing'
+  if (panContainer.value) panContainer.value.style.cursor = 'grabbing'
 }
+
 const onPan = e => {
   if (!isPanning.value) return
   e.preventDefault()
@@ -149,10 +155,12 @@ const endPan = () => {
 }
 
 /* ---------- ZOOMING ---------- */
-const onWheel = e => {
-  e.preventDefault()
-  const delta = e.deltaY > 0 ? -1 : 1
-  zoomAtPoint(delta * zoomStep, e.clientX, e.clientY)
+const onWheel = (event) => {
+  if (event.ctrlKey || event.metaKey) {
+    event.preventDefault()
+    const delta = Math.sign(event.deltaY)
+    zoomLevel.value = Math.max(50, Math.min(200, zoomLevel.value - delta * 5))
+  }
 }
 const zoomIn = () => {
   if (!panContainer.value) return
@@ -199,90 +207,106 @@ const monkeyStyle = m => ({
   transition: m.isYou ? 'none' : 'left 0.1s linear, top 0.1s linear'
 })
 
+// on hover, change to banana monkey
+const monkeySrc = (monkey) => {
+  const isHovered = hoveredMonkey.value === monkey.uid
+  const normal = `/monkey/${monkey.monkeyId}.png`
+  const banana = `/bananagif.gif`  // ← SAME IMAGE FOR ALL
+  return isHovered ? banana : normal
+}
+
 const onMonkeyClick = m => alert(`${m.name} – ${m.monkeyId}`)
 const zoomLevel = computed(() => Math.round(zoom.value * 100))
-const onHover = m => { hoveredMonkey.value = m.uid }
+const onHover = (uid) => { hoveredMonkey.value = uid }
 const onHoverLeave = () => { hoveredMonkey.value = null }
 </script>
 
 <template>
     <VillageHeader />
-    
-  <div
-    class="village-page"
-    @mousedown="startPan"
-    @mousemove="onPan"
-    @mouseup="endPan"
-    @mouseleave="endPan"
-    @wheel.prevent="onWheel"
-    @touchstart="startPan"
-    @touchmove="onPan"
-    @touchend="endPan"
-  >
-    <div ref="panContainer" class="pan-container" :style="panStyle">
-      <img
-        ref="villageImg"
-        src="/monkeyvillage.png"
-        class="village-bg"
-        alt="Monkey Village"
-      />
 
-      <!-- Monkeys -->
-      <div
-        v-for="monkey in allMonkeys"
-        :key="monkey.uid"
-        class="monkey"
-        :class="{ you: monkey.isYou, hover: hoveredMonkey === monkey.uid }"
-        :style="monkeyStyle(monkey)"
-        @mouseenter="onHover(monkey)"
-        @mouseleave="onHoverLeave"
-        @click.stop="onMonkeyClick(monkey)"
-      >
-        <img :src="`/monkey/${monkey.monkeyId}.png`" class="monkey-img" />
+    <div
+      class="village-page"
+      @wheel="onWheel"
+    >
+    <div
+      ref="panContainer"
+      class="pan-container"
+      :style="panStyle"
+      @mousedown="startPan"
+      @mousemove="onPan"
+      @mouseup="endPan"
+      @mouseleave="endPan"
+      @touchstart="startPan"
+      @touchmove="onPan"
+      @touchend="endPan"
+    >
 
-        <!-- POPUP -->
-        <div v-if="hoveredMonkey === monkey.uid" class="popup">
-          <div class="popup-name">{{ monkey.name }}</div>
-          <div class="popup-score">Score: {{ monkey.score }}</div>
+        <img
+          ref="villageImg"
+          src="/monkeyvillage.png"
+          class="village-bg"
+          alt="Monkey Village"
+        />
+
+        <!-- Monkeys -->
+        <div
+          v-for="monkey in allMonkeys"
+          :key="monkey.uid"
+          class="monkey"
+          :class="{ you: monkey.isYou, hover: hoveredMonkey === monkey.uid }"
+          :style="monkeyStyle(monkey)"
+        >
+        <img
+          :src="monkeySrc(monkey)"
+          class="monkey-img"
+          @mouseenter="onHover(monkey.uid)"
+          @mouseleave="onHoverLeave"
+          @click.stop="onMonkeyClick(monkey)"
+          alt=""
+        />
+
+          <!-- POPUP -->
+          <div v-if="hoveredMonkey === monkey.uid" class="popup">
+            <div class="popup-name">{{ monkey.name }}</div>
+            <div class="popup-score">Score: {{ monkey.score }}</div>
+          </div>
+
+          <!-- Labels -->
+          <div v-if="monkey.isYou" class="you-label">You</div>
+          <div v-else class="name-label">{{ monkey.name }}</div>
         </div>
-
-        <!-- Labels -->
-        <div v-if="monkey.isYou" class="you-label">You</div>
-        <div v-else class="name-label">{{ monkey.name }}</div>
       </div>
-    </div>
 
-    <!-- Zoom controls -->
-    <div class="zoom-controls">
-      <button @click="zoomIn" class="zoom-btn">+</button>
-      <button @click="zoomOut" class="zoom-btn">-</button>
-      <div class="zoom-level">{{ zoomLevel }}%</div>
-    </div>
+      <!-- Zoom controls -->
+      <div class="zoom-controls">
+        <button @click="zoomIn" class="zoom-btn">+</button>
+        <button @click="zoomOut" class="zoom-btn">-</button>
+        <div class="zoom-level">{{ zoomLevel }}%</div>
+      </div>
 
-    <LeaderboardSidebar />
-  </div>
+      <LeaderboardSidebar />
+    </div>
 </template>
 
 <style scoped>
-/* Full-screen page */
+/* Full-screen village section */
 .village-page {
-  position: fixed;
-  inset: 0;
+  width: 100%;
+  /* height: 100vh; */
+  position: relative;
   overflow: hidden;
-  background: #000;
+  background: transparent;
   user-select: none;
   cursor: grab;
-  padding-top: 80px;
 }
 
 /* Pan container */
 .pan-container {
   position: relative;
   width: 100vw;
-  height: 100vh;
+  /* height: 100vh; */
 }
 
-/* Village image – default: fill screen */
 .village-bg {
   width: 100vw;
   height: 100vh;
@@ -308,14 +332,24 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
   border-radius: 50%;
   box-shadow: 0 4px 8px rgba(0,0,0,.4);
 }
-.monkey.hover .monkey-img {
+.monkey-img:hover {
   filter: brightness(1.4) hue-rotate(60deg) drop-shadow(0 0 12px #FFD700);
   border-color: #FFD700;
   transform: scale(1.15);
+  transition: all 0.2s ease;
 }
+
 .monkey.you .monkey-img {
   border-color: #FFD700;
   box-shadow: 0 0 16px #FFD700;
+}
+
+.monkey, .monkey-img {
+  pointer-events: auto;
+}
+
+.popup, .you-label, .name-label {
+  pointer-events: none;
 }
 
 /* ---------- LABELS & POPUP ---------- */
@@ -392,19 +426,4 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
 .zoom-btn:hover { background:#555; transform:scale(1.1); }
 .zoom-level { color:#fff; font-weight:bold; min-width:44px; text-align:center; font-size:14px; }
 
-/* ---------- MOBILE: ≤576px – FULL SCREEN, NO BLACK ---------- */
-@media (max-width: 576px) {
-  .village-page {
-    overflow: hidden;           /* no scroll – image fills screen */
-  }
-  .pan-container {
-    height: 100vh;
-  }
-  .village-bg {
-    width: 100vw;
-    height: 100vh;
-    object-fit: cover;          /* ← FILLS ENTIRE SCREEN */
-    object-position: center;
-  }
-}
 </style>
