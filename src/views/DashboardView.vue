@@ -1220,35 +1220,42 @@ const confirmDelete = async () => {
             <div class="row g-0">
               <!-- Left panel -->
               <div class="col-md-4">
-              <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                  <div class="d-flex align-items-center mb-2">
-                    <div class="bg-warning bg-opacity-25 rounded-circle p-2 me-2">
-                      <i class="bi bi-trophy text-warning fs-5"></i>
-                    </div>
-                    <h6 class="card-title fw-semibold mb-0">Leaderboard Insights</h6>
-                  </div>
-                  <p class="card-text text-secondary small mb-0">
-                    {{ leaderboardMessage }}
-                  </p>
-                </div>
-              </div>
-            </div>
+  <div class="card shadow-sm h-100 position-relative overflow-visible leaderboard-card">
+    
+    <div class="card-body text-center pt-4">
+      <!-- Icon Circle -->
+      <div class="d-flex align-items-center justify-content-center mx-auto mb-3 rounded-circle icon-circle-hover" 
+            style="width: 80px; height: 80px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #f59e0b; transition: all 0.3s ease;">
+        <i class="bi bi-trophy fs-1"></i>
+      </div>
+      
+      <!-- Title -->
+      <h6 class="fw-bold mb-3 title-hover" style="font-size: 1.25rem; transition: color 0.3s ease;">
+        Leaderboard Insights
+      </h6>
+      
+      <!-- Description -->
+      <p class="text-secondary small mb-0 lh-base">
+        {{ leaderboardMessage }}
+      </p>
+    </div>
+  </div>
+</div>
 
               <!-- Right panel -->
               <div class="col-md-8 p-3 p-md-4">
                 <div class="d-flex align-items-center justify-content-between mb-3">
-                  <h5 class="mb-0">
+                  <h5 class="mb-0 fw-bold">
                     <i class="bi bi-activity me-2"></i>
                     Waste vs Savings
                   </h5>
                   <div class="d-flex align-items-center small fw-semibold">
                     <span class="me-3 d-inline-flex align-items-center">
-                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
+                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #FFA449"></span>
                       Savings
                     </span>
                     <span class="d-inline-flex align-items-center">
-                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #FFA449;"></span>
+                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
                       Waste
                     </span>
                   </div>
@@ -1322,7 +1329,7 @@ const confirmDelete = async () => {
 
         <div class="col-lg-4">
           <div class="glass-card p-4">
-            <h5 class="mb-3">
+            <h5 class="mb-3 fw-bold">
               <i class="bi bi-pie-chart me-2"></i>
               Waste by Category
             </h5>
@@ -2095,7 +2102,30 @@ const confirmDelete = async () => {
       0 0 0 rgba(229, 57, 53, 0);
   }
 }
+.overflow-visible {
+  overflow: visible;
+}
 
+.leaderboard-card {
+  transition: all 0.3s ease;
+  border:1px solid white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06)
+}
+
+.leaderboard-card:hover {
+  transform: translateY(-4px);
+ box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.04);
+  border:1px solid  #f59e0b;
+}
+
+.leaderboard-card:hover .icon-circle:hover {
+  transform: scale(1.1);
+  background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+}
+
+.leaderboard-card:hover .title-hover {
+  color: #f59e0b ;
+}
 /* Make activity card scrollable and match inventory height */
 .activity-scroll {
   min-height: 0;
