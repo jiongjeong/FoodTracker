@@ -164,7 +164,11 @@ export default {
           contactNo: "",
           handle: "",
           foodScore: 0,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          monkey: { selected: 'monkey1',
+            unlocked: ['monkey1']
+           },
+          village: { x: 45, y: 60}
         });
 
         await this.initializeUserCollections(user.uid);
