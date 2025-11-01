@@ -5,6 +5,9 @@ import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, upd
 import { onAuthStateChanged } from "firebase/auth"
 import LocationPicker from '@/components/LocationPicker.vue'
 import { loadGoogleMaps } from '@/composables/loadGoogleMap.js'
+import { useAlert } from '@/composables/useAlert'
+
+const { success, error, warning, confirm } = useAlert()
 
 
 const mySharedItems = ref([])
@@ -21,6 +24,7 @@ const PREFERRED_LOC_KEY = 'foodshare_preferred_location'
 
 const showDonatedItems = ref(false)
 
+// Show my shared items
 const displayedMySharedItems = computed(() => {
   const sorted = [...mySharedItems.value].sort((a, b) => {
     if (!a.donated && b.donated) return -1
@@ -41,7 +45,7 @@ const handleContact = (item) => {
   showContactModal.value = true
 }
 
-
+// Share Form ref
 const shareForm = ref({
   foodName: '',
   category: '',
@@ -54,7 +58,7 @@ const shareForm = ref({
   foodItemId: ''
 })
 
-// New edit form ref
+// Edit form ref
 const editForm = ref({
   id: '',
   foodName: '',
@@ -69,7 +73,6 @@ const editForm = ref({
 })
 
 const handleShareFood = async () => {
-  // DO NOT replace shareForm.value
   Object.assign(shareForm.value, {
     foodName: '',
     category: '',
@@ -89,7 +92,7 @@ const handleShareFood = async () => {
   }
 }
 
-// function to calculate days left until expiration
+// calculate days left until expiration
 const getDaysLeft = (food) => {
   const now = new Date()
   let expDate
@@ -113,6 +116,7 @@ const getDaysLeft = (food) => {
 
 const foodItems = ref([])
 
+// Load Food Items based on user
 async function loadFoodItems() {
   if (!currentUser.value) return;
   const foodItemsRef = collection(db, "user", currentUser.value.uid, "foodItems");
@@ -156,6 +160,7 @@ function onSelectFoodItem() {
   }
 }
 
+// Load user listings
 async function loadMyListings() {
   if (!currentUser.value) return;
   const q = query(
@@ -179,7 +184,7 @@ async function loadMyListings() {
   })
 }
 
-
+// Load all Listings
 async function loadAvailableListings() {
   const sharedItemsRef = collection(db, "communityListings")
   const sharedItemsSnapshot = await getDocs(sharedItemsRef)
@@ -267,7 +272,7 @@ async function loadAvailableListings() {
       handle: ''
     }
 
-    // Resolve food name: prefer stored foodName, then ownerFoodNameMap, then fallback
+
     let resolvedFoodName = data.foodName || 'Unknown Item'
     if ((!resolvedFoodName || resolvedFoodName === 'Unknown Item') && data.foodId && ownerFoodNameMap[data.ownerId]) {
       resolvedFoodName = ownerFoodNameMap[data.ownerId][data.foodId] || resolvedFoodName
@@ -281,7 +286,7 @@ async function loadAvailableListings() {
       sharedBy: owner.name,
       contact: {
         email: owner.email,
-        phone: owner.phone,  // ← This now contains contactNo
+        phone: owner.phone,
         handle: owner.handle
       },
       daysUntilExpiration: getDaysLeft(data.expirationDate),
@@ -294,28 +299,40 @@ async function loadAvailableListings() {
 }
 
 
-
+// Share Food
 async function submitShare() {
-  if (!currentUser.value) return alert("Please log in first")
+  if (!currentUser.value) {
+    await error('Please log in first')
+    return
+  }
   if (!shareForm.value.location?.lat || !shareForm.value.location?.lng) {
-    return alert('Please select a pickup location')
+    await warning('Please select a pickup location')
+    return
   }
 
-  // Basic validations
-  if (!shareForm.value.foodItemId) return alert('Please select a valid food item')
+
+  if (!shareForm.value.foodItemId) {
+    await warning('Please select a valid food item')
+    return
+  }
   const qtyToShare = Number(shareForm.value.quantity || 0)
-  if (!qtyToShare || qtyToShare <= 0) return alert('Please enter a valid quantity')
+  if (!qtyToShare || qtyToShare <= 0) {
+    await warning('Please enter a valid quantity')
+    return
+  }
 
   try {
-    // Check remaining quantity BEFORE writing to Firestore
+
     const remaining = getRemainingQuantity(shareForm.value.foodName)
     if (qtyToShare > remaining) {
-      return alert(`You only have ${remaining} ${shareForm.value.unit} left to share.`)
+      await warning(`You only have ${remaining} ${shareForm.value.unit} left to share.`)
+      return
     }
 
     // Prevent sharing expired items
     if (shareForm.value.expirationDate && getDaysLeft(shareForm.value.expirationDate) === 0) {
-      return alert('This item is expired and cannot be shared.')
+      await error('This item is expired and cannot be shared.')
+      return
     }
 
     const expDate = new Date(shareForm.value.expirationDate)
@@ -338,7 +355,6 @@ async function submitShare() {
       }
     }
 
-    // Reserve listing in communityListings
     const docRef = await addDoc(collection(db, "communityListings"), data)
 
     // Decrement user's foodItem quantity once
@@ -354,7 +370,8 @@ async function submitShare() {
       } catch (rollbackErr) {
         console.warn('Failed to rollback listing after insufficient qty:', rollbackErr)
       }
-      return alert('Insufficient quantity')
+      await error('Insufficient quantity')
+      return
     }
 
     await updateDoc(foodItemRef, { quantity: newQty })
@@ -374,13 +391,13 @@ async function submitShare() {
     const savedDoc = await getDoc(docRef)
     console.log("Verified Firestore document:", savedDoc.data())
 
-    alert("Food shared successfully!")
+    await success("Food shared successfully!")
     showShareModal.value = false
     await loadMyListings()
     await loadFoodItems()
   } catch (err) {
     console.error("Error adding listing:", err)
-    alert('Failed to share food: ' + (err.message || err))
+    await error('Failed to share food: ' + (err.message || err))
   }
 }
 
@@ -425,12 +442,12 @@ async function markAsDonated(item) {
       unit: item.unit
     })
 
-    alert('Marked as donated!')
+    await success('Marked as donated!')
     await loadMyListings()
     await loadFoodItems()
   } catch (err) {
     console.error(err)
-    alert('Failed to mark as donated')
+    await error('Failed to mark as donated')
   }
 }
 
@@ -460,10 +477,10 @@ const getRemainingQuantity = (foodName) => {
   return Math.max(0, total - shared)
 }
 
-// Check if a food item (from user's foodItems) is expired
+
 const isExpiredItem = (item) => {
   if (!item || !item.expirationDate) return false
-  // getDaysLeft returns 0 for expired
+
   return getDaysLeft(item.expirationDate) === 0
 }
 
@@ -471,32 +488,32 @@ onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser.value = user
     await loadFoodItems()
-    await buildFoodNameMap() // Add this
+    await buildFoodNameMap()
+    await loadMyListings()
     await loadAvailableListings()
     await loadDonationActivities()
+
+
+    if (geometry.value) {
+      calculateDistances()
+    }
   } else {
     currentUser.value = null
   }
 })
 
 
-// google maps and distance
 onMounted(async () => {
   const google = await loadGoogleMaps()
   geometry.value = google.maps.geometry
-
-  await loadAvailableListings()
-  await loadMyListings()
-  await loadFoodItems()
-  loadDonationActivities()
-
   loadPreferredLocation()
-  calculateDistances()
 
+  if (sharedItems.value.length > 0) {
+    calculateDistances()
+  }
 })
 
 function setPreferredLocation(place) {
-  // ENSURE plain object
   preferredLocation.value = {
     lat: Number(place.lat),
     lng: Number(place.lng),
@@ -543,7 +560,20 @@ function calculateDistances() {
     itemCount: sharedItems.value.length
   })
 
-  if (!preferredLocation.value || !geometry.value || sharedItems.value.length === 0) {
+  // If no items, clear the list
+  if (sharedItems.value.length === 0) {
+    itemsWithDistance.value = []
+    return
+  }
+
+  // If no preferred location, show all items without distance
+  if (!preferredLocation.value) {
+    itemsWithDistance.value = sharedItems.value.map(i => ({ ...i, distance: null }))
+    return
+  }
+
+  // If no geometry loaded yet, show items without distance
+  if (!geometry.value) {
     itemsWithDistance.value = sharedItems.value.map(i => ({ ...i, distance: null }))
     return
   }
@@ -594,7 +624,7 @@ watch(foodItems, async () => {
 watch(
   [sharedItems, preferredLocation, geometry],
   () => {
-    if (sharedItems.value.length && preferredLocation.value && geometry.value) {
+    if (sharedItems.value.length && geometry.value) {
       console.log('Watcher triggered → calculating distances')
       calculateDistances()
     }
@@ -631,9 +661,13 @@ async function editDonated(item) {
 
 // Submit edit function - with proper error handling and rollback
 async function submitEdit() {
-  if (!currentUser.value) return alert("Please log in first")
+  if (!currentUser.value) {
+    await error('Please log in first')
+    return
+  }
   if (!editForm.value.location?.lat || !editForm.value.location?.lng) {
-    return alert('Please select a pickup location')
+    await warning('Please select a pickup location')
+    return
   }
 
   try {
@@ -644,7 +678,8 @@ async function submitEdit() {
     const listingSnap = await getDoc(listingRef)
 
     if (!listingSnap.exists()) {
-      return alert("Listing not found")
+      await error("Listing not found")
+      return
     }
 
     const originalListing = listingSnap.data()
@@ -661,10 +696,12 @@ async function submitEdit() {
         const currentFoodQty = Number(foodItemSnap.data().quantity || 0)
 
         if (currentFoodQty < qtyDifference) {
-          return alert(`Insufficient quantity. You only have ${currentFoodQty} ${editForm.value.unit} available.`)
+          await warning(`Insufficient quantity. You only have ${currentFoodQty} ${editForm.value.unit} available.`)
+          return
         }
       } else {
-        return alert('Food item not found')
+        await error('Food item not found')
+        return
       }
     }
 
@@ -732,20 +769,22 @@ async function submitEdit() {
       // Don't rollback for activity errors as they're not critical
     }
 
-    alert("Listing updated successfully!")
+    await success("Listing updated successfully!")
     showEditModal.value = false
     await loadMyListings()
     await loadFoodItems()
     await loadDonationActivities()
   } catch (err) {
     console.error("Error updating listing:", err)
-    alert("Failed to update listing: " + err.message)
+    await error("Failed to update listing: " + err.message)
   }
 }
 
 // Cancel donated function - with proper error handling and rollback
 async function canDonated(item) {
-  if (!confirm(`Are you sure you want to cancel "${item.foodName}"? This will remove it from community listings.`)) {
+  const confirmed = await confirm(`Are you sure you want to cancel "${item.foodName}"? This will remove it from community listings.`, 'Cancel Donation')
+
+  if (!confirmed) {
     return
   }
 
@@ -759,7 +798,8 @@ async function canDonated(item) {
     const listingSnap = await getDoc(listingRef)
 
     if (!listingSnap.exists()) {
-      return alert("Listing not found")
+      await error("Listing not found")
+      return
     }
 
     deletedListing = { id: item.id, ...listingSnap.data() }
@@ -770,7 +810,8 @@ async function canDonated(item) {
     const foodItemSnap = await getDoc(foodItemRef)
 
     if (!foodItemSnap.exists()) {
-      return alert('Food item not found. Cannot cancel donation.')
+      await error('Food item not found. Cannot cancel donation.')
+      return
     }
 
     originalFoodQty = Number(foodItemSnap.data().quantity || 0)
@@ -810,7 +851,7 @@ async function canDonated(item) {
       // Don't rollback for activity errors as they're not critical
     }
 
-    alert('Donation cancelled successfully!')
+    await success('Donation cancelled successfully!')
 
     // Reload all data to reflect changes
     await loadMyListings()
@@ -818,7 +859,7 @@ async function canDonated(item) {
     await loadDonationActivities()
   } catch (err) {
     console.error('Error canceling donation:', err)
-    alert('Failed to cancel donation: ' + err.message)
+    await error('Failed to cancel donation: ' + err.message)
 
     // Reload to show current state
     await loadMyListings()

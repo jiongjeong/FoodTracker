@@ -2,8 +2,11 @@
 import { useRouter } from 'vue-router';
 import { db } from '../firebase.js';
 import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp, query, where } from 'firebase/firestore';
-import { ref, computed, onMounted, reactive, watch, watchEffect } from 'vue';
+import { ref, computed, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
+import { useAlert} from '@/composables/useAlert.js';
+
+const { success, error, confirm } = useAlert();
 import {
   chartOptions,
   wasteVsSavingsOpts,
@@ -218,7 +221,7 @@ watch(userId, async (val) => {
     recipes.value = []
     activities.value = []
   }
-})
+}, { immediate: true })
 
 // Watch for expired foods and donations
 watchEffect(async () => {
@@ -259,12 +262,6 @@ watchEffect(async () => {
       }
     }
   }
-
-  // NOTE: Do NOT process donFood activities here!
-  // When food is shared (pendingDonFood), the quantity is already deducted from foodItems.
-  // When marked as donated (donFood), it just confirms the donation was completed.
-  // Processing donFood here would cause DOUBLE deduction of the food quantity.
-  // The food quantity management is handled in CommunityView during the sharing process.
 
 })
 
@@ -742,11 +739,13 @@ const saveUse = async () => {
     } else {
       await updateDoc(refDoc, { quantity: newQty })
       foodItems.value[foodIndex].quantity = newQty
+      await success(`Consumed ${usedQty} ${food.unit} of ${food.name}`)
       showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`)
     }
     closeUse()
   } catch (err) {
     console.error('Failed to log used food:', err)
+    await error('Failed to update food usage.')
     showToastFor('Failed to update food usage.')
   }
 }
@@ -821,9 +820,11 @@ const saveAdd = async () => {
 
     showToastFor('Food item added and activity logged!')
     closeAdd()
+    await success('Food Added Successfully')
   } catch (error) {
     console.error('Error adding food item or activity:', error)
     showToastFor('Failed to add food item.')
+    await error('Failed to add food')
   }
 }
 
@@ -889,6 +890,7 @@ const saveEdit = async () => {
   if (idx !== -1) {
     foodItems.value[idx] = { ...foodItems.value[idx], ...payload }
   }
+  await success('Successfully Edited')
   closeEdit()
 }
 
@@ -923,7 +925,7 @@ const deleteFood = async (food) => {
     activities.value = activities.value.filter(
       (a) => !(a.foodName === food.name && a.activityType === 'addFood'),
     )
-
+    await success('Successfully Deleted')
     return true
   } catch (err) {
     console.error('Failed to delete food and its activity log:', err)
@@ -948,12 +950,6 @@ const confirmDelete = async () => {
   if (ok) showToastFor('Item deleted')
   else showToastFor('Failed to delete')
 }
-
-// On mounted
-onMounted(() => {
-  loadFoodItems()
-  loadActivities()
-})
 </script>
 
 <template>
@@ -1661,6 +1657,8 @@ onMounted(() => {
 </template>
 
 <style scoped>
+
+
 .dashboard-overview {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.08) 100%);
   border: 1px solid rgba(16, 185, 129, 0.1);
