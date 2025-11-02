@@ -18,12 +18,6 @@ const startY = ref(0)
 const translateX = ref(0)
 const translateY = ref(0)
 
-/* ---------- ZOOM ---------- */
-const zoom = ref(1.0)
-const minZoom = 1
-const maxZoom = 5.0
-const zoomStep = 0.3
-
 /* ---------- WALKING ---------- */
 const LAND_BOUNDS = { minX: 30, maxX: 70, minY: 20, maxY: 75 }
 let animationFrame = null
@@ -127,6 +121,9 @@ const startWalking = () => {
 
 /* ---------- PANNING ---------- */
 const startPan = e => {
+  // Only allow panning on small viewports (<=576px)
+  if (window.innerWidth > 576) return
+
   // don't start panning when the pointer started inside a monkey element
   // handle both mouse and touch events
   const target = (e.touches && e.touches[0] && document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY)) || e.target
@@ -146,54 +143,47 @@ const onPan = e => {
   e.preventDefault()
   const clientX = e.touches ? e.touches[0].clientX : e.clientX
   const clientY = e.touches ? e.touches[0].clientY : e.clientY
-  translateX.value = clientX - startX.value
-  translateY.value = clientY - startY.value
+
+  // Calculate new translate values
+  let newX = clientX - startX.value
+  let newY = clientY - startY.value
+
+  // Get container and image dimensions
+  if (panContainer.value && villageImg.value) {
+    const containerRect = panContainer.value.getBoundingClientRect()
+    const imgRect = villageImg.value.getBoundingClientRect()
+
+    // Calculate max pan distances (allow panning to see full image)
+    const maxPanLeft = 0
+    const maxPanRight = Math.min(0, containerRect.width - imgRect.width)
+    const maxPanTop = 0
+    const maxPanBottom = Math.min(0, containerRect.height - imgRect.height)
+
+    // Constrain the translation
+    newX = Math.max(maxPanRight, Math.min(maxPanLeft, newX))
+    newY = Math.max(maxPanBottom, Math.min(maxPanTop, newY))
+  }
+
+  translateX.value = newX
+  translateY.value = newY
 }
+
 const endPan = () => {
   isPanning.value = false
-  if (panContainer.value) panContainer.value.style.cursor = 'grab'
-}
-
-/* ---------- ZOOMING ---------- */
-const onWheel = (event) => {
-  if (event.ctrlKey || event.metaKey) {
-    event.preventDefault()
-    const delta = Math.sign(event.deltaY)
-    zoomLevel.value = Math.max(50, Math.min(200, zoomLevel.value - delta * 5))
+  if (panContainer.value) {
+    panContainer.value.style.cursor = window.innerWidth <= 576 ? 'grab' : 'default'
   }
-}
-const zoomIn = () => {
-  if (!panContainer.value) return
-  const r = panContainer.value.getBoundingClientRect()
-  zoomAtPoint(zoomStep, r.left + r.width / 2, r.top + r.height / 2)
-}
-const zoomOut = () => {
-  if (!panContainer.value) return
-  const r = panContainer.value.getBoundingClientRect()
-  zoomAtPoint(-zoomStep, r.left + r.width / 2, r.top + r.height / 2)
-}
-const zoomAtPoint = (delta, clientX, clientY) => {
-  if (!panContainer.value) return
-  const rect = panContainer.value.getBoundingClientRect()
-  const old = zoom.value
-  const neu = Math.max(minZoom, Math.min(maxZoom, old + delta))
-  if (neu === old) return
-
-  const offsetX = clientX - rect.left
-  const offsetY = clientY - rect.top
-  const ratio = neu / old
-
-  translateX.value = clientX - (offsetX + translateX.value) * ratio
-  translateY.value = clientY - (offsetY + translateY.value) * ratio
-  zoom.value = neu
 }
 
 /* ---------- STYLE ---------- */
-const panStyle = computed(() => ({
-  transform: `translate(${translateX.value}px, ${translateY.value}px) scale(${zoom.value})`,
-  transformOrigin: 'top left',
-  cursor: isPanning.value ? 'grabbing' : 'grab'
-}))
+const panStyle = computed(() => {
+  const canPan = window.innerWidth <= 576
+  return {
+    transform: `translate(${translateX.value}px, ${translateY.value}px)`,
+    transformOrigin: 'top left',
+    cursor: canPan ? (isPanning.value ? 'grabbing' : 'grab') : 'default'
+  }
+})
 
 const monkeyStyle = m => ({
   position: 'absolute',
@@ -216,7 +206,6 @@ const monkeySrc = (monkey) => {
 }
 
 const onMonkeyClick = m => alert(`${m.name} – ${m.monkeyId}`)
-const zoomLevel = computed(() => Math.round(zoom.value * 100))
 const onHover = (uid) => { hoveredMonkey.value = uid }
 const onHoverLeave = () => { hoveredMonkey.value = null }
 </script>
@@ -224,10 +213,7 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
 <template>
     <VillageHeader />
 
-    <div
-      class="village-page"
-      @wheel="onWheel"
-    >
+    <div class="village-page">
     <div
       ref="panContainer"
       class="pan-container"
@@ -277,13 +263,6 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
         </div>
       </div>
 
-      <!-- Zoom controls -->
-      <div class="zoom-controls">
-        <button @click="zoomIn" class="zoom-btn">+</button>
-        <button @click="zoomOut" class="zoom-btn">-</button>
-        <div class="zoom-level">{{ zoomLevel }}%</div>
-      </div>
-
       <LeaderboardSidebar />
     </div>
 </template>
@@ -292,28 +271,31 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
 /* Full-screen village section */
 .village-page {
   width: 100%;
-  /* height: 100vh; */
+  height: 100vh;
   position: relative;
   overflow: hidden;
   background: transparent;
   user-select: none;
   cursor: grab;
+  touch-action: none; /* Prevent default touch behaviors */
 }
 
 /* Pan container */
 .pan-container {
   position: relative;
-  width: 100vw;
-  /* height: 100vh; */
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
 }
 
 .village-bg {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
   object-fit: cover;
   object-position: center;
   display: block;
-  image-rendering: pixelated;
+  image-rendering: auto;
   pointer-events: none;
 }
 
@@ -324,19 +306,21 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
   height: 64px;
   text-align: center;
 }
+
 .monkey-img {
   width: 100%;
   height: 100%;
-  image-rendering: pixelated;
+  image-rendering: auto;
   border: 3px solid #000;
   border-radius: 50%;
   box-shadow: 0 4px 8px rgba(0,0,0,.4);
+  transition: all 0.2s ease;
 }
+
 .monkey-img:hover {
   filter: brightness(1.4) hue-rotate(60deg) drop-shadow(0 0 12px #FFD700);
   border-color: #FFD700;
   transform: scale(1.15);
-  transition: all 0.2s ease;
 }
 
 .monkey.you .monkey-img {
@@ -363,6 +347,7 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
   pointer-events: none;
   font-family: monospace;
 }
+
 .you-label {
   top: -50px;
   background: #000;
@@ -372,6 +357,7 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
   font: bold 14px monospace;
   z-index: 200;
 }
+
 .name-label {
   bottom: -24px;
   background: rgba(0,0,0,.7);
@@ -380,6 +366,7 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
   border-radius: 8px;
   font: 10px monospace;
 }
+
 .popup {
   bottom: 100%;
   background: #000;
@@ -392,38 +379,101 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
   animation: popupFade .2s ease forwards;
   z-index: 300;
 }
-.popup-name { color:#FFD700; font-size:13px; font-weight:bold; }
-.popup-score { color:#aaa; font-size:11px; margin-top:1px; }
+
+.popup-name {
+  color: #FFD700;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.popup-score {
+  color: #aaa;
+  font-size: 11px;
+  margin-top: 1px;
+}
+
 @keyframes popupFade {
-  from { opacity:0; transform:translateX(-50%) translateY(8px); }
-  to   { opacity:1; transform:translateX(-50%) translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
-/* ---------- ZOOM CONTROLS ---------- */
-.zoom-controls {
-  position: fixed;
-  bottom: 16px;
-  right: 16px;
-  display: flex;
-  gap: 6px;
-  background: rgba(0,0,0,.8);
-  padding: 8px 12px;
-  border-radius: 24px;
-  font-family: monospace;
-  z-index: 1000;
-}
-.zoom-btn {
-  width: 32px;
-  height: 32px;
-  background:#333;
-  color:#fff;
-  border:none;
-  border-radius:50%;
-  font-size:18px;
-  font-weight:bold;
-  cursor:pointer;
-}
-.zoom-btn:hover { background:#555; transform:scale(1.1); }
-.zoom-level { color:#fff; font-weight:bold; min-width:44px; text-align:center; font-size:14px; }
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 768px) {
+  .monkey {
+    width: 48px;
+    height: 48px;
+  }
 
+  .you-label {
+    top: -40px;
+    font-size: 12px;
+    padding: 4px 10px;
+  }
+
+  .name-label {
+    bottom: -20px;
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+
+  .popup {
+    padding: 5px 8px;
+  }
+
+  .popup-name {
+    font-size: 11px;
+  }
+
+  .popup-score {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .monkey {
+    width: 40px;
+    height: 40px;
+  }
+
+  .monkey-img {
+    border-width: 2px;
+  }
+
+  .you-label {
+    top: -35px;
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .name-label {
+    bottom: -18px;
+    font-size: 8px;
+    padding: 1px 5px;
+  }
+
+  .popup {
+    padding: 4px 7px;
+  }
+
+  .popup-name {
+    font-size: 10px;
+  }
+
+  .popup-score {
+    font-size: 9px;
+  }
+}
+
+/* Landscape mobile optimization */
+@media (max-width: 768px) and (orientation: landscape) {
+  .village-page {
+    height: 100vh;
+  }
+}
 </style>
