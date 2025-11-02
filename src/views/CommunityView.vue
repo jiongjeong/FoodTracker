@@ -22,7 +22,6 @@ const currentUser = ref(null)
 const itemsWithDistance = ref([])
 const preferredLocation = ref(null)
 const geometry = ref(null)
-const PREFERRED_LOC_KEY = 'foodshare_preferred_location'
 
 const showDonatedItems = ref(false)
 
@@ -409,7 +408,12 @@ async function submitShare() {
 
 
 async function markAsDonated(item) {
-  if (!confirm(`Mark "${item.foodName}" as donated?`)) return
+  const confirmed = await confirm(
+    `Are you sure you want to mark "${item.foodName}" as donated? This action cannot be undone.`,
+    'Confirm Donation'
+  )
+
+  if (!confirmed) return
 
   try {
     // Update listing as donated
@@ -417,6 +421,15 @@ async function markAsDonated(item) {
       donated: true,
       donatedAt: serverTimestamp()
     })
+
+    const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', item.foodId)
+    const foodItemSnap = await getDoc(foodItemRef)
+
+    let isFullyDonated = false
+    if (foodItemSnap.exists()) {
+      const remainingQty = Number(foodItemSnap.data().quantity || 0)
+      isFullyDonated = remainingQty <= 0
+    }
 
     try {
       const pendingActivitiesQuery = query(
@@ -451,7 +464,7 @@ async function markAsDonated(item) {
     })
 
     // Log donation activity with points earned
-    await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
+    const activityPayload = {
       activityType: 'donFood',
       category: item.category,
       createdAt: new Date().toISOString(),
@@ -460,9 +473,23 @@ async function markAsDonated(item) {
       quantity: donationQty,
       unit: item.unit,
       pointsEarned: Math.round(baseScoreChange)
-    })
+    }
 
-    await success('Marked as donated!')
+    // If fully donated, add note to mark it
+    if (isFullyDonated) {
+      activityPayload.note = 'fully donated'
+
+      // Delete the food item from inventory
+      await deleteDoc(foodItemRef)
+    }
+
+    await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), activityPayload)
+
+    const successMsg = isFullyDonated
+      ? `${item.foodName} fully donated and removed from inventory!`
+      : 'Food marked as donated successfully!'
+
+    await success(successMsg)
     await loadMyListings()
     await loadFoodItems()
   } catch (err) {
@@ -567,6 +594,9 @@ function clearPreferredLocation() {
 }
 
 function loadPreferredLocation() {
+  if (!currentUser.value) return
+
+  const PREFERRED_LOC_KEY = `foodshare_preferred_location_${currentUser.value.uid}`
   const raw = localStorage.getItem(PREFERRED_LOC_KEY)
   console.log('Raw from localStorage:', raw)
   if (raw) {
@@ -585,6 +615,9 @@ function loadPreferredLocation() {
 }
 
 function savePreferredLocation() {
+  if (!currentUser.value) return
+
+  const PREFERRED_LOC_KEY = `foodshare_preferred_location_${currentUser.value.uid}`
   if (preferredLocation.value) {
     localStorage.setItem(PREFERRED_LOC_KEY, JSON.stringify(preferredLocation.value))
   } else {
@@ -805,18 +838,18 @@ async function submitEdit() {
       const activitiesSnap = await getDocs(activitiesQuery)
 
       if (!activitiesSnap.empty) {
-        const activityDoc = activitiesSnap.docs[0]
+        // Find the activity with matching original quantity
+        const matchingActivity = activitiesSnap.docs.find(doc =>
+          Number(doc.data().quantity) === originalQty
+        )
 
-        // Get the food item from memory to calculate price
-        const foodItem = foodItems.value.find(f => f.id === editForm.value.foodItemId)
+        const activityDoc = matchingActivity || activitiesSnap.docs[0]
+        const oldActivityPrice = Number(activityDoc.data().price) || 0
+        const oldActivityQty = Number(activityDoc.data().quantity) || 1
 
-        let updatedPrice = 0
-        if (foodItem) {
-          // Calculate price based on original total quantity and price
-          const originalTotalQty = Number(foodItem.quantity || 0) + originalQty
-          const pricePerUnit = Number(foodItem.price || 0) / originalTotalQty
-          updatedPrice = pricePerUnit * newQty
-        }
+        // Calculate price per unit from the activity (which stores the original proportional price)
+        const pricePerUnit = oldActivityQty > 0 ? oldActivityPrice / oldActivityQty : 0
+        const updatedPrice = pricePerUnit * newQty
 
         await updateDoc(activityDoc.ref, {
           quantity: newQty,
