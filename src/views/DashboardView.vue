@@ -246,7 +246,7 @@ const updateFoodScore = async (activityType, price, uid, quantity = 1, isDonatio
       streak: streakDays
     });
 
-    return { newScore, pointsEarned: adjustedChange };
+    return { newScore, pointsEarned: Math.round(adjustedChange) };
   } catch (err) {
     console.error('Failed to update foodScore:', err);
     return { newScore: null, pointsEarned: 0 };
@@ -325,7 +325,7 @@ watchEffect(async () => {
           quantity: String(food.quantity || ''),
           unit: String(food.unit || ''),
           note: 'expired',
-          pointsEarned: pointsEarned // ← ADD THIS LINE
+          pointsEarned: pointsEarned 
         }
         const docRef = await addDoc(actRef, payload)
         activities.value.unshift({
@@ -852,7 +852,7 @@ const saveUse = async () => {
       price: String(pricePerUnit),
       quantity: String(usedQty),
       unit: food.unit || '',
-      pointsEarned: pointsEarned // ← ADD THIS LINE
+      pointsEarned: pointsEarned
     }
     const docRef = await addDoc(actRef, activityPayload)
     activities.value.unshift({

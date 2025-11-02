@@ -362,7 +362,7 @@ async function submitShare() {
     const currentQty = Number(currentItem?.quantity || 0)
     const totalPrice = Number(currentItem?.price || 0)
 
-
+    // Calculate price per unit from total price
     const pricePerUnit = currentQty > 0 ? totalPrice / currentQty : 0
     const newQty = Math.max(0, currentQty - qtyToShare)
     const remainingPrice = pricePerUnit * newQty
@@ -406,6 +406,56 @@ async function submitShare() {
   }
 }
 
+// Helper function to get streak days
+const getStreakDays = async (uid) => {
+  if (!uid) return 0
+  
+  try {
+    const activityRef = collection(db, 'user', uid, 'activities')
+    const activitySnapshot = await getDocs(activityRef)
+    const activities = activitySnapshot.docs.map((doc) => doc.data())
+    
+    if (activities.length === 0) return 0
+
+    const activityDates = [
+      ...new Set(
+        activities
+          .map((a) => {
+            const date = new Date(a.createdAt)
+            return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+          })
+          .filter((timestamp) => !isNaN(timestamp)),
+      ),
+    ].sort((a, b) => b - a)
+
+    if (activityDates.length === 0) return 0
+
+    const today = new Date()
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+    const oneDayMs = 24 * 60 * 60 * 1000
+
+    let streak = 0
+    let expectedDate = todayMidnight
+
+    if (activityDates[0] < todayMidnight - oneDayMs) {
+      return 0
+    }
+
+    for (const activityDate of activityDates) {
+      if (activityDate === expectedDate || activityDate === expectedDate - oneDayMs) {
+        streak++
+        expectedDate = activityDate - oneDayMs
+      } else {
+        break
+      }
+    }
+
+    return streak
+  } catch (err) {
+    console.error('Failed to calculate streak:', err)
+    return 0
+  }
+}
 
 async function markAsDonated(item) {
   const confirmed = await confirm(
@@ -448,19 +498,25 @@ async function markAsDonated(item) {
       console.warn('Failed to delete pending activities:', activityError)
     }
 
-    const donationPrice = Number(item.price) || 0
     const donationQty = Number(item.quantity) || 1
+    const donationTotalPrice = Number(item.price) || 0  // This is total price from listing
 
-    // manually updateFoodScore
-    const baseScoreChange = (0.4 * donationQty) + (0.2 * donationPrice) + (0.5 * donationQty)
+    // Get streak for multiplier
+    const streakDays = await getStreakDays(currentUser.value.uid)
+    const streakMultiplier = streakDays > 0 ? (1 + streakDays / 7) : 1
+
+    // Calculate score: (0.4 * qty) + (0.2 * totalPrice) + (0.5 * qty for donation bonus)
+    const baseScoreChange = (0.4 * donationQty) + (0.2 * donationTotalPrice) + (0.5 * donationQty)
+    const adjustedChange = baseScoreChange * streakMultiplier
 
     const userDocRef = doc(db, 'user', currentUser.value.uid)
     const userSnap = await getDoc(userDocRef)
     const currentScore = userSnap.exists() ? (userSnap.data().foodScore || 0) : 0
-    const newScore = Math.round(Math.max(0, currentScore + baseScoreChange))
+    const newScore = Math.round(Math.max(0, currentScore + adjustedChange))
 
     await updateDoc(userDocRef, {
-      foodScore: newScore
+      foodScore: newScore,
+      streak: streakDays
     })
 
     // Log donation activity with points earned
@@ -469,10 +525,10 @@ async function markAsDonated(item) {
       category: item.category,
       createdAt: new Date().toISOString(),
       foodName: item.foodName,
-      price: donationPrice,
+      price: donationTotalPrice,  // Store total price
       quantity: donationQty,
       unit: item.unit,
-      pointsEarned: Math.round(baseScoreChange)
+      pointsEarned: Math.round(adjustedChange)
     }
 
     // If fully donated, add note to mark it
@@ -1241,7 +1297,7 @@ const getGoogleMapsUrl = (location) => {
                   <i class="bi bi-calendar-x me-1"></i>
                   <span v-if="item.donated">Was expiring in {{ item.daysUntilExpiration }} days</span>
                   <span v-else>Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : ''
-                  }}</span>
+                    }}</span>
                 </div>
 
                 <button v-if="!item.donated" @click="markAsDonated(item)" class="btn-mark-donated">
