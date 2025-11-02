@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="modal-fade">
-      <div v-if="true" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
+      <div class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
         <div 
           class="modal-backdrop fade show" 
           @click="emit('close')" 
