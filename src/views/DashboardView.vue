@@ -19,6 +19,7 @@ import {
   WASTE_COLORS,
   leaderboardNudge
 } from '@/composables/dashboardDesign'
+import FlippedStatCard from '@/components/dashboard/flippedCard.vue'
 import { Bar, Pie, Line, Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -69,6 +70,7 @@ const showUseModal = ref(false)
 const showToast = ref(false)
 const toastMessage = ref('')
 const overviewCollapsed = ref(false)
+const isFlipped = ref(false)
 
 const editForm = reactive({
   id: null,
@@ -653,7 +655,7 @@ const analytics = computed(() => {
   const usedActivities = activities.value.filter((a) => a.activityType === 'conFood')
   const donatedActivities = activities.value.filter((a) => a.activityType === 'donFood')
   const pendingDonations = activities.value.filter((a) => a.activityType === 'pendingDonFood')
-
+  const inventoryActivities = foodItems.value.filter((food) => getDaysLeft(food) > 0)
   const totalWasteItems = wasteActivities.length
   const totalWasteMoney = wasteActivities.reduce((total, activity) => {
     return total + Number(activity.price)
@@ -674,11 +676,11 @@ const analytics = computed(() => {
   const reductionPercentage =
     totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
 
-  const inventoryValue = foodItems.value.reduce((sum, item) => {
+  const inventoryValue = inventoryActivities.reduce((sum, item) => {
     const price = Number(item.price) || 0
     return sum + price
   }, 0)
-  const inventoryItems = foodItems.value.length
+  const inventoryItems = inventoryActivities.length
 
   const streakDays = calculateActivityStreak()
   const foodDonated = donatedActivities.length
@@ -1122,85 +1124,41 @@ const confirmDelete = async () => {
 
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
-          <div class="flip-card" style="height: 130px;">
-            <div class="flip-card-inner">
-              <!-- Front Side (Your Original Card) -->
-              <div
-                class="flip-card-front position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-                style="
-                  background: linear-gradient(
-                        135deg,
-                        rgba(0, 102, 60, 0.85) 0%,
-                        rgba(50, 200, 120, 0.6) 100%
-                      );
-                  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-                  height: 130px;
-                ">
-                <!-- Left: Icon + label -->
-                <div
-                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                  style="width: 90px">
-                  <div
-                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                    style="width: 56px; height: 56px">
-                    <i class="bi bi-graph-up-arrow fs-5 text-white"></i>
-                  </div>
-                  <small class="text-white text-center">Food Score</small>
-                </div>
+          <FlippedStatCard
+            title="Food Score"
+            iconClass="bi bi-graph-up-arrow"
+            :gradient="`linear-gradient(135deg, rgba(0, 102, 60, 0.85) 0%, rgba(50, 200, 120, 0.6) 100%)`"
+            height="130px"
+          >
+            <!-- FRONT content -->
+            <template #default>
+              <h3 class="fw-bold mb-0 text-white">{{ userFoodScore }}</h3>
+              <small class="text-white">points</small>
 
-                <!-- Right: Count -->
-                <div class="text-end align-self-end pe-2 mt-2 position-relative">
-                  <h3 class="fw-bold mb-0 text-white">{{ userFoodScore }}</h3>
-                  <small class="text-white">points</small>
-
-                  <!-- Streak badge -->
-                  <div v-if="analytics.streakDays > 0" class="mt-2">
-                    <span class="streak-fire" :class="{
-                      'fire-small': analytics.streakDays < 7,
-                      'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
-                      'fire-large': analytics.streakDays >= 14,
-                    }">🔥</span>
-                    <span class="streak-text text-white">
-                      {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
-                    </span>
-                  </div>
-                </div>
+              <!-- Streak badge -->
+              <div v-if="analytics.streakDays > 0" class="mt-2">
+                <span
+                  class="streak-fire"
+                  :class="{
+                    'fire-small': analytics.streakDays < 7,
+                    'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
+                    'fire-large': analytics.streakDays >= 14
+                  }"
+                >🔥</span>
+                <span class="streak-text text-white">
+                  {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
+                </span>
               </div>
+            </template>
 
-              <!-- Back Side (Food Score Information) -->
-              <div
-                class="flip-card-back position-absolute p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-                style="
-                  background: linear-gradient(
-                        135deg,
-                        rgba(0, 102, 60, 0.85) 0%,
-                        rgba(50, 200, 120, 0.6) 100%
-                      );
-                  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-                  height: 130px;
-                ">
-                <!-- Left: Icon + label -->
-                <div
-                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                  style="width: 90px">
-                  <div
-                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                    style="width: 56px; height: 56px">
-                    <i class="bi bi-info-circle fs-5 text-white"></i>
-                  </div>
-                  <small class="text-white text-center">Food Score</small>
-                </div>
-
-                <!-- Right: Information -->
-                <div class="text-end align-self-end pe-2 position-relative" style="max-width: 55%;">
-                  <p class="mb-0 text-white small text-center" style="font-size:10px">
-                    Measures how effectively you save food, money, and help others. It rewards items and money saved,
-                    penalizes waste, and adds bonus points for food donations
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+            <!-- BACK content -->
+            <template #back>
+              <p class="mb-0 text-white small text-center" style="font-size:10px">
+                Measures how effectively you save food, money, and help others. It rewards items and money saved,
+                penalizes waste, and adds bonus points for food donations
+              </p>
+            </template>
+          </FlippedStatCard>
         </div>
         <div class="col-6 col-lg-3">
           <div class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
@@ -1232,73 +1190,25 @@ const confirmDelete = async () => {
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="flip-card" style="height: 130px;">
-            <div class="flip-card-inner">
-              <!-- Front Side (Your Original Card) -->
-              <div
-                class="flip-card-front position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-                style="
-                background: linear-gradient(
-                      135deg,
-                      rgba(153, 27, 27, 0.9) 0%,
-                      rgba(239, 68, 68, 0.65) 100%
-                    );
-                box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-                height: 130px;
-              ">
-                <!-- Left: Icon + label -->
-                <div
-                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                  style="width: 90px">
-                  <div
-                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-2"
-                    style="width: 56px; height: 56px">
-                    <i class="bi bi-currency-dollar fs-5 text-white"></i>
-                  </div>
-                  <small class="text-white text-center">Potential Loss</small>
-                </div>
+         <FlippedStatCard
+            title="Potential Loss"
+            iconClass="bi bi-currency-dollar"
+            :gradient="`linear-gradient(135deg, rgba(153, 27, 27, 0.9) 0%, rgba(239, 68, 68, 0.65) 100%)`"
+            height="130px"
+          >
+            <!-- FRONT content -->
+            <template #default>
+              <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
+              <small class="text-white">if expired</small>
+            </template>
 
-
-                <!-- Right: Count -->
-                <div class="text-end align-self-end pe-2 mt-2 position-relative">
-                  <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
-                  <small class="text-white">if expired</small>
-                </div>
-              </div>
-
-              <!-- Back Side (Food Score Information) -->
-              <div
-                class="flip-card-back position-absolute p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-                style="
-                background: linear-gradient(
-                      135deg,
-                      rgba(153, 27, 27, 0.9) 0%,
-                      rgba(239, 68, 68, 0.65) 100%
-                    );
-                box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-                height: 130px;
-              ">
-                <!-- Left: Icon + label -->
-                <div
-                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                  style="width: 90px">
-                  <div
-                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                    style="width: 56px; height: 56px">
-                    <i class="bi bi-info-circle fs-5 text-white"></i>
-                  </div>
-                  <small class="text-white text-center">Potential Loss</small>
-                </div>
-
-                <!-- Right: Information -->
-                <div class=" pe-2 d-flex flex-column align-self-end align-items-center mt-3" style="max-width: 55%;">
-                  <p class="mb-0 text-white small text-center" style="font-size:10px">
-                    Measures the total value of food that’s at risk of expiring within the next 7 days.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+            <!-- BACK content -->
+            <template #back>
+              <p class="mb-0 text-white small text-center mt-4" style="font-size:10px">
+                Measures the total value of food that’s at risk of expiring within the next 7 days.
+              </p>
+            </template>
+          </FlippedStatCard>
         </div>
         <div class="col-6 col-lg-3">
           <div class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
@@ -1330,10 +1240,6 @@ const confirmDelete = async () => {
           </div>
         </div>
       </div>
-
-
-
-
       <!-- Charts Section -->
       <div class="row g-4 mb-3" v-show="overviewCollapsed">
         <div class="col-lg-8">
@@ -1580,7 +1486,7 @@ const confirmDelete = async () => {
       </div>
 
       <!-- Activities -->
-      <div class="col-lg-4 d-none d-lg-block d-flex flex-column h-100">
+      <div class="col-lg-4 d-lg-block d-flex flex-column h-100">
         <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0">
           <h3 class="h5 mb-3 fw-bold">Recent Activity</h3>
 
@@ -1968,7 +1874,7 @@ const confirmDelete = async () => {
   transform-style: preserve-3d;
 }
 
-.flip-card-inner:hover {
+.flip-card-inner.is-flipped {
   transform: rotateY(180deg);
 }
 
