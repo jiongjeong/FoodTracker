@@ -4,7 +4,7 @@
       <!-- Brand -->
       <RouterLink
         to="/dashboard"
-        class="navbar-brand fw-bold text-primary text-decoration-none d-flex align-items-center"
+        class="navbar-brand fw-bold title text-decoration-none d-flex align-items-center"
         exact-active-class="active"
         @click="closeNavbar"
       >
@@ -70,16 +70,6 @@
                 <i class="bi bi-people me-1"></i>Community
               </RouterLink>
             </li>
-            <!-- <li class="nav-item">
-              <RouterLink
-                to="/leaderboard"
-                class="nav-link"
-                exact-active-class="active"
-                @click="closeNavbar"
-              >
-                <i class="bi bi-trophy me-1"></i>Leaderboard
-              </RouterLink>
-            </li> -->
             <li class="nav-item">
               <RouterLink
                 to="/village"
@@ -246,10 +236,13 @@ const userInitials = computed(() => {
   height: 36px;
   width: 36px;
 }
-
 /* Navbar brand responsive font */
 .navbar-brand {
   font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+}
+
+.title{
+  color: #059669
 }
 
 /* Mobile overlay positioning */
@@ -296,7 +289,7 @@ const userInitials = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #0d6efd;
+  background: #059669;
   color: #fff;
   font-weight: 700;
   border-radius: 50%;

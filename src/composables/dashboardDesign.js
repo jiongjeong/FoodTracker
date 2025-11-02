@@ -58,22 +58,29 @@ export const wasteRingOpts = {
 
 export const centerTextPlugin = {
   id: 'centerText',
-  afterDraw(chart) {
-    const { ctx, chartArea, data } = chart
-    const ds = data?.datasets?.[0]
-    if (!chartArea || !ds?.data?.length) return
-
-    const vals = ds.data
-    const total = vals.reduce((a,b)=>a+b,0)
-    if (!total) return
-    const max = Math.max(...vals)
-    const pct = Math.round((max / total) * 100)
-
-    const x = (chartArea.left + chartArea.right) / 2
-    const y = (chartArea.top + chartArea.bottom) / 2
-
+  afterDraw: (chart) => {
+    const { ctx, width, height } = chart;
+    ctx.restore();
+    
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    // Draw "Total" text
+    ctx.font = 'normal 1rem sans-serif';
+    ctx.fillStyle = '#6c757d';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Total', centerX, centerY - 20);
+    
+    // Draw total value
+    const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+    ctx.font = 'bold 2.5rem sans-serif';
+    ctx.fillStyle = '#2d3436';
+    ctx.fillText(total , centerX, centerY + 20);
+    
+    ctx.save();
   }
-}
+};
 
 export const hexA = (hex, a = 1) => {
   const h = hex.replace('#','')
@@ -173,15 +180,83 @@ export function styleAsRing(basePie) {
   }
 }
 
-// 4) Build Top-3 legend rows from labels/data/colors
-export function buildTop3Legend(labels = [], data = [], colors = WASTE_COLORS) {
-  if (!labels.length || !data.length) return []
-  const total = data.reduce((a,b)=>a+b,0) || 1
-  return data
-    .map((v,i) => ({ label: labels[i], pct: Math.round((v/total)*100), color: colors[i] || '#e5e7eb', v }))
-    .sort((a,b)=>b.v - a.v)
-    .slice(0,3)
-}
+export const getPercentageLabelPosition = (index, items) => {
+  // Calculate the cumulative percentage for this segment
+  let cumulativePercentage = 0;
+  for (let i = 0; i < index; i++) {
+    cumulativePercentage += items[i].pct;
+  }
+  
+  // Calculate the middle of this segment
+  const segmentMiddle = cumulativePercentage + (items[index].pct / 2);
+  
+  // Convert percentage to angle (starting from top, going clockwise)
+  const angleInDegrees = (segmentMiddle / 100) * 360 - 90;
+  const angleInRadians = angleInDegrees * (Math.PI / 180);
+  
+  // Radius from center
+  const radius = 140;
+  
+  // Container dimensions
+  const centerX = 140; // Half of 280px
+  const centerY = 140;
+  
+  // Calculate positions
+  const x = centerX + radius * Math.cos(angleInRadians);
+  const y = centerY + radius * Math.sin(angleInRadians);
+  
+  // Center the label
+  const labelSize = 65;
+  
+  return {
+    left: `${x - labelSize / 2}px`,
+    top: `${y - labelSize / 2}px`,
+  };
+};
+
+export const createAllLegendItems = (chartData) => {
+  const labels = chartData.labels || [];
+  const data = chartData.datasets[0]?.data || [];
+  const colors = chartData.datasets[0]?.backgroundColor || [];
+  
+  const total = data.reduce((sum, val) => sum + val, 0);
+  
+  return labels.map((label, i) => ({
+    label: label,
+    value: data[i],
+    pct: total > 0 ? Math.round((data[i] / total) * 100) : 0,
+    color: colors[i] || '#6c757d'
+  })).filter(item => item.pct > 0);
+};
+
+// Then update the method to work with any number of segments
+export const darkenColor = (color, percent) => {
+  // Handle hex colors
+  if (color.startsWith('#')) {
+    let r = parseInt(color.slice(1, 3), 16);
+    let g = parseInt(color.slice(3, 5), 16);
+    let b = parseInt(color.slice(5, 7), 16);
+    
+    r = Math.floor(r * (1 - percent / 100));
+    g = Math.floor(g * (1 - percent / 100));
+    b = Math.floor(b * (1 - percent / 100));
+    
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+  
+  // Handle rgb/rgba colors
+  if (color.startsWith('rgb')) {
+    const matches = color.match(/\d+/g);
+    if (matches && matches.length >= 3) {
+      let r = Math.floor(parseInt(matches[0]) * (1 - percent / 100));
+      let g = Math.floor(parseInt(matches[1]) * (1 - percent / 100));
+      let b = Math.floor(parseInt(matches[2]) * (1 - percent / 100));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+  }
+  
+  return color; // Return original if can't parse
+};
 
 // 5) Leaderboard nudge (pure string builder)
 export function leaderboardNudge(activities = []) {

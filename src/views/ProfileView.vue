@@ -1,9 +1,12 @@
 <script setup name="ProfileView">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { doc, getDoc, getDocs, updateDoc, deleteDoc, collection, setDoc } from "firebase/firestore";
+import { doc, getDoc, getDocs, updateDoc, deleteDoc, collection, setDoc, query, where } from "firebase/firestore";
 import { getAuth, updateProfile, updatePassword, deleteUser } from "firebase/auth";
 import { db } from "@/firebase";
+import { useAlert } from '@/composables/useAlert'
+
+const { success, error, confirm } = useAlert()
 
 
 const router = useRouter()
@@ -180,28 +183,81 @@ async function confirmDelete() {
 
 async function deleteAccount() {
   if (!user.value) {
-    errorMessage.value = "User not found."
+    await error("User not found.")
+    return
+  }
+
+  // Confirm deletion with custom alert
+  const confirmed = await confirm(
+    "This action cannot be undone. All your data including food items, activities, recipes, and shared community listings will be permanently deleted.",
+    "Delete Account?"
+  )
+
+  if (!confirmed) {
+    showDeleteModal.value = false
     return
   }
 
   try {
     const userDocRef = doc(db, "user", user.value.uid);
+    const uid = user.value.uid;
 
-    const subcollections = ["foodItems", "activities", "recipes"];
-    for (const subcol of subcollections) {
-      const subcolRef = collection(userDocRef, subcol);
-      await deleteCollection(subcolRef);
+    try {
+      await deleteUser(user.value);
+      console.log("✓ Auth user deleted");
+    } catch (authError) {
+      console.error("Error deleting auth user:", authError);
+      if (authError.code === 'auth/requires-recent-login') {
+        await error(
+          "For security reasons, please log out and log back in, then try deleting your account again.",
+          "Re-authentication Required"
+        )
+        showDeleteModal.value = false
+        return
+      }
+      throw authError
     }
 
-    await deleteDoc(userDocRef);
-    await deleteUser(user.value);
+
+    try {
+
+      const subcollections = ["foodItems", "activities", "recipes"];
+      for (const subcol of subcollections) {
+        const subcolRef = collection(userDocRef, subcol);
+        await deleteCollection(subcolRef);
+      }
+      console.log("✓ User subcollections deleted");
+
+
+      const communityListingsQuery = query(
+        collection(db, "communityListings"),
+        where("ownerId", "==", uid)
+      );
+      const communityListingsSnapshot = await getDocs(communityListingsQuery);
+
+      if (communityListingsSnapshot.size > 0) {
+        const deleteCommunityPromises = communityListingsSnapshot.docs.map(doc =>
+          deleteDoc(doc.ref)
+        );
+        await Promise.all(deleteCommunityPromises);
+        console.log(`✓ Deleted ${communityListingsSnapshot.size} community listings`);
+      }
+
+      await deleteDoc(userDocRef);
+      console.log("✓ User document deleted");
+    } catch (firestoreError) {
+      console.error("Error deleting Firestore data:", firestoreError);
+      console.warn("⚠ Auth user deleted but some Firestore data may remain");
+    }
 
     localStorage.clear()
     sessionStorage.clear()
 
+    await success("Your account has been successfully deleted.")
     router.push("/signup");
-  } catch (error) {
-    errorMessage.value = "Error deleting account: " + error.message
+  } catch (err) {
+    console.error("Error deleting account:", err)
+    await error("Error deleting account: " + err.message)
     showDeleteModal.value = false
   }
 }
@@ -209,13 +265,6 @@ async function deleteAccount() {
 onMounted(() => {
   loadUser()
 })
-
-const allAccessories = ref([])
-const unlockedCount = ref(0)
-const totalAccessories = ref(0)
-
-
-
 
 
 
