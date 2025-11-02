@@ -1,12 +1,11 @@
-<!-- src/components/LeaderboardSidebar.vue -->
 <template>
   <div class="sidebar-wrapper" :class="{ collapsed: isCollapsed }">
-    <!-- Toggle Button - Always Visible -->
+    <!-- Toggle Button - Always visible -->
     <button class="toggle-btn btn" @click="isCollapsed = !isCollapsed">
       <i :class="isCollapsed ? 'bi bi-chevron-left' : 'bi bi-chevron-right'"></i>
     </button>
 
-    <!-- Content -->
+    <!-- Sidebar Content - Hidden when collapsed -->
     <div class="sidebar">
       <div class="sidebar-header d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
         <div class="icon-wrapper d-flex align-items-center justify-content-center">
@@ -70,58 +69,28 @@ onUnmounted(() => unsubscribe?.())
 </script>
 
 <style scoped>
+/* === SIDEBAR WRAPPER === */
 .sidebar-wrapper {
   position: fixed;
   right: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 300px;
   z-index: 999;
   transition: transform 0.3s ease;
   pointer-events: none;
 }
 
+/* Default: Collapsed - Only button shows */
 .sidebar-wrapper.collapsed {
-  transform: translate(260px, -50%);
+  transform: translateY(-50%) translateX(280px); /* full width + button */
 }
 
-.sidebar-wrapper > * {
-  pointer-events: auto;
+/* Expanded */
+.sidebar-wrapper:not(.collapsed) {
+  transform: translateY(-50%) translateX(0);
 }
 
-/* Sidebar Container */
-.sidebar {
-  height: auto;
-  max-height: 70vh;
-  border-radius: 16px 0 0 16px;
-  background: rgba(255, 255, 255, 0.98);
-  border: 2px solid #e5e7eb;
-  border-right: none;
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 1.25rem;
-}
-
-.sidebar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.sidebar::-webkit-scrollbar-track {
-  background: #f3f4f6;
-  border-radius: 3px;
-}
-
-.sidebar::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
-}
-
-.sidebar::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
-
-/* Toggle Button - Always Visible */
+/* === TOGGLE BUTTON - Always visible === */
 .toggle-btn {
   position: absolute;
   left: -40px;
@@ -142,6 +111,8 @@ onUnmounted(() => unsubscribe?.())
   justify-content: center;
   font-size: 18px;
   padding: 0;
+  z-index: 10;
+  pointer-events: auto;
 }
 
 .toggle-btn:hover {
@@ -150,7 +121,45 @@ onUnmounted(() => unsubscribe?.())
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.12);
 }
 
-/* Icon Wrapper */
+/* === SIDEBAR CONTENT === */
+.sidebar {
+  width: 280px;
+  max-height: 70vh;
+  border-radius: 16px 0 0 16px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 2px solid #e5e7eb;
+  border-right: none;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.25rem;
+  pointer-events: auto;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* === HEADER === */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
 .icon-wrapper {
   width: 48px;
   height: 48px;
@@ -158,6 +167,9 @@ onUnmounted(() => unsubscribe?.())
   border-radius: 50%;
   color: #fff;
   box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
@@ -165,7 +177,6 @@ onUnmounted(() => unsubscribe?.())
   font-size: 22px;
 }
 
-/* Header Text */
 .sidebar-title {
   font-size: 1.125rem;
   font-weight: 700;
@@ -176,6 +187,9 @@ onUnmounted(() => unsubscribe?.())
 .sidebar-subtitle {
   font-size: 0.75rem;
   color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .sidebar-subtitle i {
@@ -183,7 +197,7 @@ onUnmounted(() => unsubscribe?.())
   font-size: 0.8125rem;
 }
 
-/* Rank Item */
+/* === RANK ITEM === */
 .rank-item {
   background: #f9fafb;
   border: 2px solid #f3f4f6;
@@ -254,60 +268,23 @@ onUnmounted(() => unsubscribe?.())
   padding: 0.25rem 0.5rem;
   border-radius: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.03125rem;
+  letter-spacing: 0.03rem;
   flex-shrink: 0;
 }
 
-/* Responsive - Hide sidebar content on smaller screens but KEEP toggle button */
+/* === RESPONSIVE === */
 @media (max-width: 991.98px) {
-  .sidebar-wrapper {
-    transform: translateY(-50%);
-  }
-  
   .sidebar {
-    display: none;
+    width: 240px;
   }
-  
-  .sidebar-wrapper.collapsed .sidebar {
-    display: block;
-  }
-  
-  /* Keep toggle button visible and on the right edge */
-  .toggle-btn {
-    display: flex !important;
-    left: -40px;
-  }
-  
   .sidebar-wrapper.collapsed {
-    transform: translate(0, -50%);
+    transform: translateY(-50%) translateX(240px);
   }
-  
-  .sidebar-wrapper:not(.collapsed) {
-    transform: translate(260px, -50%);
-  }
-}
-
-@media (max-width: 1199.98px) {
-  .sidebar-wrapper {
-    width: 260px;
-  }
-  
-  .sidebar {
-    padding: 1rem;
-  }
-}
-
-/* Extra small screens */
-@media (max-width: 575.98px) {
   .toggle-btn {
+    left: -20px;
     width: 36px;
     height: 70px;
-    left: -36px;
     font-size: 16px;
-  }
-  
-  .sidebar-wrapper:not(.collapsed) {
-    transform: translate(260px, -50%);
   }
 }
 </style>

@@ -6,11 +6,12 @@ import { doc, getDoc, getDocs, updateDoc, setDoc, arrayUnion, collection } from 
 const currentUser = ref(null)
 const allMonkeys = ref([])
 const userMonkey = ref({ selected: 'monkey1', unlocked: ['monkey1'] })
+const userScore = ref(0)
 
 const chunkCount = ref(3)
 const currentSlide = ref(0)
 
-// Load monkeys from Firestore
+
 const loadMonkeys = async () => {
   if (!currentUser.value) return
   const userRef = doc(db, 'user', currentUser.value.uid)
@@ -27,6 +28,7 @@ const loadMonkeys = async () => {
   const userSnap = await getDoc(userRef)
   const data = userSnap.data() || {}
   const score = data.foodScore || 0
+  userScore.value = data.foodScore || 0
 
   if (!data.monkey) {
     await setDoc(userRef, { monkey: { selected: 'monkey1', unlocked: ['monkey1'] } }, { merge: true })
@@ -50,10 +52,13 @@ const loadMonkeys = async () => {
 }
 
 const updateChunkCount = () => {
-  const width = window.innerWidth
-  if (width >= 1200) chunkCount.value = 4
-  else if (width <1200) chunkCount.value = 3
-  else if (width <768) chunkCount.value = 2
+  const w = window.innerWidth
+  if (w >= 1200) chunkCount.value = 3
+  else if (w >= 992) chunkCount.value = 2
+  else chunkCount.value = 1
+
+  
+
 }
 
 const monkeyChunks = computed(() => {
@@ -100,14 +105,15 @@ onMounted(() => {
 
 <template>
   <div class="monkey-selector-row mx-auto" v-if="allMonkeys.length">
-    <div class="d-flex align-items-center justify-content-center position-relative">
-      <!-- Left button -->
+    <h5 class="text-center fw-bold text-dark mb-3">Monkeys for Grabs</h5>
+    <div class="d-flex align-items-center justify-content-center position-relative mb-3">
+      <!-- Left button -->  
       <button 
-        class="btn btn-dark carousel-btn left-btn" 
+        class="carousel-btn left-btn"
         @click="prevSlide" 
         :disabled="currentSlide === 0"
       >
-        <
+        <i class="bi bi-chevron-left"></i>
       </button>
 
       <!-- Avatars for current slide -->
@@ -143,19 +149,23 @@ onMounted(() => {
 
       <!-- Right button -->
       <button 
-        class="btn btn-dark carousel-btn right-btn" 
+        class="carousel-btn right-btn"
         @click="nextSlide" 
         :disabled="currentSlide >= monkeyChunks.length - 1"
       >
-        >
+        <i class="bi bi-chevron-right"></i>
       </button>
     </div>
+    <p>
+      <p class="text-muted text-center mb-0">
+        You have <strong class="text-success">{{ userScore }}</strong> food points
+      </p>
+    </p>
   </div>
 </template>
 
 <style scoped>
 .monkey-selector-row {
-  background: rgba(255, 255, 255, 0.95);
   padding: 20px 24px;
   border-radius: 16px;
   backdrop-filter: blur(10px);
@@ -348,6 +358,7 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
   transition: all 0.2s ease;
 }
+
 
 .carousel-arrow:hover {
   background: rgba(33, 37, 41, 1);

@@ -15,10 +15,11 @@ import {
   buildWasteVsSavingsData,
   buildWasteByCategoryChart,
   styleAsRing,
-  buildTop3Legend,
   WASTE_COLORS,
-  leaderboardNudge
+  leaderboardNudge,
+  getPercentageLabelPosition, createAllLegendItems, darkenColor
 } from '@/composables/dashboardDesign'
+import FlippedStatCard from '@/components/dashboard/flippedCard.vue'
 import { Bar, Pie, Line, Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -98,6 +99,7 @@ const useForm = reactive({
   name: '',
   quantity: 0,
   unit: '',
+  maxQuantity: 0,
 })
 
 const deleteTarget = ref(null)
@@ -172,8 +174,8 @@ const categoryUnits = {
 const wasteVsSavingsData = computed(() => buildWasteVsSavingsData(activities.value || []))
 const basePie = computed(() => buildWasteByCategoryChart(activities.value || [], WASTE_COLORS))
 const chartDataStyled = computed(() => styleAsRing(basePie.value))
-const legendTop3 = computed(() => buildTop3Legend(basePie.value.labels, basePie.value.datasets[0]?.data || [], basePie.value.datasets[0]?.backgroundColor || WASTE_COLORS))
 const leaderboardMessage = computed(() => leaderboardNudge(activities.value || []))
+const allLegendItems = computed(() => createAllLegendItems(chartDataStyled.value));
 // Functions
 function showToastFor(msg, ms = 2200) {
   toastMessage.value = msg
@@ -211,9 +213,9 @@ const calculateScoreChange = (activityType, price, quantity = 1, isDonation = fa
     case 'conFood': // Consumed/Saved
       return (0.4 * quantity) + (0.2 * price); // +0.4 per item, +0.2*total_value for money
     case 'expFood': // Expired/Wasted
-      return -((0.6 * quantity) + (0.2 * price)); // -0.6 per item, -0.2*total_value for money
+      return -((0.6 * quantity) + (0.2 * price)); // -0.6 per item, -0.2*total_value for money, wasting food should bear heaviest weightage
     case 'donFood': // Donated
-      return (0.4 * quantity) + (0.2 * price) + (0.5 * quantity); // +0.4 per item, +0.2*total_value, +0.5 per item donated
+      return (0.4 * quantity) + (0.2 * price) + (0.5 * quantity); // +0.4 per item, +0.2*total_value, +0.5 per item donated. Bears higher weightage to encourage donation
     default:
       return 0;
   }
@@ -232,13 +234,13 @@ const updateFoodScore = async (activityType, price, uid, quantity = 1, isDonatio
     const baseScoreChange = calculateScoreChange(activityType, price, quantity, isDonation);
 
     // Apply streak multiplier
-    const adjustedChange = Math.round(baseScoreChange * streakMultiplier);
+    const adjustedChange = (baseScoreChange * streakMultiplier);
 
     // Get current score from Firebase (or initialize to 0)
     const currentDoc = await getDoc(userDocRef);
     const currentScore = currentDoc.exists() ? (currentDoc.data().foodScore || 0) : 0;
 
-    const newScore = Math.max(0, currentScore + adjustedChange);
+    const newScore = Math.round(Math.max(0, currentScore + adjustedChange));
 
     await updateDoc(userDocRef, {
       foodScore: newScore,
@@ -310,6 +312,8 @@ watchEffect(async () => {
       const snapshot = await getDocs(q)
       if (snapshot.empty) {
         // Calculate points BEFORE creating activity
+        const foodPrice = food.price || 0
+        const foodQty = food.quantity || 1
         const { newScore, pointsEarned } = await updateFoodScore('expFood', food.price, uid, food.quantity);
         if (newScore !== null) {
           userFoodScore.value = newScore;
@@ -653,7 +657,7 @@ const analytics = computed(() => {
   const usedActivities = activities.value.filter((a) => a.activityType === 'conFood')
   const donatedActivities = activities.value.filter((a) => a.activityType === 'donFood')
   const pendingDonations = activities.value.filter((a) => a.activityType === 'pendingDonFood')
-
+  const inventoryActivities = foodItems.value.filter((food) => getDaysLeft(food) > 0)
   const totalWasteItems = wasteActivities.length
   const totalWasteMoney = wasteActivities.reduce((total, activity) => {
     return total + Number(activity.price)
@@ -674,11 +678,37 @@ const analytics = computed(() => {
   const reductionPercentage =
     totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
 
-  const inventoryValue = foodItems.value.reduce((sum, item) => {
-    const price = Number(item.price) || 0
-    return sum + price
+  // Calculate inventory value excluding pending donations
+  // For each food item, calculate its current value based on remaining quantity
+  const inventoryValue = inventoryActivities.reduce((sum, item) => {
+    const originalPrice = Number(item.price) || 0
+    const currentQty = Number(item.quantity) || 0
+
+    // Find all pending donations for this specific food item
+    const itemPendingDonations = pendingDonations.filter(
+      (activity) => activity.foodId === item.id
+    )
+
+    // Calculate total quantity that's pending donation
+    const pendingQty = itemPendingDonations.reduce((total, activity) => {
+      return total + (Number(activity.quantity) || 0)
+    }, 0)
+
+    // Total quantity (current + pending) to calculate price per unit
+    const totalQty = currentQty + pendingQty
+
+    // Calculate the value of only the remaining quantity
+    let itemValue = originalPrice
+    if (totalQty > 0) {
+      const pricePerUnit = originalPrice / totalQty
+      itemValue = pricePerUnit * currentQty
+    }
+
+    return sum + itemValue
   }, 0)
-  const inventoryItems = foodItems.value.length
+
+  const adjustedInventoryValue = Math.max(0, inventoryValue)
+  const inventoryItems = inventoryActivities.length
 
   const streakDays = calculateActivityStreak()
   const foodDonated = donatedActivities.length
@@ -687,7 +717,7 @@ const analytics = computed(() => {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
     reduction: reductionPercentage,
-    inventory: { value: inventoryValue, items: inventoryItems },
+    inventory: { value: adjustedInventoryValue, items: inventoryItems },
     streakDays: streakDays,
     foodDonated: foodDonated,
     pendingDonations: pendingDonations.length,
@@ -796,6 +826,7 @@ const openUse = (food) => {
   useForm.name = food.name
   useForm.quantity = 1
   useForm.unit = food.unit || ''
+  useForm.maxQuantity = food.quantity
   showUseModal.value = true
 }
 
@@ -805,6 +836,7 @@ const closeUse = () => {
   useForm.name = ''
   useForm.quantity = 0
   useForm.unit = ''
+  useForm.maxQuantity = 0
 }
 
 const saveUse = async () => {
@@ -821,9 +853,10 @@ const saveUse = async () => {
     const usedQty = Math.min(useForm.quantity, food.quantity)
     const newQty = food.quantity - usedQty
 
-    // Price is per unit, so calculate the value consumed
-    const pricePerUnit = food.price || 0
+    const totalPrice = food.price || 0
+    const pricePerUnit = totalPrice / (food.quantity || 1)
     const usedValue = pricePerUnit * usedQty
+    const remainingValue = pricePerUnit * newQty
 
     const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id)
     const actRef = collection(db, 'user', uid, 'activities')
@@ -877,8 +910,9 @@ const saveUse = async () => {
 
       showToastFor(`${food.name} fully consumed and removed`)
     } else {
-      await updateDoc(refDoc, { quantity: newQty })
+      await updateDoc(refDoc, { quantity: newQty, price: remainingValue })
       foodItems.value[foodIndex].quantity = newQty
+      foodItems.value[foodIndex].price = remainingValue
       await success(`Consumed ${usedQty} ${food.unit} of ${food.name}`)
       showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`)
     }
@@ -928,7 +962,7 @@ const saveAdd = async () => {
   const foodPayload = {
     name: nameValue,
     category: addForm.category || '',
-    price: Number(addForm.price) || 0,
+    price: (Number(addForm.price) || 0) * (Number(addForm.quantity) || 1),
     quantity: Number(addForm.quantity) || 0,
     unit: addForm.unit || '',
     createdAt: addForm.createdAt
@@ -1024,7 +1058,7 @@ const saveEdit = async () => {
   const payload = {
     name: editForm.name,
     category: editForm.category,
-    price: Number(editForm.price) || 0,
+    price: (Number(editForm.price) || 0) * (Number(editForm.quantity) || 1),
     quantity: Number(editForm.quantity) || 0,
     unit: editForm.unit || '',
   }
@@ -1106,7 +1140,7 @@ const confirmDelete = async () => {
     <div class="dashboard-overview">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <h1 class="h2 mb-2">Dashboard</h1>
+          <h1 class="h2 mb-2 fw-bold">Dashboard</h1>
           <p class="text-muted mb-0">Track your food inventory and reduce waste</p>
         </div>
         <div class="ms-3">
@@ -1122,85 +1156,41 @@ const confirmDelete = async () => {
 
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
-          <div class="flip-card" style="height: 130px;">
-            <div class="flip-card-inner">
-              <!-- Front Side (Your Original Card) -->
-              <div
-                class="flip-card-front position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-                style="
-                  background: linear-gradient(
-                        135deg,
-                        rgba(0, 102, 60, 0.85) 0%,
-                        rgba(50, 200, 120, 0.6) 100%
-                      );
-                  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-                  height: 130px;
-                ">
-                <!-- Left: Icon + label -->
-                <div
-                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                  style="width: 90px">
-                  <div
-                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                    style="width: 56px; height: 56px">
-                    <i class="bi bi-graph-up-arrow fs-5 text-white"></i>
-                  </div>
-                  <small class="text-white text-center">Food Score</small>
-                </div>
+          <FlippedStatCard
+            title="Food Score"
+            iconClass="bi bi-graph-up-arrow"
+            :gradient="`linear-gradient(135deg, rgba(0, 102, 60, 0.85) 0%, rgba(50, 200, 120, 0.6) 100%)`"
+            height="130px"
+          >
+            <!-- FRONT content -->
+            <template #default>
+              <h3 class="fw-bold mb-0 text-white">{{ userFoodScore }}</h3>
+              <small class="text-white">points</small>
 
-                <!-- Right: Count -->
-                <div class="text-end align-self-end pe-2 mt-2 position-relative">
-                  <h3 class="fw-bold mb-0 text-white">{{ userFoodScore }}</h3>
-                  <small class="text-white">points</small>
-
-                  <!-- Streak badge -->
-                  <div v-if="analytics.streakDays > 0" class="mt-2">
-                    <span class="streak-fire" :class="{
-                      'fire-small': analytics.streakDays < 7,
-                      'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
-                      'fire-large': analytics.streakDays >= 14,
-                    }">🔥</span>
-                    <span class="streak-text text-white">
-                      {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
-                    </span>
-                  </div>
-                </div>
+              <!-- Streak badge -->
+              <div v-if="analytics.streakDays > 0" class="mt-2">
+                <span
+                  class="streak-fire"
+                  :class="{
+                    'fire-small': analytics.streakDays < 7,
+                    'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
+                    'fire-large': analytics.streakDays >= 14
+                  }"
+                >🔥</span>
+                <span class="streak-text text-white">
+                  {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
+                </span>
               </div>
+            </template>
 
-              <!-- Back Side (Food Score Information) -->
-              <div
-                class="flip-card-back position-absolute p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-                style="
-                  background: linear-gradient(
-                        135deg,
-                        rgba(0, 102, 60, 0.85) 0%,
-                        rgba(50, 200, 120, 0.6) 100%
-                      );
-                  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-                  height: 130px;
-                ">
-                <!-- Left: Icon + label -->
-                <div
-                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                  style="width: 90px">
-                  <div
-                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                    style="width: 56px; height: 56px">
-                    <i class="bi bi-info-circle fs-5 text-white"></i>
-                  </div>
-                  <small class="text-white text-center">Food Score</small>
-                </div>
-
-                <!-- Right: Information -->
-                <div class="text-end align-self-end pe-2 position-relative" style="max-width: 55%;">
-                  <p class="mb-0 text-white small text-center" style="font-size:10px">
-                    Measures how effectively you save food, money, and help others. It rewards items and money saved,
-                    penalizes waste, and adds bonus points for food donations
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+            <!-- BACK content -->
+            <template #back>
+              <p class="mb-0 text-white small text-center mt-2" style="font-size:10px">
+                Rewards when food is consumed and money saved,
+                penalizes waste, and adds bonus points for food donations
+              </p>
+            </template>
+          </FlippedStatCard>
         </div>
         <div class="col-6 col-lg-3">
           <div class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
@@ -1232,73 +1222,25 @@ const confirmDelete = async () => {
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="flip-card" style="height: 130px;">
-            <div class="flip-card-inner">
-              <!-- Front Side (Your Original Card) -->
-              <div
-                class="flip-card-front position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-                style="
-                background: linear-gradient(
-                      135deg,
-                      rgba(153, 27, 27, 0.9) 0%,
-                      rgba(239, 68, 68, 0.65) 100%
-                    );
-                box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-                height: 130px;
-              ">
-                <!-- Left: Icon + label -->
-                <div
-                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                  style="width: 90px">
-                  <div
-                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-2"
-                    style="width: 56px; height: 56px">
-                    <i class="bi bi-currency-dollar fs-5 text-white"></i>
-                  </div>
-                  <small class="text-white text-center">Potential Loss</small>
-                </div>
+         <FlippedStatCard
+            title="Potential Loss"
+            iconClass="bi bi-currency-dollar"
+            :gradient="`linear-gradient(135deg, rgba(153, 27, 27, 0.9) 0%, rgba(239, 68, 68, 0.65) 100%)`"
+            height="130px"
+          >
+            <!-- FRONT content -->
+            <template #default>
+              <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
+              <small class="text-white">if expired</small>
+            </template>
 
-
-                <!-- Right: Count -->
-                <div class="text-end align-self-end pe-2 mt-2 position-relative">
-                  <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
-                  <small class="text-white">if expired</small>
-                </div>
-              </div>
-
-              <!-- Back Side (Food Score Information) -->
-              <div
-                class="flip-card-back position-absolute p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-                style="
-                background: linear-gradient(
-                      135deg,
-                      rgba(153, 27, 27, 0.9) 0%,
-                      rgba(239, 68, 68, 0.65) 100%
-                    );
-                box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-                height: 130px;
-              ">
-                <!-- Left: Icon + label -->
-                <div
-                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                  style="width: 90px">
-                  <div
-                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                    style="width: 56px; height: 56px">
-                    <i class="bi bi-info-circle fs-5 text-white"></i>
-                  </div>
-                  <small class="text-white text-center">Potential Loss</small>
-                </div>
-
-                <!-- Right: Information -->
-                <div class=" pe-2 d-flex flex-column align-self-end align-items-center mt-3" style="max-width: 55%;">
-                  <p class="mb-0 text-white small text-center" style="font-size:10px">
-                    Measures the total value of food that’s at risk of expiring within the next 7 days.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+            <!-- BACK content -->
+            <template #back>
+              <p class="mb-0 text-white small text-center mt-3 mt-md-4" style="font-size:10px">
+                Measures the total value of food that’s at risk of expiring within the next 7 days.
+              </p>
+            </template>
+          </FlippedStatCard>
         </div>
         <div class="col-6 col-lg-3">
           <div class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
@@ -1330,10 +1272,6 @@ const confirmDelete = async () => {
           </div>
         </div>
       </div>
-
-
-
-
       <!-- Charts Section -->
       <div class="row g-4 mb-3" v-show="overviewCollapsed">
         <div class="col-lg-8">
@@ -1341,27 +1279,28 @@ const confirmDelete = async () => {
             <div class="row g-0">
               <!-- Left panel -->
               <div class="col-md-4">
-  <div class="card shadow-sm h-100 position-relative overflow-visible leaderboard-card">
-    
-    <div class="card-body text-center pt-4">
-      <!-- Icon Circle -->
-      <div class="d-flex align-items-center justify-content-center mx-auto mb-3 rounded-circle icon-circle-hover" 
-            style="width: 80px; height: 80px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #f59e0b; transition: all 0.3s ease;">
-        <i class="bi bi-trophy fs-1"></i>
-      </div>
-      
-      <!-- Title -->
-      <h6 class="fw-bold mb-3 title-hover" style="font-size: 1.25rem; transition: color 0.3s ease;">
-        Leaderboard Insights
-      </h6>
-      
-      <!-- Description -->
-      <p class="text-secondary small mb-0 lh-base">
-        {{ leaderboardMessage }}
-      </p>
-    </div>
-  </div>
-</div>
+                <div class="card shadow-sm h-100 position-relative overflow-visible leaderboard-card">
+
+                  <div class="card-body text-center pt-4">
+                    <!-- Icon Circle -->
+                    <div
+                      class="d-flex align-items-center justify-content-center mx-auto mb-3 rounded-circle icon-circle-hover"
+                      style="width: 80px; height: 80px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #f59e0b; transition: all 0.3s ease;">
+                      <i class="bi bi-trophy fs-1"></i>
+                    </div>
+
+                    <!-- Title -->
+                    <h6 class="fw-bold mb-3 title-hover" style="font-size: 1.25rem; transition: color 0.3s ease;">
+                      Leaderboard Insights
+                    </h6>
+
+                    <!-- Description -->
+                    <p class="text-secondary small mb-0 lh-base">
+                      {{ leaderboardMessage }}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               <!-- Right panel -->
               <div class="col-md-8 p-3 p-md-4">
@@ -1376,7 +1315,8 @@ const confirmDelete = async () => {
                       Savings
                     </span>
                     <span class="d-inline-flex align-items-center">
-                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
+                      <span class="me-2"
+                        style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
                       Waste
                     </span>
                   </div>
@@ -1453,34 +1393,48 @@ const confirmDelete = async () => {
         </div>
 
         <div class="col-lg-4">
-          <div class="glass-card p-4">
-            <h5 class="mb-3 fw-bold">
-              <i class="bi bi-pie-chart me-2"></i>
-              Waste by Category
-            </h5>
-            <div class="mx-auto" style="width:240px;height:300px;" v-if="chartDataStyled.datasets[0].data.length">
-              <Pie :data="chartDataStyled" :options="wasteRingOpts" :plugins="[centerTextPlugin]" />
-            </div>
-            <p class="text-secondary small text-center my-4" v-else>No waste data yet</p>
+          <div class="card border-0 shadow-sm p-4" style="border-radius: 16px;">
+  <h5 class="mb-4 fw-bold text-dark">
+    <i class="bi bi-pie-chart me-2"></i>
+    Waste by Category
+  </h5>
+  
+  <!-- Chart Container with Total in Center -->
+  <div class="position-relative mx-auto mb-4" style="width: 240px; height: 300px;" v-if="chartDataStyled.datasets[0].data.length">
+    <Pie :data="chartDataStyled" :options="wasteRingOpts" :plugins="[centerTextPlugin]" />
+    
+    <!-- Dynamic Percentage Labels Outside Ring -->
+    <div v-for="(item, i) in allLegendItems" :key="i" 
+     class="position-absolute"
+     :style="getPercentageLabelPosition(i, allLegendItems)">
+  <div class="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold shadow-lg percentage-badge"
+           :style="{ 
+             width: '56px', 
+             height: '56px', 
+             background: `linear-gradient(135deg, ${item.color} 0%, ${darkenColor(item.color, 20)} 100%)`,
+             fontSize: '1.125rem',
+             border: '2px solid white'
+           }">
+    {{ item.pct }}%
+  </div>
+</div>
+  </div>
+  
+  <p class="text-muted small text-center my-4" v-else>No waste data yet</p>
 
-            <div class="row text-center mt-3 g-0" v-if="legendTop3.length">
-              <div class="col" v-for="(item, i) in legendTop3" :key="i">
-                <div class="fw-bold fs-3">
-                  {{ item.pct }}<span class="fs-6">%</span>
-                </div>
-                <div class="d-inline-flex align-items-center gap-1 text-secondary small">
-                  <span class="rounded-circle"
-                    :style="{ width: '8px', height: '8px', backgroundColor: item.color }"></span>
-                  {{ item.label }}
-                </div>
-              </div>
-            </div>
-
-
-
-
-
-          </div>
+  <!-- Dynamic Legend at Bottom -->
+  <div class="d-flex flex-wrap justify-content-center gap-3 mt-3" v-if="allLegendItems.length">
+    <div v-for="(item, i) in allLegendItems" :key="i" class="d-flex align-items-center gap-2">
+      <span class="rounded-circle flex-shrink-0" 
+            :style="{ 
+              width: '16px', 
+              height: '16px', 
+              backgroundColor: item.color,
+            }"></span>
+      <span class="text-secondary small fw-medium">{{ item.label }}</span>
+    </div>
+  </div>
+</div>
         </div>
       </div>
     </div>
@@ -1562,14 +1516,17 @@ const confirmDelete = async () => {
                   <div class="food-actions d-flex gap-2">
                     <!-- If expired, only show delete. Otherwise allow edit and consume. -->
                     <template v-if="getDaysLeft(food) < 0">
-                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i class="bi bi-trash"></i></button>
+                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
+                          class="bi bi-trash"></i></button>
                     </template>
                     <template v-else>
-                      <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
+                      <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i
+                          class="bi bi-pencil"></i>
                         Edit</button>
                       <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i>
                         Consume</button>
-                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i class="bi bi-trash"></i></button>
+                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
+                          class="bi bi-trash"></i></button>
                     </template>
                   </div>
                 </div>
@@ -1580,7 +1537,7 @@ const confirmDelete = async () => {
       </div>
 
       <!-- Activities -->
-      <div class="col-lg-4 d-none d-lg-block d-flex flex-column h-100">
+      <div class="col-lg-4 d-lg-block d-flex flex-column h-100">
         <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0">
           <h3 class="h5 mb-3 fw-bold">Recent Activity</h3>
 
@@ -1751,19 +1708,37 @@ const confirmDelete = async () => {
         <p>
           How much of <strong>{{ useForm.name }}</strong> did you use?
         </p>
+
+        <!-- Show available quantity alert -->
+        <div class="alert alert-info py-2 mb-2" style="font-size: 0.875rem;">
+          <i class="bi bi-info-circle me-2"></i>
+          Available: <strong>{{ useForm.maxQuantity }} {{ useForm.unit }}</strong>
+        </div>
+
         <div class="row g-2 mt-2">
           <div class="col-6">
             <label class="form-label">Quantity</label>
-            <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" style="height: 45px" />
+            <input v-model.number="useForm.quantity" type="number" min="1" :max="useForm.maxQuantity"
+              class="form-control" :class="{ 'is-invalid': useForm.quantity > useForm.maxQuantity }"
+              style="height: 45px" />
+            <!-- Error message if exceeds max -->
+            <div v-if="useForm.quantity > useForm.maxQuantity" class="invalid-feedback d-block">
+              Cannot exceed {{ useForm.maxQuantity }} {{ useForm.unit }}
+            </div>
           </div>
           <div class="col-6">
             <label class="form-label">Unit</label>
             <input v-model="useForm.unit" type="text" class="form-control" disabled style="height: 45px;" />
           </div>
         </div>
+
         <div class="d-flex justify-content-end gap-2 mt-3">
           <button class="btn btn-secondary" @click="closeUse">Cancel</button>
-          <button class="btn btn-primary" @click="saveUse">Use</button>
+          <!-- Disable button when invalid -->
+          <button class="btn btn-primary" @click="saveUse"
+            :disabled="useForm.quantity <= 0 || useForm.quantity > useForm.maxQuantity">
+            Use
+          </button>
         </div>
       </div>
     </div>
@@ -1944,6 +1919,16 @@ const confirmDelete = async () => {
   background: #ede9e8;
   color: #333;
 }
+.percentage-badge {
+  transition: all 0.3s ease;
+  cursor: pointer;
+  font-size: 0.875rem;
+  letter-spacing: -0.5px;
+}
+
+.percentage-badge:hover {
+  transform: scale(1.15) rotate(5deg);
+}
 
 .flip-card-front,
 .flip-card-back {
@@ -1968,7 +1953,7 @@ const confirmDelete = async () => {
   transform-style: preserve-3d;
 }
 
-.flip-card-inner:hover {
+.flip-card-inner.is-flipped {
   transform: rotateY(180deg);
 }
 
@@ -2135,6 +2120,7 @@ const confirmDelete = async () => {
     opacity 0.25s ease,
     transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 .fab-add:hover .fab-text {
   max-width: 100px;
   opacity: 1;
@@ -2187,20 +2173,21 @@ const confirmDelete = async () => {
       0 0 0 rgba(229, 57, 53, 0);
   }
 }
+
 .overflow-visible {
   overflow: visible;
 }
 
 .leaderboard-card {
   transition: all 0.3s ease;
-  border:1px solid white;
+  border: 1px solid white;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06)
 }
 
 .leaderboard-card:hover {
   transform: translateY(-4px);
- box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.04);
-  border:1px solid  #f59e0b;
+  box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f59e0b;
 }
 
 .leaderboard-card:hover .icon-circle:hover {
@@ -2209,8 +2196,9 @@ const confirmDelete = async () => {
 }
 
 .leaderboard-card:hover .title-hover {
-  color: #f59e0b ;
+  color: #f59e0b;
 }
+
 /* Make activity card scrollable and match inventory height */
 .activity-scroll {
   min-height: 0;
