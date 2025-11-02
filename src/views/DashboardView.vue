@@ -98,6 +98,7 @@ const useForm = reactive({
   name: '',
   quantity: 0,
   unit: '',
+  maxQuantity: 0,
 })
 
 const deleteTarget = ref(null)
@@ -211,9 +212,9 @@ const calculateScoreChange = (activityType, price, quantity = 1, isDonation = fa
     case 'conFood': // Consumed/Saved
       return (0.4 * quantity) + (0.2 * price); // +0.4 per item, +0.2*total_value for money
     case 'expFood': // Expired/Wasted
-      return -((0.6 * quantity) + (0.2 * price)); // -0.6 per item, -0.2*total_value for money
+      return -((0.6 * quantity) + (0.2 * price)); // -0.6 per item, -0.2*total_value for money, wasting food should bear heaviest weightage
     case 'donFood': // Donated
-      return (0.4 * quantity) + (0.2 * price) + (0.5 * quantity); // +0.4 per item, +0.2*total_value, +0.5 per item donated
+      return (0.4 * quantity) + (0.2 * price) + (0.5 * quantity); // +0.4 per item, +0.2*total_value, +0.5 per item donated. Bears higher weightage to encourage donation
     default:
       return 0;
   }
@@ -796,6 +797,7 @@ const openUse = (food) => {
   useForm.name = food.name
   useForm.quantity = 1
   useForm.unit = food.unit || ''
+  useForm.maxQuantity = food.quantity
   showUseModal.value = true
 }
 
@@ -805,6 +807,7 @@ const closeUse = () => {
   useForm.name = ''
   useForm.quantity = 0
   useForm.unit = ''
+  useForm.maxQuantity = 0
 }
 
 const saveUse = async () => {
@@ -1341,27 +1344,28 @@ const confirmDelete = async () => {
             <div class="row g-0">
               <!-- Left panel -->
               <div class="col-md-4">
-  <div class="card shadow-sm h-100 position-relative overflow-visible leaderboard-card">
-    
-    <div class="card-body text-center pt-4">
-      <!-- Icon Circle -->
-      <div class="d-flex align-items-center justify-content-center mx-auto mb-3 rounded-circle icon-circle-hover" 
-            style="width: 80px; height: 80px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #f59e0b; transition: all 0.3s ease;">
-        <i class="bi bi-trophy fs-1"></i>
-      </div>
-      
-      <!-- Title -->
-      <h6 class="fw-bold mb-3 title-hover" style="font-size: 1.25rem; transition: color 0.3s ease;">
-        Leaderboard Insights
-      </h6>
-      
-      <!-- Description -->
-      <p class="text-secondary small mb-0 lh-base">
-        {{ leaderboardMessage }}
-      </p>
-    </div>
-  </div>
-</div>
+                <div class="card shadow-sm h-100 position-relative overflow-visible leaderboard-card">
+
+                  <div class="card-body text-center pt-4">
+                    <!-- Icon Circle -->
+                    <div
+                      class="d-flex align-items-center justify-content-center mx-auto mb-3 rounded-circle icon-circle-hover"
+                      style="width: 80px; height: 80px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #f59e0b; transition: all 0.3s ease;">
+                      <i class="bi bi-trophy fs-1"></i>
+                    </div>
+
+                    <!-- Title -->
+                    <h6 class="fw-bold mb-3 title-hover" style="font-size: 1.25rem; transition: color 0.3s ease;">
+                      Leaderboard Insights
+                    </h6>
+
+                    <!-- Description -->
+                    <p class="text-secondary small mb-0 lh-base">
+                      {{ leaderboardMessage }}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               <!-- Right panel -->
               <div class="col-md-8 p-3 p-md-4">
@@ -1376,7 +1380,8 @@ const confirmDelete = async () => {
                       Savings
                     </span>
                     <span class="d-inline-flex align-items-center">
-                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
+                      <span class="me-2"
+                        style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
                       Waste
                     </span>
                   </div>
@@ -1751,19 +1756,37 @@ const confirmDelete = async () => {
         <p>
           How much of <strong>{{ useForm.name }}</strong> did you use?
         </p>
+
+        <!-- NEW: Show available quantity alert -->
+        <div class="alert alert-info py-2 mb-2" style="font-size: 0.875rem;">
+          <i class="bi bi-info-circle me-2"></i>
+          Available: <strong>{{ useForm.maxQuantity }} {{ useForm.unit }}</strong>
+        </div>
+
         <div class="row g-2 mt-2">
           <div class="col-6">
             <label class="form-label">Quantity</label>
-            <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" style="height: 45px" />
+            <input v-model.number="useForm.quantity" type="number" min="1" :max="useForm.maxQuantity"
+              class="form-control" :class="{ 'is-invalid': useForm.quantity > useForm.maxQuantity }"
+              style="height: 45px" />
+            <!-- NEW: Error message if exceeds max -->
+            <div v-if="useForm.quantity > useForm.maxQuantity" class="invalid-feedback d-block">
+              Cannot exceed {{ useForm.maxQuantity }} {{ useForm.unit }}
+            </div>
           </div>
           <div class="col-6">
             <label class="form-label">Unit</label>
             <input v-model="useForm.unit" type="text" class="form-control" disabled style="height: 45px;" />
           </div>
         </div>
+
         <div class="d-flex justify-content-end gap-2 mt-3">
           <button class="btn btn-secondary" @click="closeUse">Cancel</button>
-          <button class="btn btn-primary" @click="saveUse">Use</button>
+          <!-- NEW: Disable button when invalid -->
+          <button class="btn btn-primary" @click="saveUse"
+            :disabled="useForm.quantity <= 0 || useForm.quantity > useForm.maxQuantity">
+            Use
+          </button>
         </div>
       </div>
     </div>
@@ -2187,20 +2210,21 @@ const confirmDelete = async () => {
       0 0 0 rgba(229, 57, 53, 0);
   }
 }
+
 .overflow-visible {
   overflow: visible;
 }
 
 .leaderboard-card {
   transition: all 0.3s ease;
-  border:1px solid white;
+  border: 1px solid white;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06)
 }
 
 .leaderboard-card:hover {
   transform: translateY(-4px);
- box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.04);
-  border:1px solid  #f59e0b;
+  box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f59e0b;
 }
 
 .leaderboard-card:hover .icon-circle:hover {
@@ -2209,8 +2233,9 @@ const confirmDelete = async () => {
 }
 
 .leaderboard-card:hover .title-hover {
-  color: #f59e0b ;
+  color: #f59e0b;
 }
+
 /* Make activity card scrollable and match inventory height */
 .activity-scroll {
   min-height: 0;
