@@ -1,4 +1,3 @@
-<!-- src/components/PodiumLeaderboard.vue -->
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { db, auth } from '@/firebase'
@@ -9,7 +8,6 @@ const currentUserId = computed(() => auth.currentUser?.uid)
 
 onMounted(() => {
   const q = query(collection(db, 'user'), orderBy('foodScore', 'desc'), limit(3))
-  
   onSnapshot(q, snap => {
     topPlayers.value = snap.docs.map(d => {
       const data = d.data()
@@ -18,11 +16,10 @@ onMounted(() => {
       const initials = nameParts.length >= 2 
         ? (nameParts[0][0] + nameParts[1][0]).toUpperCase()
         : name[0]?.toUpperCase() || 'U'
-      
       return {
         uid: d.id,
-        name: name,
-        initials: initials,
+        name,
+        initials,
         monkeyId: data.monkey?.selected || 'monkey1',
         score: data.foodScore || 0,
         streak: data.streak || 0,
@@ -32,77 +29,71 @@ onMounted(() => {
   })
 })
 
-// Reorder for podium display: [2nd, 1st, 3rd]
 const podiumOrder = computed(() => {
   if (topPlayers.value.length < 2) return topPlayers.value
   return [
-    topPlayers.value[1], // 2nd place
-    topPlayers.value[0], // 1st place
-    topPlayers.value[2]  // 3rd place
+    topPlayers.value[1], // 2nd
+    topPlayers.value[0], // 1st
+    topPlayers.value[2]  // 3rd
   ].filter(Boolean)
 })
 </script>
 
 <template>
-  <div class="podium-leaderboard bg-white rounded shadow p-3 mx-auto" style="max-width: 90%;">
-    <div class="podium-title d-flex align-items-center justify-content-center gap-2 text-black fs-4 fw-bold mb-3">
-      <i class="bi bi-trophy-fill"></i>
-      Top Players
-    </div>
+<div class="podium-leaderboard card shadow-lg border-0 mx-auto p-4">
+    <!-- Title - Now ABOVE crown -->
+    <h2 class="podium-title text-success fw-bold text-center fs-4 mb-8 position-relative">
+      <i class="bi bi-trophy-fill me-2"></i>BigBacksVille Leaderboard
+    </h2>
 
-    <div class="podium-wrapper d-flex align-items-end justify-content-center gap-2 px-2">
+    <!-- Podium Row - Vertically Centered -->
+    <div class="podium-wrapper d-flex justify-content-center align-items-end flex-nowrap gap-4 h-100">
       <!-- 2nd Place -->
-      <div v-if="podiumOrder[0]" class="podium-place text-center">
-        <div class="podium-user position-relative p-2 rounded bg-light">
-          <span v-if="podiumOrder[0].isCurrentUser" class="badge bg-success position-absolute top-0 start-50 translate-middle-x" style="font-size:0.6rem;">You</span>
-          <img 
-            :src="`/monkey/${podiumOrder[0].monkeyId}.png`" 
-            :alt="podiumOrder[0].name"
-            class="rounded-circle border border-dark"
-            style="width:50px; height:50px;"
-          />
-          <div class="podium-name text-black fw-semibold text-truncate" style="max-width:70px;">{{ podiumOrder[0].name }}</div>
-          <div class="podium-score text-black fw-bold bg-success bg-opacity-10 rounded px-1">{{ podiumOrder[0].score }}</div>
-        </div>
-        <div class="podium-stand bg-secondary rounded-top" style="height:55px; width:70px;">
-          <div class="podium-rank text-black fw-bold fs-5">#2</div>
+      <div v-if="podiumOrder[0]" class="podium-place text-center animate-on-load pulse">
+        <div class="podium-container d-flex flex-column align-items-center">
+          <span v-if="podiumOrder[0].isCurrentUser" class="badge bg-success position-absolute top-0 start-50 translate-middle-x">You</span>
+          <div class="podium-user bg-light rounded p-3">
+            <img :src="`/monkey/${podiumOrder[0].monkeyId}.png`" class="rounded-circle border border-dark mb-2 podium-avatar" />
+            <div class="fw-semibold text-truncate mx-auto">{{ podiumOrder[0].name }}</div>
+            <div class="fw-bold text-success bg-success bg-opacity-10 rounded px-2 mt-1">{{ podiumOrder[0].score }}</div>
+          </div>
+          <div class="podium-stand rank-silver d-flex align-items-center justify-content-center rounded-top mt-1">
+            <span class="fw-bold text-white">#2</span>
+          </div>
         </div>
       </div>
 
       <!-- 1st Place -->
-      <div v-if="podiumOrder[1]" class="podium-place text-center">
-        <div class="podium-crown text-warning fs-3 position-absolute" style="top:-20px;"><i class="bi bi-award-fill"></i></div>
-        <div class="podium-user position-relative p-2 rounded bg-light">
-          <span v-if="podiumOrder[1].isCurrentUser" class="badge bg-success position-absolute top-0 start-50 translate-middle-x" style="font-size:0.6rem;">You</span>
-          <img 
-            :src="`/monkey/${podiumOrder[1].monkeyId}.png`" 
-            :alt="podiumOrder[1].name"
-            class="rounded-circle border border-dark"
-            style="width:60px; height:60px;"
-          />
-          <div class="podium-name text-black fw-semibold text-truncate" style="max-width:70px;">{{ podiumOrder[1].name }}</div>
-          <div class="podium-score text-black fw-bold bg-success bg-opacity-10 rounded px-1">{{ podiumOrder[1].score }}</div>
-        </div>
-        <div class="podium-stand bg-warning rounded-top" style="height:70px; width:70px;">
-          <div class="podium-rank text-black fw-bold fs-5">#1</div>
+      <div v-if="podiumOrder[1]" class="podium-place text-center position-relative animate-on-load pulse" style="animation-delay: 0.2s;">
+        <div class="podium-container d-flex flex-column align-items-center">
+          <!-- Crown is INSIDE podium-container, BELOW title -->
+          <div class="podium-crown text-warning position-absolute">
+            <i class="bi bi-award-fill"></i>
+          </div>
+          <span v-if="podiumOrder[1].isCurrentUser" class="badge bg-success position-absolute top-0 start-50 translate-middle-x">You</span>
+          <div class="podium-user bg-light rounded p-3 z-1">
+            <img :src="`/monkey/${podiumOrder[1].monkeyId}.png`" class="rounded-circle border border-dark mb-2 podium-avatar-lg" />
+            <div class="fw-semibold text-truncate mx-auto">{{ podiumOrder[1].name }}</div>
+            <div class="fw-bold text-success bg-success bg-opacity-10 rounded px-2 mt-1">{{ podiumOrder[1].score }}</div>
+          </div>
+          <div class="podium-stand rank-gold d-flex align-items-center justify-content-center rounded-top mt-1">
+            <span class="fw-bold text-white">#1</span>
+          </div>
         </div>
       </div>
 
       <!-- 3rd Place -->
-      <div v-if="podiumOrder[2]" class="podium-place text-center">
-        <div class="podium-user position-relative p-2 rounded bg-light">
-          <span v-if="podiumOrder[2].isCurrentUser" class="badge bg-success position-absolute top-0 start-50 translate-middle-x" style="font-size:0.6rem;">You</span>
-          <img 
-            :src="`/monkey/${podiumOrder[2].monkeyId}.png`" 
-            :alt="podiumOrder[2].name"
-            class="rounded-circle border border-dark"
-            style="width:50px; height:50px;"
-          />
-          <div class="podium-name text-black fw-semibold text-truncate" style="max-width:70px;">{{ podiumOrder[2].name }}</div>
-          <div class="podium-score text-black fw-bold bg-success bg-opacity-10 rounded px-1">{{ podiumOrder[2].score }}</div>
-        </div>
-        <div class="podium-stand bg-warning rounded-top" style="height:45px; width:70px;">
-          <div class="podium-rank text-black fw-bold fs-5">#3</div>
+      <div v-if="podiumOrder[2]" class="podium-place text-center animate-on-load pulse" style="animation-delay: 0.4s;">
+        <div class="podium-container d-flex flex-column align-items-center">
+          <span v-if="podiumOrder[2].isCurrentUser" class="badge bg-success position-absolute top-0 start-50 translate-middle-x">You</span>
+          <div class="podium-user bg-light rounded p-3">
+            <img :src="`/monkey/${podiumOrder[2].monkeyId}.png`" class="rounded-circle border border-dark mb-2 podium-avatar" />
+            <div class="fw-semibold text-truncate mx-auto">{{ podiumOrder[2].name }}</div>
+            <div class="fw-bold text-success bg-success bg-opacity-10 rounded px-2 mt-1">{{ podiumOrder[2].score }}</div>
+          </div>
+          <div class="podium-stand rank-bronze d-flex align-items-center justify-content-center rounded-top mt-1">
+            <span class="fw-bold text-white">#3</span>
+          </div>
         </div>
       </div>
     </div>
@@ -111,226 +102,135 @@ const podiumOrder = computed(() => {
 
 <style scoped>
 .podium-leaderboard {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  border: 2px solid #e5e7eb;
-  min-width: 360px;
-  margin: 0 auto;
-  max-width: 90%;
-}
-
-.podium-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #fbbf24;
-  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 1.2rem;
+  width: 100%;
+  max-width: 950px;
+  min-height: 520px;
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
   justify-content: center;
+  padding: 2rem;
+}
+.podium-title {
+  font-weight: 700;
+  margin-bottom: 3rem !important;
+  z-index: 10;
+  
 }
 
 .podium-wrapper {
-  display: flex;
+  gap: 1.5rem;
   align-items: flex-end;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 8px;
 }
 
 .podium-place {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
+  flex: 1;
+  max-width: 200px;
+  transition: transform 0.3s ease;
+}
+.podium-place:hover {
+  transform: translateY(-6px);
 }
 
 .podium-user {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 8px;
-  position: relative;
-  padding: 8px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  transition: all 0.2s;
+  width: 100%;
+  transition: transform 0.3s ease;
 }
-
 .podium-user:hover {
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateY(-2px);
-}
-
-.podium-user.current-user {
-  background: rgba(16, 185, 129, 0.1);
-  border: 2px solid #10b981;
-}
-
-.you-badge {
-  position: absolute;
-  top: -8px;
-  background: #10b981;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
-  text-transform: uppercase;
-}
-
-.podium-crown {
-  position: absolute;
-  top: -16px;
-  font-size: 24px;
-  color: #fbbf24;
-  animation: bounce 2s infinite;
-  z-index: 10;
-}
-
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  transform: scale(1.05);
 }
 
 .podium-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 2px solid #fbbf24;
-  image-rendering: pixelated;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.podium-avatar-first {
-  width: 48px;
-  height: 48px;
-  border: 3px solid #fbbf24;
-  box-shadow: 0 0 16px rgba(251, 191, 36, 0.5);
-}
-
-.podium-name {
-  font-size: 11px;
-  font-weight: 600;
-  color: #fff;
-  text-align: center;
-  max-width: 70px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.podium-score {
-  font-size: 10px;
-  font-weight: 700;
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.1);
-  padding: 2px 6px;
-  border-radius: 8px;
-}
-
-.podium-stand {
   width: 70px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px 8px 0 0;
-  position: relative;
-  overflow: hidden;
+  height: 70px;
+}
+.podium-avatar-lg {
+  width: 85px;
+  height: 85px;
 }
 
-.podium-rank {
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-  z-index: 2;
-  padding: 8px 0;
+/* Equal width podiums */
+.podium-stand {
+  width: 100%;
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 4px 10px rgba(251, 191, 36, 0.4);
+  transition: transform 0.3s ease;
+}
+.podium-stand:hover {
+  transform: translateY(-4px);
 }
 
 .rank-gold {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-  height: 70px;
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+  height: 110px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
 }
-
 .rank-silver {
-  background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
-  height: 55px;
-  box-shadow: 0 0 16px rgba(209, 213, 219, 0.3);
+  height: 85px;
+  background: linear-gradient(135deg, #d1d5db, #9ca3af);
 }
-
 .rank-bronze {
-  background: linear-gradient(135deg, #cd7f32 0%, #b8733a 100%);
-  height: 45px;
-  box-shadow: 0 0 16px rgba(205, 127, 50, 0.3);
+  height: 70px;
+  background: linear-gradient(135deg, #cd7f32, #b8733a);
 }
 
-/* Podium order */
-.podium-second {
-  order: 1;
+/* Crown */
+.podium-crown {
+  top: -45px; /* adjust so it’s above the user card */
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 3rem;
+  animation: bounce 2s infinite ease-in-out;
+  z-index: 10;
 }
 
-.podium-first {
-  order: 2;
+.podium-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
 }
 
-.podium-third {
-  order: 3;
+/* Entrance + pulse animations */
+.animate-on-load {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeUp 0.8s ease forwards;
+}
+@keyframes fadeUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-6px); }
+}
+
+.pulse {
+  animation: fadeUp 0.8s ease forwards, pulseEffect 2.2s ease-in-out infinite;
+}
+@keyframes pulseEffect {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .podium-leaderboard {
-    min-width: 280px;
-    padding: 10px;
-  }
-  
-  .podium-wrapper {
-    gap: 6px;
-  }
-  
-  .podium-stand {
-    width: 60px;
-  }
-  
-  .podium-avatar {
-    width: 36px;
-    height: 36px;
-  }
-  
-  .podium-avatar-first {
-    width: 42px;
-    height: 42px;
-  }
-  
-  .rank-gold {
-    height: 60px;
-  }
-  
-  .rank-silver {
-    height: 48px;
-  }
-  
-  .rank-bronze {
-    height: 40px;
-  }
+@media (max-width: 992px) {
+  .podium-avatar { width: 60px; height: 60px; }
+  .podium-avatar-lg { width: 75px; height: 75px; }
+  .podium-stand { width: 100%; }
+  .rank-gold { height: 90px; }
+  .rank-silver { height: 70px; }
+  .rank-bronze { height: 60px; }
+  .podium-crown { font-size: 2.4rem; top: -40px; }
 }
 
-@media (max-width: 576px) {
-  .podium-leaderboard {
-    min-width: 240px;
-  }
-  
-  .podium-stand {
-    width: 50px;
-  }
-  
-  .podium-name {
-    font-size: 10px;
-    max-width: 60px;
-  }
+@media (max-width: 768px) {
+  .podium-wrapper { gap: 1rem; }
+  .podium-stand { width: 100%; }
+  .rank-gold { height: 80px; }
+  .rank-silver { height: 65px; }
+  .rank-bronze { height: 55px; }
+  .podium-crown { font-size: 2rem; top: -32px; }
 }
 </style>
