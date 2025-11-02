@@ -44,7 +44,7 @@
       <!-- Right Content - Food Image -->
       <div class="col-lg-6 position-relative d-none d-lg-flex justify-content-center" style="z-index: 5;">
         <div class="food-plate rounded-circle shadow-lg overflow-hidden d-flex align-items-center justify-content-center bg-dark">
-          <img src="../../../public/food.jpg" alt="Delicious Salad" class="food-image" />
+          <img src="/food.jpg" alt="Delicious Salad" class="food-image" />
         </div>
       </div>
     </div>
