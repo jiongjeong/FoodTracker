@@ -445,7 +445,7 @@ async function markAsDonated(item) {
     const userDocRef = doc(db, 'user', currentUser.value.uid)
     const userSnap = await getDoc(userDocRef)
     const currentScore = userSnap.exists() ? (userSnap.data().foodScore || 0) : 0
-    const newScore = Math.max(0, currentScore + baseScoreChange)
+    const newScore = Math.round(Math.max(0, currentScore + baseScoreChange))
 
     // Update score in Firebase
     await updateDoc(userDocRef, {

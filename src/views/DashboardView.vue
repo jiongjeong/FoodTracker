@@ -235,13 +235,13 @@ const updateFoodScore = async (activityType, price, uid, quantity = 1, isDonatio
     const baseScoreChange = calculateScoreChange(activityType, price, quantity, isDonation);
 
     // Apply streak multiplier
-    const adjustedChange = Math.round(baseScoreChange * streakMultiplier);
+    const adjustedChange = (baseScoreChange * streakMultiplier);
 
     // Get current score from Firebase (or initialize to 0)
     const currentDoc = await getDoc(userDocRef);
     const currentScore = currentDoc.exists() ? (currentDoc.data().foodScore || 0) : 0;
 
-    const newScore = Math.max(0, currentScore + adjustedChange);
+    const newScore = Math.round(Math.max(0, currentScore + adjustedChange));
 
     await updateDoc(userDocRef, {
       foodScore: newScore,
