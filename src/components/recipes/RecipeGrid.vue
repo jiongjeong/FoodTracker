@@ -119,7 +119,8 @@ const filteredRecipes = computed(() => {
   return props.recipes.filter(r => 
     r.name?.toLowerCase().includes(search) ||
     r.category?.toLowerCase().includes(search) ||
-    r.area?.toLowerCase().includes(search)
+    r.area?.toLowerCase().includes(search) ||
+    (r.ingredients || []).some(i => i.toLowerCase().includes(search))
   )
 })
 
