@@ -396,42 +396,79 @@ onAuthStateChanged(auth, async (u) => {
 </script>
 
 <template>
-
-<div class="recipe-discovery-page" style="background: linear-gradient(180deg, #e8f5e9 0%, #ffffff 100%); min-height: 100vh;">
+<div class="recipe-discovery-page" style="background: #faf8f5; min-height: 100vh; position: relative; overflow: hidden;">
   <div class="container-fluid p-4">
     <!-- Hero Section -->
-   <div class="hero-card position-relative p-4 p-md-5 mb-4 overflow-hidden">
-    <p class="lead text-green-muted mb-0">
-      Discover fresh recipes to cut waste and boost flavor 🌿
-    </p>
+    <div class="row align-items-center min-vh-100 p-4 p-md-5 mb-4 position-relative">
+      <!-- Decorative Background Blobs -->
+    <!-- Decorative Circular Blobs -->
+<!-- blob container: keep behind interactive elements -->
+<div class="position-absolute top-0 end-0 h-100 w-50 recipe-blobs" style="z-index: 0; pointer-events: none;">
+  <!-- Top pink-red blob -->
+  <div 
+    class="position-absolute top-0 end-0 rounded-circle bg-danger bg-gradient opacity-75 shadow "
+    style="width: 350px; height: 350px; background: radial-gradient(circle at 30% 30%, #ff8882, #ff6b6b); transform: translate(20%, -20%);">
+  </div>
+
+  <!-- Bottom yellow blob -->
+  <div 
+    class="position-absolute bottom-0 end-0 rounded-circle bg-warning bg-gradient opacity-75 shadow recipe-blob-yellow"
+    style="width: 280px; height: 280px; background: radial-gradient(circle at 70% 70%, #ffeaa7, #fdcb6e); transform: translate(20%, 20%); z-index: 0;">
+  </div>
+</div>
 
 
+      <!-- Floating Ingredients -->
+      <!-- Floating Ingredients -->
+<div class="floating-ingredient position-absolute" 
+     style="top: 55%; left: 40%; font-size: 2rem; animation-delay: 0s;">🍅</div>
 
-      <div class="mb-4">
-        <h1 class="display-6 fw-bold mb-2">Feeling hungry?</h1>
-        <h2 class="h3 text-muted">What are we cookin' today?</h2>
-      </div>
+<div class="floating-ingredient position-absolute" 
+     style="top: 15%; left: 48%; font-size: 1.8rem; animation-delay: 1s;">🌽</div>
 
-      <!-- Search Bar -->
-      <div class="search-bar-container mb-4">
-        <div class="input-group shadow-sm" style="border-radius: 50px; overflow: hidden; background: white;">
-          <span class="input-group-text border-0 bg-white ps-4">
-            <i class="bi bi-search text-muted"></i>
-          </span>
+<div class="floating-ingredient position-absolute" 
+     style="top: 10%; left: 54%; font-size: 1.6rem; animation-delay: 2s;">🍃</div>
+
+<div class="floating-ingredient position-absolute" 
+     style="top: 57%; left: 50%; font-size: 1.5rem; animation-delay: 3s;">🫑</div>
+
+      <!-- Left Content -->
+      <div class="col-lg-6 position-relative" style="z-index: 10;">
+        <div class="mb-4">
+          <h1 class="display-3 fw-bold mb-3" style="color: #2d3436; line-height: 1.2;">
+            Discover<br>
+            <span style="color: #00b894;">fresh recipes </span>
+          </h1>
+          <p class="lead text-muted mb-4" style="letter-spacing: 0.5px;">
+            to cut waste and boost flavor 🌿
+          </p>
+        </div>
+
+
+        <!-- Search Bar -->
+        <div class="input-group shadow-sm mb-4" style="max-width: 400px; border-radius: 50px; overflow: hidden; background: white;">
           <input
             v-model="searchQuery"
             type="text"
-            class="form-control border-0"
+            class="form-control border-0 m-2"
             placeholder="Search any recipe..."
             @keyup.enter="handleSearch"
             style="padding: 15px 10px;"
           />
-          <button class="btn border-0 bg-white pe-4">
-            <i class="bi bi-sliders text-muted fs-5"></i>
+          <button class="btn m-1" @click="handleSearch" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: white; padding: 0 25px; border-radius: 50px">
+            <i class="bi bi-arrow-right fs-5"></i>
           </button>
         </div>
+    </div>
+      <!-- Right Content - Food Image -->
+      <div class="col-lg-6 position-relative d-lg-block" style="z-index: 5;">
+        <div class="position-relative">
+          <!-- Main Food Plate Circle with Grooves -->
+          <div class="position-relative rounded-circle filter:blur(30px) shadow-lg overflow-hidden d-flex align-items-center justify-content-center food-plate" style="width: 400px; height: 400px; background: #2d3436;">
+            <img src="../../public/food.jpg" alt="Delicious Salad"  style="object-fit: cover; width: 450px; height:450px" />
+          </div>
+        </div>
       </div>
-
       <!-- Category Pills -->
       <div
           class="category-pills d-flex gap-2 overflow-auto pb-2 mb-3"
@@ -687,11 +724,122 @@ onAuthStateChanged(auth, async (u) => {
   </div>
 </div>
 </template>
-
 <style scoped>
+@keyframes riseAndFloat {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1);
+  }
+  50% {
+    transform: translateY(-25px) scale(1.1);
+  }
+  80% {
+    opacity: 0.8;
+    transform: translateY(-40px) scale(1.05);
+  }
+  100% {
+    transform: translateY(-60px) scale(1);
+    opacity: 0;
+  }
+}
+
+.floating-ingredient {
+  animation: riseAndFloat 4s ease-in-out infinite;
+  pointer-events: none;
+  transform-origin: center;
+}
+
+
+.category-pill {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.category-pill:hover {
+  transform: translateY(-8px) scale(1.05);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15) !important;
+}
+
+.category-pill.active {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(253, 203, 110, 0.4) !important;
+}
+
+.social-btn {
+  transition: all 0.3s ease;
+}
+
+.social-btn:hover {
+  transform: scale(1.15);
+  background: linear-gradient(135deg, #00b894 0%, #00cec9 100%) !important;
+}
+
+.input-group:focus-within {
+  box-shadow: 0 6px 20px rgba(0, 184, 148, 0.25) !important;
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+}
+
+.food-plate {
+  animation: plateRotate 20s linear infinite;
+}
+
+@keyframes plateRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.discount-badge {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.nav-link {
+  transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+  color: #00b894 !important;
+}
 .shadow-soft {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
   transition: all 0.25s ease-in-out;
+}
+
+/* Ensure the category pills (tabs) sit above decorative blobs on small screens */
+.category-pills {
+  position: relative; /* create stacking context */
+  z-index: 20; /* above blobs which use z-index 0/1 */
+}
+
+/* Make sure decorative blobs are visually behind and non-interactive on very small viewports */
+@media (max-width: 575px) {
+  .recipe-blobs,
+  .recipe-blob-yellow {
+    z-index: 0 !important;
+    pointer-events: none !important;
+  }
+  /* ensure pill buttons remain fully interactive above blobs */
+  .category-pills .btn {
+    position: relative;
+    z-index: 30;
+  }
 }
 
 /* Slightly lifted shadow + glow for active tab */
