@@ -82,21 +82,18 @@ router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const currentUser = auth.currentUser
 
-  // Also check localStorage/sessionStorage
-  const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user')
-
   if (requiresAuth) {
-    if (currentUser || storedUser) {
-      // User is authenticated
+    if (currentUser) {
+      // User is authenticated via Firebase
       next()
     } else {
-      // Not authenticated, redirect to landing
-      console.log('Not authenticated, redirecting to landing')
-      next('/')
+      // Not authenticated, redirect to login
+      console.log('Not authenticated, redirecting to login')
+      next('/login')
     }
   } else {
     // Public route
-    if ((to.path === '/login' || to.path === '/signup') && (currentUser || storedUser)) {
+    if ((to.path === '/login' || to.path === '/signup') && currentUser) {
       // Already logged in, redirect to dashboard
       next('/dashboard')
     } else {

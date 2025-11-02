@@ -27,13 +27,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { auth } from '@/firebase'
 import navbar from '@/components/navbar/navbar.vue'
 import CustomAlert from '@/components/CustomAlert.vue'
 import { useAlert } from '@/composables/useAlert'
 
 const route = useRoute()
+const router = useRouter()
 const authLoading = ref(true)
 const { alertState } = useAlert()
 
@@ -50,6 +51,11 @@ onMounted(() => {
       console.log('User authenticated:', user.uid)
     } else {
       console.log('No user authenticated')
+      // Check if current route requires auth
+      if (route.meta.requiresAuth) {
+        console.log('Redirecting to login...')
+        router.push('/login')
+      }
     }
     unsubscribe()
   })
