@@ -23,7 +23,7 @@
                 <div class="col-md-5 bg-light border-end left-col">
                   <div class="p-3 left-content">
                     <div class="image-wrapper">
-                      <div class="square-image-container">
+                      <div class="compact-image-container">
                         <img 
                           :src="recipe.image" 
                           :alt="recipe.name" 
@@ -191,10 +191,9 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
   margin-bottom: 0.5rem;
 }
 
-.square-image-container {
+.compact-image-container {
   width: 100%;
-  padding-bottom: 100%;
-  aspect-ratio: 1 / 1;
+  padding-bottom: 60%;
   position: relative;
   overflow: hidden;
   border-radius: 8px;

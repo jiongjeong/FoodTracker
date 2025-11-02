@@ -22,7 +22,7 @@
             @input="updateFilter($event.target.value)"
             type="text"
             class="form-control"
-            placeholder="Search recipes..."
+            placeholder="Filter results"
           />
           <button
             v-if="searchFilter"
@@ -44,7 +44,7 @@
         :key="recipe.id"
         class="recipe-grid-item"
       >
-        <CompactRecipeCard
+        <RecipeCard
           :recipe="recipe"
           :is-bookmarked="isBookmarkedFn(recipe.id)"
           :user-ingredient-count="countIngredientsFn(recipe)"
@@ -66,7 +66,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import CompactRecipeCard from './CompactRecipeCard.vue'
+import RecipeCard from './RecipeCard.vue'
 import RecipePagination from './RecipePagination.vue'
 
 const props = defineProps({

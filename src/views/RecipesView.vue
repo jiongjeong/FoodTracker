@@ -8,10 +8,10 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { useRecipesStore } from '../stores/recipes.js'
 import { db } from '../firebase.js'
 import { collection, getDocs, query } from 'firebase/firestore'
-import CompactHeroSection from '../components/recipes/CompactHeroSection.vue'
-import CompactRecipeGrid from '../components/recipes/CompactRecipeGrid.vue'
-import CompactEmptyState from '../components/recipes/CompactEmptyState.vue'
-import CompactRecipeModal from '../components/recipes/CompactRecipeModal.vue'
+import HeroSection from '../components/recipes/HeroSection.vue'
+import RecipeGrid from '../components/recipes/RecipeGrid.vue'
+import EmptyState from '../components/recipes/EmptyState.vue'
+import RecipeModal from '../components/recipes/RecipeModal.vue'
 import LoadingSpinner from '../components/recipes/LoadingSpinner.vue'
 import ErrorAlert from '../components/recipes/ErrorAlert.vue'
 
@@ -400,8 +400,8 @@ onAuthStateChanged(auth, async (u) => {
 <template>
 <div class="bg-light min-vh-100">
   <div class="container-fluid px-4 py-3">
-    <!-- Compact Hero Section -->
-    <CompactHeroSection
+    <!-- Hero Section -->
+    <HeroSection
       v-model:search-query="searchQuery"
       v-model:active-tab="activeTab"
       @search="handleSearch"
@@ -421,19 +421,19 @@ onAuthStateChanged(auth, async (u) => {
       <div v-if="!isLoading" key="content">
         <!-- Search Results Tab -->
         <div v-if="activeTab === 'search'">
-          <CompactEmptyState
+          <EmptyState
             v-if="searchResults.length === 0 && !searchQuery.trim()"
             icon="bi-search"
             title="Search for recipes"
             message="Enter a recipe name, ingredient, or cuisine type to get started"
           />
-          <CompactEmptyState
+          <EmptyState
             v-else-if="searchResults.length === 0 && searchQuery.trim()"
             icon="bi-emoji-frown"
             title="No results found"
             message="Try searching with different keywords or ingredients"
           />
-          <CompactRecipeGrid
+          <RecipeGrid
             v-else
             v-model:search-filter="searchFilter"
             :recipes="searchResults"
@@ -449,13 +449,13 @@ onAuthStateChanged(auth, async (u) => {
 
         <!-- Suggested Recipes Tab -->
         <div v-else-if="activeTab === 'suggested'">
-          <CompactEmptyState
+          <EmptyState
             v-if="suggestedRecipes.length === 0"
             icon="bi-lightbulb"
             title="No suggested recipes"
             message="No food items expiring soon, or no recipes found for your ingredients"
           />
-          <CompactRecipeGrid
+          <RecipeGrid
             v-else
             :recipes="suggestedRecipes"
             title="Recommended For You"
@@ -471,13 +471,13 @@ onAuthStateChanged(auth, async (u) => {
 
         <!-- Bookmarked Recipes Tab -->
         <div v-else-if="activeTab === 'bookmarked'">
-          <CompactEmptyState
+          <EmptyState
             v-if="bookmarkedRecipeObjects.length === 0"
             icon="bi-bookmark-heart"
             title="No bookmarked recipes"
             message="Bookmark recipes you like to save them for later"
           />
-          <CompactRecipeGrid
+          <RecipeGrid
             v-else
             :recipes="bookmarkedRecipeObjects"
             title="Your Bookmarks"
@@ -492,7 +492,7 @@ onAuthStateChanged(auth, async (u) => {
     </Transition>
 
     <!-- Recipe Detail Modal -->
-    <CompactRecipeModal
+    <RecipeModal
       v-if="showRecipeModal && selectedRecipe"
       :recipe="selectedRecipe"
       :is-bookmarked="isRecipeBookmarked(selectedRecipe.id)"

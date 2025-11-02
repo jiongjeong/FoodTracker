@@ -41,13 +41,13 @@
       <!-- User Ingredient Match -->
       <div v-if="userIngredientCount > 0" class="d-flex align-items-center gap-1 mb-2">
         <span class="badge bg-success bg-opacity-10 text-success px-2 py-1 fw-semibold" style="font-size: 0.75rem;">
-          <i class="bi bi-check-circle-fill me-1"></i>{{ userIngredientCount }} ingredients you have
+          <i class="bi bi-check-circle-fill me-1"></i>You have {{ userIngredientCount }} / {{ totalIngredients }} ingredients
         </span>
       </div>
 
       <!-- Suggested By -->
       <div v-if="showSuggestedBy && recipe.suggestedBy?.length" class="mt-2">
-        <p class="mb-1 text-muted fw-semibold" style="font-size: 0.75rem;">Suggested by:</p>
+        <p class="mb-1 text-muted fw-semibold" style="font-size: 0.75rem;">Expiring soon:</p>
         <div class="d-flex flex-wrap gap-1">
           <span
             v-for="food in recipe.suggestedBy.slice(0, 3)"
@@ -92,6 +92,10 @@ const props = defineProps({
 })
 
 defineEmits(['view', 'toggle-bookmark'])
+
+const totalIngredients = computed(() => {
+  return props.recipe.ingredients?.length || 0
+})
 
 const estimatedTime = computed(() => {
   const count = props.recipe.ingredients?.length || 0
