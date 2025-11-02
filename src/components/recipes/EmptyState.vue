@@ -20,7 +20,7 @@ defineProps({
   },
   message: {
     type: String,
-    required: true
+    default: 'Try a different search'
   }
 })
 </script>
