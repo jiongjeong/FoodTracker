@@ -1,5 +1,5 @@
 <template>
-  <div class="empty-state-container text-center py-5">
+  <div class="empty-state-container text-center py-3">
     <div class="icon-wrapper mb-3">
       <i :class="icon" class="empty-icon text-muted"></i>
     </div>

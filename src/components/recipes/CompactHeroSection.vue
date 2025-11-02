@@ -1,5 +1,5 @@
 <template>
-  <div class="compact-hero position-relative py-4 py-md-5">
+  <div class="compact-hero position-relative py-2 py-md-3">
     <!-- Decorative Blobs -->
     <div class="position-absolute top-0 end-0 h-100 w-50 recipe-blobs pe-none" style="z-index: 0;">
       <div class="blob blob-pink position-absolute top-0 end-0 rounded-circle opacity-75 shadow"></div>
