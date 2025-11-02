@@ -52,7 +52,7 @@
     <!-- Category Pills -->
     <div class="category-pills d-flex gap-2 overflow-auto pb-2 mt-4 position-relative" style="scrollbar-width: none; -ms-overflow-style: none; z-index: 20;">
       <button
-        @click="$emit('update:activeTab', 'search'); $emit('clearSearch')"
+        @click="$emit('reset-to-all')"
         class="btn rounded-pill flex-shrink-0 px-4 py-2 text-nowrap"
         :class="activeTab === 'search' ? 'btn-success text-white shadow-active' : 'btn-light shadow-soft'">
         See All
