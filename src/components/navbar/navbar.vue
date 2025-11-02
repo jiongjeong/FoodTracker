@@ -106,7 +106,7 @@
               >
                 <span class="initials-avatar">{{ userInitials }}</span>{{ userName }}
               </a>
-              <ul class="dropdown-menu dropdown-menu-end" :class="{ show: dropdownOpen }" @click.stop>
+              <ul class="dropdown-menu dropdown-menu-end" :class="{ show: dropdownOpen }">
                 <li>
                   <RouterLink to="/profile" class="dropdown-item" @click="closeNavbar">
                     <i class="bi bi-person me-2"></i>My Profile
