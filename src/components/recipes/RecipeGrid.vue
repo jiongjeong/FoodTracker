@@ -113,7 +113,7 @@ const emit = defineEmits(['view-recipe', 'toggle-bookmark', 'update:searchFilter
 const currentPage = ref(1)
 
 const filteredRecipes = computed(() => {
-  if (!props.searchFilter) return props.recipes
+  if (!props.showFilter || !props.searchFilter) return props.recipes
   
   const search = props.searchFilter.toLowerCase().trim()
   return props.recipes.filter(r => 
