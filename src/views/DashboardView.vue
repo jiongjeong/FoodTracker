@@ -1757,7 +1757,7 @@ const confirmDelete = async () => {
           How much of <strong>{{ useForm.name }}</strong> did you use?
         </p>
 
-        <!-- NEW: Show available quantity alert -->
+        <!-- Show available quantity alert -->
         <div class="alert alert-info py-2 mb-2" style="font-size: 0.875rem;">
           <i class="bi bi-info-circle me-2"></i>
           Available: <strong>{{ useForm.maxQuantity }} {{ useForm.unit }}</strong>
@@ -1769,7 +1769,7 @@ const confirmDelete = async () => {
             <input v-model.number="useForm.quantity" type="number" min="1" :max="useForm.maxQuantity"
               class="form-control" :class="{ 'is-invalid': useForm.quantity > useForm.maxQuantity }"
               style="height: 45px" />
-            <!-- NEW: Error message if exceeds max -->
+            <!-- Error message if exceeds max -->
             <div v-if="useForm.quantity > useForm.maxQuantity" class="invalid-feedback d-block">
               Cannot exceed {{ useForm.maxQuantity }} {{ useForm.unit }}
             </div>
@@ -1782,7 +1782,7 @@ const confirmDelete = async () => {
 
         <div class="d-flex justify-content-end gap-2 mt-3">
           <button class="btn btn-secondary" @click="closeUse">Cancel</button>
-          <!-- NEW: Disable button when invalid -->
+          <!-- Disable button when invalid -->
           <button class="btn btn-primary" @click="saveUse"
             :disabled="useForm.quantity <= 0 || useForm.quantity > useForm.maxQuantity">
             Use
