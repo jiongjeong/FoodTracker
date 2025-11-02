@@ -12,7 +12,7 @@
 defineProps({
   icon: {
     type: String,
-    required: true
+    default: 'bi-search'
   },
   title: {
     type: String,
