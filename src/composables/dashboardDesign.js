@@ -109,7 +109,8 @@ export function buildWasteVsSavingsData(activities = []) {
     if (m == null) continue
     if (a.activityType === 'expFood') {
       waste[m] += Number(a.quantity) || 1
-    } else if (a.activityType === 'conFood' && a.note === 'fully consumed') {
+    } else if ((a.activityType === 'conFood' && a.note === 'fully consumed') ||
+      (a.activityType === 'donFood')) {
       saved[m] += Number(a.quantity) || 1
     }
   }

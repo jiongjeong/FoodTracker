@@ -8,7 +8,6 @@ import { useAlert } from '@/composables/useAlert.js';
 
 const { success, error, confirm } = useAlert();
 import {
-  chartOptions,
   wasteVsSavingsOpts,
   wasteRingOpts,
   centerTextPlugin,
@@ -20,7 +19,7 @@ import {
   getPercentageLabelPosition, createAllLegendItems, darkenColor
 } from '@/composables/dashboardDesign'
 import FlippedStatCard from '@/components/dashboard/flippedCard.vue'
-import { Bar, Pie, Line, Doughnut } from 'vue-chartjs'
+import {  Pie, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   Title,
@@ -1288,12 +1287,12 @@ const confirmDelete = async () => {
                   </h5>
                   <div class="d-flex align-items-center small fw-semibold">
                     <span class="me-3 d-inline-flex align-items-center">
-                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #FFA449"></span>
+                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
                       Savings
                     </span>
                     <span class="d-inline-flex align-items-center">
                       <span class="me-2"
-                        style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
+                        style="width:10px; height:10px; border-radius:50%; background: #FFA449;"></span>
                       Waste
                     </span>
                   </div>
