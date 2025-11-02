@@ -310,8 +310,6 @@ const countUserIngredients = (recipe) => {
     if (last && (userFoodKeywords.value.has(last) || 
         [...userFoodKeywords.value].some(k => k.includes(last) || last.includes(k)))) {
       count++
-    } else if ([...userFoodKeywords.value].some(k => k.includes(last))) {
-      count++
     }
   })
   return count
