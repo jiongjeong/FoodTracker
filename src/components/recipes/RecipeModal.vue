@@ -1,7 +1,15 @@
 <template>
   <Teleport to="body">
     <Transition name="modal-fade">
-      <div class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
+      <div 
+        v-if="true" 
+        class="modal fade show d-block" 
+        tabindex="-1" 
+        role="dialog"
+        aria-modal="true"
+        :aria-labelledby="'modal-title-' + recipe.id"
+        style="z-index: 1055;"
+      >
         <div 
           class="modal-backdrop fade show" 
           @click="emit('close')" 
@@ -66,7 +74,13 @@
                 <div class="col-md-7 right-col">
                   <div class="p-3 right-content">
                     <div class="mb-2">
-                      <h3 class="fw-bold mb-1" style="font-size: 1.3rem; line-height: 1.3;">{{ recipe.name }}</h3>
+                      <h3 
+                        :id="'modal-title-' + recipe.id" 
+                        class="fw-bold mb-1" 
+                        style="font-size: 1.3rem; line-height: 1.3;"
+                      >
+                        {{ recipe.name }}
+                      </h3>
                       <p class="text-muted mb-0" style="font-size: 0.8rem;">Follow these step-by-step instructions</p>
                     </div>
 
