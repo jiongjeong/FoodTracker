@@ -1432,7 +1432,7 @@ async function canDonated(item) {
               </div>
 
               <div class="col-md-6">
-                <label class="form-label">Expiration Date *</label>
+                <label class="form-label">Expiration Date</label>
                 <input v-model="shareForm.expirationDate" type="date" class="form-control" readonly
                   style="background-color: #e9ecef; cursor: not-allowed;" />
               </div>
@@ -1440,7 +1440,7 @@ async function canDonated(item) {
 
             <div class="row g-3 mb-3">
               <div class="col-md-6">
-                <label class="form-label">Quantity</label>
+                <label class="form-label">Quantity *</label>
                 <input v-model.number="shareForm.quantity" type="number" class="form-control"
                   :class="{ 'is-invalid': shareForm.quantity > maxShareQuantity }"
                   min="1" step="1" :max="maxShareQuantity"
