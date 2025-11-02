@@ -337,9 +337,9 @@ async function submitShare() {
 
     const expDate = new Date(shareForm.value.expirationDate)
 
+
     const data = {
       ownerId: currentUser.value.uid,
-      foodName: shareForm.value.foodName || '',
       foodId: shareForm.value.foodItemId,
       category: shareForm.value.category,
       quantity: qtyToShare,
@@ -357,21 +357,20 @@ async function submitShare() {
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
 
-    // Decrement user's foodItem quantity once
+
     const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', shareForm.value.foodItemId)
     const currentItem = foodItems.value.find(f => f.id === shareForm.value.foodItemId)
     const currentQty = Number(currentItem?.quantity || 0)
     const totalPrice = Number(currentItem?.price || 0)
-    
-    // Calculate per-unit price
+
+
     const pricePerUnit = currentQty > 0 ? totalPrice / currentQty : 0
-    
-    // Calculate remaining quantity and price
     const newQty = Math.max(0, currentQty - qtyToShare)
     const remainingPrice = pricePerUnit * newQty
+    const sharedPrice = pricePerUnit * qtyToShare
 
     if (currentQty < qtyToShare) {
-      // Rollback created listing
+
       try {
         await deleteDoc(doc(db, 'communityListings', docRef.id))
       } catch (rollbackErr) {
@@ -382,21 +381,17 @@ async function submitShare() {
     }
 
     // Update both quantity AND price
-    await updateDoc(foodItemRef, { 
+    await updateDoc(foodItemRef, {
       quantity: newQty,
       price: remainingPrice
     })
 
-
-    const originalPrice = Number(currentItem?.price || 0)
-    
-    // Log pending donation activity
     await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
       activityType: 'pendingDonFood',
       createdAt: new Date().toISOString(),
       category: data.category,
-      price: totalPrice,
-      foodName: data.foodName,
+      price: sharedPrice,
+      foodName: currentItem?.name || shareForm.value.foodName || '',
       foodId: data.foodId,
       quantity: data.quantity,
       unit: data.unit,
@@ -776,10 +771,10 @@ async function submitEdit() {
         if (foodItemSnap.exists()) {
           const currentFoodQty = Number(foodItemSnap.data().quantity || 0)
           const currentFoodPrice = Number(foodItemSnap.data().price || 0)
-          
+
           // Calculate per-unit price from current food item
           const pricePerUnit = currentFoodQty > 0 ? currentFoodPrice / currentFoodQty : 0
-          
+
           // Calculate new quantity and price
           const updatedFoodQty = currentFoodQty - qtyDifference
           const updatedFoodPrice = pricePerUnit * updatedFoodQty
@@ -847,6 +842,12 @@ async function submitEdit() {
 
 // Cancel donated function
 async function canDonated(item) {
+  // Check if already donated/claimed
+  if (item.donated) {
+    await error("This item has already been donated and cannot be cancelled.")
+    return
+  }
+
   const confirmed = await confirm(`Are you sure you want to cancel "${item.foodName}"? This will remove it from community listings.`, 'Cancel Donation')
 
   if (!confirmed) {
@@ -857,27 +858,93 @@ async function canDonated(item) {
   let originalFoodQty = null
 
   try {
+
+    if (!item.id) {
+      console.error('❌ Item ID is missing')
+      await error("Listing ID is missing")
+      return
+    }
+
     const listingRef = doc(db, 'communityListings', item.id)
     const listingSnap = await getDoc(listingRef)
 
     if (!listingSnap.exists()) {
-      await error("Listing not found")
+      await error("Listing not found. It may have already been deleted.")
       return
     }
 
-    deletedListing = { id: item.id, ...listingSnap.data() }
+    // Double check if it was marked as donated after the UI was loaded
+    const listingData = listingSnap.data()
+    if (listingData.donated) {
+      await error("This item has already been donated and cannot be cancelled.")
+      await loadMyListings() // Refresh the list
+      return
+    }
+
+    deletedListing = { id: item.id, ...listingData }
     const returnQty = Number(deletedListing.quantity || 0)
 
     const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', item.foodId)
     const foodItemSnap = await getDoc(foodItemRef)
 
     if (!foodItemSnap.exists()) {
+
       await error('Food item not found. Cannot cancel donation.')
       return
     }
 
     originalFoodQty = Number(foodItemSnap.data().quantity || 0)
+    const currentFoodPrice = Number(foodItemSnap.data().price || 0)
     const newQty = originalFoodQty + returnQty
+
+    // Find the specific pending donation activity for THIS listing
+    const activitiesQuery = query(
+      collection(db, 'user', currentUser.value.uid, 'activities'),
+      where('activityType', '==', 'pendingDonFood'),
+      where('foodId', '==', item.foodId)
+    )
+    const activitiesSnap = await getDocs(activitiesQuery)
+
+    // Find the activity that matches this listing's quantity
+    // Only return the price for THIS specific donation being cancelled
+    let priceToReturn = 0
+    let activityToDelete = null
+
+    if (!activitiesSnap.empty) {
+      // Try to find an activity with matching quantity
+      const matchingActivity = activitiesSnap.docs.find(doc =>
+        Number(doc.data().quantity) === returnQty
+      )
+
+      if (matchingActivity) {
+        priceToReturn = Number(matchingActivity.data().price) || 0
+        activityToDelete = matchingActivity
+      } else {
+        // If no exact match, calculate proportionally from the first activity
+        const firstActivity = activitiesSnap.docs[0]
+        const activityQty = Number(firstActivity.data().quantity) || 1
+        const activityPrice = Number(firstActivity.data().price) || 0
+        const pricePerUnit = activityQty > 0 ? activityPrice / activityQty : 0
+        priceToReturn = pricePerUnit * returnQty
+        activityToDelete = firstActivity
+      }
+    } else {
+      // Fallback: calculate proportionally from current food price
+      const pricePerUnit = originalFoodQty > 0 ? currentFoodPrice / originalFoodQty : 0
+      priceToReturn = pricePerUnit * returnQty
+    }
+
+    const newPrice = currentFoodPrice + priceToReturn
+
+    console.log('💰 Price calculation:', {
+      currentFoodPrice,
+      priceToReturn,
+      newPrice,
+      originalQty: originalFoodQty,
+      returnQty,
+      newQty,
+      activityFound: !!activityToDelete
+    })
 
     await deleteDoc(listingRef)
 
@@ -893,22 +960,13 @@ async function canDonated(item) {
       throw new Error('Failed to update food item quantity. Listing restored.')
     }
 
-    // Remove pending donation activity
+    // Remove only the specific pending donation activity
     try {
-      const activitiesQuery = query(
-        collection(db, 'user', currentUser.value.uid, 'activities'),
-        where('activityType', '==', 'pendingDonFood'),
-        where('foodId', '==', item.foodId)
-      )
-
-      const activitiesSnap = await getDocs(activitiesQuery)
-
-      if (!activitiesSnap.empty) {
-        const deletePromises = activitiesSnap.docs.map(doc => deleteDoc(doc.ref))
-        await Promise.all(deletePromises)
+      if (activityToDelete) {
+        await deleteDoc(activityToDelete.ref)
       }
     } catch (activityError) {
-      console.warn('Failed to delete activities, but listing was cancelled:', activityError)
+      console.warn('Failed to delete activity, but listing was cancelled:', activityError)
 
     }
 
@@ -1433,18 +1491,9 @@ const getGoogleMapsUrl = (location) => {
                 :key="foodItems.map(i => i.id + ':' + i.quantity).join('|') + '|' + donationActivities.length">
                 <option value="" disabled>Select a food item...</option>
                 <option v-for="item in foodItems" :key="item.id" :value="item.id"
-                  :disabled="getRemainingQuantity(item.id) <= 0 || isExpiredItem(item)" :title="getRemainingQuantity(item.id) <= 0
-                    ? 'No quantity left to share'
-                    : isExpiredItem(item)
-                      ? 'Item expired'
-                      : `Remaining: ${getRemainingQuantity(item.id)} ${item.unit}`
-                    ">
-                  {{ item.name }}
-                  <small v-if="getRemainingQuantity(item.id) > 0 && !isExpiredItem(item)" class="text-success ms-1">
-                    ({{ getRemainingQuantity(item.id) }} left)
-                  </small>
-                  <small v-else-if="isExpiredItem(item)" class="text-danger ms-1">(expired)</small>
-                  <small v-else class="text-muted ms-1">(none left)</small>
+                  :disabled="getRemainingQuantity(item.id) <= 0 || isExpiredItem(item)">
+                  {{ item.name }} - {{ getRemainingQuantity(item.id) }} {{ item.unit }} left
+                  <template v-if="isExpiredItem(item)"> (expired)</template>
                 </option>
               </select>
             </div>
