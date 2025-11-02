@@ -6,7 +6,7 @@
     </div>
     <template v-else>
       <navbar v-if="showNavbar" />
-      <div class="main-content">
+      <div class="main-content" :class="{ 'with-navbar': showNavbar }">
         <router-view />
       </div>
     </template>
@@ -63,7 +63,7 @@ onMounted(() => {
   min-height: 100vh;
 }
 
-.main-content {
+.main-content.with-navbar {
   padding-top: 56px;
 }
 
