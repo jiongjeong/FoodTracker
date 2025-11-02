@@ -76,7 +76,7 @@ const props = defineProps({
   },
   title: {
     type: String,
-    default: 'Recipes'
+    required: true
   },
   showFilter: {
     type: Boolean,
