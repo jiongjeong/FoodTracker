@@ -962,7 +962,7 @@ const saveAdd = async () => {
   const foodPayload = {
     name: nameValue,
     category: addForm.category || '',
-    price: (Number(addForm.price) || 0) * (Number(addForm.quantity) || 1),
+    price: Number(addForm.price) || 0,
     quantity: Number(addForm.quantity) || 0,
     unit: addForm.unit || '',
     createdAt: addForm.createdAt
@@ -1058,7 +1058,7 @@ const saveEdit = async () => {
   const payload = {
     name: editForm.name,
     category: editForm.category,
-    price: (Number(editForm.price) || 0) * (Number(editForm.quantity) || 1),
+    price: (Number(editForm.price) || 0),
     quantity: Number(editForm.quantity) || 0,
     unit: editForm.unit || '',
   }
@@ -1679,7 +1679,7 @@ const confirmDelete = async () => {
         </div>
         <div class="row g-2 mt-2">
           <div class="col-4">
-            <label class="form-label">Price</label>
+            <label class="form-label">Total Price</label>
             <input v-model="editForm.price" type="number" step="0.01" class="form-control" />
           </div>
           <div class="col-4">
@@ -1778,7 +1778,7 @@ const confirmDelete = async () => {
         </div>
         <div class="row g-2 mt-2">
           <div class="col-4">
-            <label class="form-label">Price</label>
+            <label class="form-label">Total Price</label>
             <input v-model="addForm.price" type="number" step="0.01" class="form-control" />
           </div>
           <div class="col-4">

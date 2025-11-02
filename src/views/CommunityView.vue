@@ -361,7 +361,14 @@ async function submitShare() {
     const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', shareForm.value.foodItemId)
     const currentItem = foodItems.value.find(f => f.id === shareForm.value.foodItemId)
     const currentQty = Number(currentItem?.quantity || 0)
+    const totalPrice = Number(currentItem?.price || 0)
+    
+    // Calculate per-unit price
+    const pricePerUnit = currentQty > 0 ? totalPrice / currentQty : 0
+    
+    // Calculate remaining quantity and price
     const newQty = Math.max(0, currentQty - qtyToShare)
+    const remainingPrice = pricePerUnit * newQty
 
     if (currentQty < qtyToShare) {
       // Rollback created listing
@@ -374,14 +381,15 @@ async function submitShare() {
       return
     }
 
-    await updateDoc(foodItemRef, { quantity: newQty })
+    // Update both quantity AND price
+    await updateDoc(foodItemRef, { 
+      quantity: newQty,
+      price: remainingPrice
+    })
 
-    // Calculate price for the quantity being shared
-    // Use currentQty (the quantity before decrementing) to calculate price per unit
+
     const originalPrice = Number(currentItem?.price || 0)
-    const pricePerUnit = currentQty > 0 ? originalPrice / currentQty : 0
-    const totalPrice = pricePerUnit * qtyToShare
-
+    
     // Log pending donation activity
     await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
       activityType: 'pendingDonFood',
@@ -767,10 +775,18 @@ async function submitEdit() {
 
         if (foodItemSnap.exists()) {
           const currentFoodQty = Number(foodItemSnap.data().quantity || 0)
+          const currentFoodPrice = Number(foodItemSnap.data().price || 0)
+          
+          // Calculate per-unit price from current food item
+          const pricePerUnit = currentFoodQty > 0 ? currentFoodPrice / currentFoodQty : 0
+          
+          // Calculate new quantity and price
           const updatedFoodQty = currentFoodQty - qtyDifference
+          const updatedFoodPrice = pricePerUnit * updatedFoodQty
 
           await updateDoc(foodItemRef, {
-            quantity: updatedFoodQty
+            quantity: updatedFoodQty,
+            price: updatedFoodPrice
           })
         }
       } catch (foodItemError) {
@@ -867,7 +883,8 @@ async function canDonated(item) {
 
     try {
       await updateDoc(foodItemRef, {
-        quantity: newQty
+        quantity: newQty,
+        price: newPrice
       })
     } catch (foodItemError) {
 
