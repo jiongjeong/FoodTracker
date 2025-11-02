@@ -16,7 +16,7 @@ defineProps({
   },
   title: {
     type: String,
-    required: true
+    default: 'No results'
   },
   message: {
     type: String,
