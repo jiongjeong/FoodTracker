@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { doc, getDoc, getDocs, updateDoc, deleteDoc, collection, setDoc, query, where } from "firebase/firestore";
-import { getAuth, updateProfile, updatePassword, deleteUser, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { getAuth, updateProfile, updatePassword, deleteUser } from "firebase/auth";
 import { db } from "@/firebase";
 import { useAlert } from '@/composables/useAlert'
 
@@ -202,15 +202,11 @@ async function deleteAccount() {
     const userDocRef = doc(db, "user", user.value.uid);
     const uid = user.value.uid;
 
-    // Step 1: Delete from Firebase Authentication FIRST
-    // This ensures the user can't access the app even if Firestore cleanup fails
     try {
       await deleteUser(user.value);
       console.log("✓ Auth user deleted");
     } catch (authError) {
       console.error("Error deleting auth user:", authError);
-
-      // Check if it's a requires-recent-login error
       if (authError.code === 'auth/requires-recent-login') {
         await error(
           "For security reasons, please log out and log back in, then try deleting your account again.",
@@ -219,15 +215,12 @@ async function deleteAccount() {
         showDeleteModal.value = false
         return
       }
-
-      // For other auth errors, show error and stop
       throw authError
     }
 
-    // Step 2: Delete Firestore data (after auth is deleted)
-    // If this fails, at least the user can't log in anymore
+
     try {
-      // Delete all subcollections
+
       const subcollections = ["foodItems", "activities", "recipes"];
       for (const subcol of subcollections) {
         const subcolRef = collection(userDocRef, subcol);
@@ -235,7 +228,7 @@ async function deleteAccount() {
       }
       console.log("✓ User subcollections deleted");
 
-      // Delete user's shared community listings
+
       const communityListingsQuery = query(
         collection(db, "communityListings"),
         where("ownerId", "==", uid)
@@ -250,16 +243,13 @@ async function deleteAccount() {
         console.log(`✓ Deleted ${communityListingsSnapshot.size} community listings`);
       }
 
-      // Delete user document from Firestore
       await deleteDoc(userDocRef);
       console.log("✓ User document deleted");
     } catch (firestoreError) {
       console.error("Error deleting Firestore data:", firestoreError);
-      // Don't throw - auth is already deleted, which is most important
       console.warn("⚠ Auth user deleted but some Firestore data may remain");
     }
 
-    // Clear all storage
     localStorage.clear()
     sessionStorage.clear()
 
