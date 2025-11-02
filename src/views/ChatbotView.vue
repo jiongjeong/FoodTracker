@@ -466,18 +466,6 @@ html, body {
 }
 
 
-/* Subtle tails */
-.bubble::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: -6px;
-  width: 10px; height: 10px;
-  background: var(--ai-bubble);
-  transform: translateY(0) rotate(45deg);
-  border-bottom-left-radius: 2px;
-  box-shadow: -2px 2px 3px rgba(0,0,0,.03);
-}
 .message-row.is-user .bubble::after {
   right: -6px; left: auto;
   background: linear-gradient(135deg, var(--indigo-500), var(--indigo-600));
