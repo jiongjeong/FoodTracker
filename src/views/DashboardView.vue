@@ -311,6 +311,8 @@ watchEffect(async () => {
       const snapshot = await getDocs(q)
       if (snapshot.empty) {
         // Calculate points BEFORE creating activity
+        const foodPrice = food.price || 0
+        const foodQty = food.quantity || 1
         const { newScore, pointsEarned } = await updateFoodScore('expFood', food.price, uid, food.quantity);
         if (newScore !== null) {
           userFoodScore.value = newScore;
@@ -824,9 +826,10 @@ const saveUse = async () => {
     const usedQty = Math.min(useForm.quantity, food.quantity)
     const newQty = food.quantity - usedQty
 
-    // Price is per unit, so calculate the value consumed
-    const pricePerUnit = food.price || 0
+    const totalPrice = food.price || 0
+    const pricePerUnit = totalPrice / (food.quantity || 1)
     const usedValue = pricePerUnit * usedQty
+    const remainingValue = pricePerUnit * newQty
 
     const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id)
     const actRef = collection(db, 'user', uid, 'activities')
@@ -880,8 +883,9 @@ const saveUse = async () => {
 
       showToastFor(`${food.name} fully consumed and removed`)
     } else {
-      await updateDoc(refDoc, { quantity: newQty })
+      await updateDoc(refDoc, { quantity: newQty, price: remainingValue })
       foodItems.value[foodIndex].quantity = newQty
+      foodItems.value[foodIndex].price = remainingValue
       await success(`Consumed ${usedQty} ${food.unit} of ${food.name}`)
       showToastFor(`Used ${usedQty} ${food.unit} of ${food.name}`)
     }
@@ -931,7 +935,7 @@ const saveAdd = async () => {
   const foodPayload = {
     name: nameValue,
     category: addForm.category || '',
-    price: Number(addForm.price) || 0,
+    price: (Number(addForm.price) || 0) * (Number(addForm.quantity) || 1),
     quantity: Number(addForm.quantity) || 0,
     unit: addForm.unit || '',
     createdAt: addForm.createdAt
@@ -1027,7 +1031,7 @@ const saveEdit = async () => {
   const payload = {
     name: editForm.name,
     category: editForm.category,
-    price: Number(editForm.price) || 0,
+    price: (Number(editForm.price) || 0) * (Number(editForm.quantity) || 1),
     quantity: Number(editForm.quantity) || 0,
     unit: editForm.unit || '',
   }
@@ -1567,14 +1571,17 @@ const confirmDelete = async () => {
                   <div class="food-actions d-flex gap-2">
                     <!-- If expired, only show delete. Otherwise allow edit and consume. -->
                     <template v-if="getDaysLeft(food) < 0">
-                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i class="bi bi-trash"></i></button>
+                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
+                          class="bi bi-trash"></i></button>
                     </template>
                     <template v-else>
-                      <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
+                      <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i
+                          class="bi bi-pencil"></i>
                         Edit</button>
                       <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i>
                         Consume</button>
-                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i class="bi bi-trash"></i></button>
+                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
+                          class="bi bi-trash"></i></button>
                     </template>
                   </div>
                 </div>
@@ -2158,6 +2165,7 @@ const confirmDelete = async () => {
     opacity 0.25s ease,
     transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 .fab-add:hover .fab-text {
   max-width: 100px;
   opacity: 1;

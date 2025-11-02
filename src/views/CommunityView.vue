@@ -411,8 +411,10 @@ async function markAsDonated(item) {
       donated: true,
       donatedAt: serverTimestamp()
     })
+    // Continue anyway since we still want to log the donation
 
 
+    // Delete pending donation activities
     try {
       const pendingActivitiesQuery = query(
         collection(db, 'user', currentUser.value.uid, 'activities'),
@@ -428,18 +430,36 @@ async function markAsDonated(item) {
       }
     } catch (activityError) {
       console.warn('Failed to delete pending activities:', activityError)
-      // Continue anyway since we still want to log the donation
     }
 
-    // Log donation in user's activities
+    // Calculate food score for donation BEFORE logging activity
+    const donationPrice = Number(item.price) || 0
+    const donationQty = Number(item.quantity) || 1
+
+    // manually updateFoodScore
+    const baseScoreChange = (0.4 * donationQty) + (0.2 * donationPrice) + (0.5 * donationQty)
+
+    // Get current score
+    const userDocRef = doc(db, 'user', currentUser.value.uid)
+    const userSnap = await getDoc(userDocRef)
+    const currentScore = userSnap.exists() ? (userSnap.data().foodScore || 0) : 0
+    const newScore = Math.max(0, currentScore + baseScoreChange)
+
+    // Update score in Firebase
+    await updateDoc(userDocRef, {
+      foodScore: newScore
+    })
+
+    // Log donation activity WITH pointsEarned
     await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
       activityType: 'donFood',
       category: item.category,
       createdAt: new Date().toISOString(),
       foodName: item.foodName,
-      price: 0,
-      quantity: item.quantity,
-      unit: item.unit
+      price: donationPrice,
+      quantity: donationQty,
+      unit: item.unit,
+      pointsEarned: Math.round(baseScoreChange)  // Add this
     })
 
     await success('Marked as donated!')
@@ -588,8 +608,8 @@ function calculateDistances() {
     const itemLng = Number(item.location.lng)
 
     try {
-  const p1 = new window.google.maps.LatLng(userLat, userLng)
-  const p2 = new window.google.maps.LatLng(itemLat, itemLng)
+      const p1 = new window.google.maps.LatLng(userLat, userLng)
+      const p2 = new window.google.maps.LatLng(itemLat, itemLng)
       const meters = geometry.value.spherical.computeDistanceBetween(p1, p2)
       const km = (meters / 1000).toFixed(1)
       return { ...item, distance: `${km}km` + " Away" }
@@ -988,13 +1008,10 @@ async function canDonated(item) {
       </div>
       <div class="d-flex gap-2 align-items-center">
         <!-- Toggle Donated Items Button -->
-        <button
-          v-if="mySharedItems.some(item => item.donated)"
-          class="btn btn-outline-secondary"
-          @click="showDonatedItems = !showDonatedItems"
-        >
+        <button v-if="mySharedItems.some(item => item.donated)" class="btn btn-outline-secondary"
+          @click="showDonatedItems = !showDonatedItems">
           <i :class="showDonatedItems ? 'bi bi-eye-slash' : 'bi bi-eye'" class="me-2"></i>
-          {{ showDonatedItems ? 'Hide' : 'Show' }} Donated ({{ mySharedItems.filter(i => i.donated).length }})
+          {{ showDonatedItems ? 'Hide' : 'Show' }} Donated ({{mySharedItems.filter(i => i.donated).length}})
         </button>
 
         <!-- Share Food Button -->
@@ -1089,7 +1106,8 @@ async function canDonated(item) {
                 }">
                   <i class="bi bi-calendar-x me-1"></i>
                   <span v-if="item.donated">Was expiring in {{ item.daysUntilExpiration }} days</span>
-                  <span v-else>Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}</span>
+                  <span v-else>Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : ''
+                    }}</span>
                 </div>
 
                 <button v-if="!item.donated" @click="markAsDonated(item)" class="btn-mark-donated">
@@ -1232,7 +1250,9 @@ async function canDonated(item) {
                 'expiry-normal': selectedContact?.daysUntilExpiration > 5
               }">
                 <i class="bi bi-calendar-check me-1"></i>
-                {{ selectedContact?.daysUntilExpiration }} day{{ selectedContact?.daysUntilExpiration !== 1 ? 's' : '' }} left
+                {{ selectedContact?.daysUntilExpiration }} day{{ selectedContact?.daysUntilExpiration !== 1 ? 's' : ''
+                }}
+                left
               </span>
             </div>
           </div>
@@ -1255,7 +1275,8 @@ async function canDonated(item) {
             </div>
 
             <!-- Phone -->
-            <div class="contact-info-card" v-if="selectedContact?.contact?.phone && selectedContact.contact.phone !== 'Not provided'">
+            <div class="contact-info-card"
+              v-if="selectedContact?.contact?.phone && selectedContact.contact.phone !== 'Not provided'">
               <div class="contact-info-icon phone-icon">
                 <i class="bi bi-telephone-fill"></i>
               </div>
@@ -1299,7 +1320,8 @@ async function canDonated(item) {
             </div>
 
             <!-- Pickup Time -->
-            <div class="contact-info-card" v-if="selectedContact?.pickupTime && selectedContact.pickupTime !== 'Not specified'">
+            <div class="contact-info-card"
+              v-if="selectedContact?.pickupTime && selectedContact.pickupTime !== 'Not specified'">
               <div class="contact-info-icon time-icon">
                 <i class="bi bi-clock-fill"></i>
               </div>
@@ -1354,8 +1376,7 @@ async function canDonated(item) {
                 :key="foodItems.map(i => i.id + ':' + i.quantity).join('|') + '|' + donationActivities.length">
                 <option value="" disabled>Select a food item...</option>
                 <option v-for="item in foodItems" :key="item.id" :value="item.name"
-                  :disabled="getRemainingQuantity(item.name) <= 0 || isExpiredItem(item)"
-                  :title="getRemainingQuantity(item.name) <= 0
+                  :disabled="getRemainingQuantity(item.name) <= 0 || isExpiredItem(item)" :title="getRemainingQuantity(item.name) <= 0
                     ? 'No quantity left to share'
                     : isExpiredItem(item)
                       ? 'Item expired'
@@ -1387,7 +1408,7 @@ async function canDonated(item) {
 
             <div class="row g-3 mb-3">
               <div class="col-md-6">
-                <label class="form-label">Quantity</label>
+                <label class="form-label">Quantity *</label>
                 <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="1"
                   required />
                 <small class="text-muted">
@@ -1408,7 +1429,7 @@ async function canDonated(item) {
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Preferred Pickup Location</label>
+              <label class="form-label">Preferred Pickup Location *</label>
               <LocationPicker @place-selected="shareForm.location = $event" />
               <small v-if="shareForm.location" class="text-success d-block mt-1">
                 Selected: {{ shareForm.location.address }}
@@ -1467,7 +1488,7 @@ async function canDonated(item) {
               </div>
 
               <div class="col-md-6">
-                <label class="form-label">Expiration Date</label>
+                <label class="form-label">Expiration Date *</label>
                 <input v-model="editForm.expirationDate" type="date" class="form-control" readonly
                   style="background-color: #e9ecef; cursor: not-allowed;" />
               </div>
@@ -1833,9 +1854,10 @@ async function canDonated(item) {
 }
 
 @media (max-width: 480px) {
-  .hero-section{
+  .hero-section {
     padding: 1.5rem 0.75rem;
   }
+
   .hero-title {
     font-size: 1.5rem;
   }
@@ -1986,8 +2008,10 @@ async function canDonated(item) {
 /* Items Grid */
 .items-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); /* Changed from 320px to 240px */
-  gap: 1.25rem; /* Slightly reduced gap */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  /* Changed from 320px to 240px */
+  gap: 1.25rem;
+  /* Slightly reduced gap */
 }
 
 /* Item Card */
@@ -2009,7 +2033,8 @@ async function canDonated(item) {
 
 .item-card {
   background: white;
-  border-radius: 16px; /* Reduced from 20px */
+  border-radius: 16px;
+  /* Reduced from 20px */
   overflow: hidden;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
@@ -2048,9 +2073,11 @@ async function canDonated(item) {
   left: 0.75rem;
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
-  padding: 0.4rem 0.8rem; /* Reduced from 0.5rem 1rem */
+  padding: 0.4rem 0.8rem;
+  /* Reduced from 0.5rem 1rem */
   border-radius: 8px;
-  font-size: 0.75rem; /* Reduced from 0.8rem */
+  font-size: 0.75rem;
+  /* Reduced from 0.8rem */
   font-weight: 700;
   z-index: 10;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
@@ -2091,7 +2118,8 @@ async function canDonated(item) {
 }
 
 .action-btn {
-  width: 36px; /* Reduced from 40px */
+  width: 36px;
+  /* Reduced from 40px */
   height: 36px;
   border-radius: 10px;
   border: none;
@@ -2232,9 +2260,11 @@ async function canDonated(item) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem 0.8rem; /* Reduced from 0.625rem 1rem */
+  padding: 0.5rem 0.8rem;
+  /* Reduced from 0.625rem 1rem */
   border-radius: 8px;
-  font-size: 0.8rem; /* Reduced from 0.875rem */
+  font-size: 0.8rem;
+  /* Reduced from 0.875rem */
   font-weight: 700;
   width: 100%;
 }
@@ -2261,11 +2291,13 @@ async function canDonated(item) {
 .btn-mark-donated,
 .btn-contact {
   width: 100%;
-  padding: 0.75rem; /* Reduced from 0.875rem */
+  padding: 0.75rem;
+  /* Reduced from 0.875rem */
   border-radius: 10px;
   border: none;
   font-weight: 700;
-  font-size: 0.85rem; /* Reduced from 0.95rem */
+  font-size: 0.85rem;
+  /* Reduced from 0.95rem */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2844,7 +2876,7 @@ async function canDonated(item) {
   color: white;
 }
 
-.location-icon-cc{
+.location-icon-cc {
   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   color: white;
 }
