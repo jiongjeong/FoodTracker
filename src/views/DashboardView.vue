@@ -955,7 +955,7 @@ const saveAdd = async () => {
 
     const activityDocRef = await addDoc(actRef, activityPayload)
 
-  foodItems.value.unshift({ id: newDocRef.id, ...foodPayload })
+    foodItems.value.unshift({ id: newDocRef.id, ...foodPayload })
 
     activities.value.unshift({
       id: activityDocRef.id,
