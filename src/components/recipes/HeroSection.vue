@@ -79,7 +79,7 @@ defineProps({
   activeTab: String
 })
 
-defineEmits(['update:searchQuery', 'update:activeTab', 'search', 'clearSearch'])
+defineEmits(['update:searchQuery', 'update:activeTab', 'search', 'clear-search'])
 </script>
 
 <style scoped>
