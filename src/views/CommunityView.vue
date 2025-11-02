@@ -323,7 +323,7 @@ async function submitShare() {
 
   try {
 
-    const remaining = getRemainingQuantity(shareForm.value.foodName)
+    const remaining = getRemainingQuantity(shareForm.value.foodItemId)
     if (qtyToShare > remaining) {
       await warning(`You only have ${remaining} ${shareForm.value.unit} left to share.`)
       return
@@ -376,20 +376,23 @@ async function submitShare() {
 
     await updateDoc(foodItemRef, { quantity: newQty })
 
+    // Calculate price for the quantity being shared
+    // Use currentQty (the quantity before decrementing) to calculate price per unit
+    const originalPrice = Number(currentItem?.price || 0)
+    const pricePerUnit = currentQty > 0 ? originalPrice / currentQty : 0
+    const totalPrice = pricePerUnit * qtyToShare
+
     // Log pending donation activity
     await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
       activityType: 'pendingDonFood',
       createdAt: new Date().toISOString(),
       category: data.category,
-      price: 0,
+      price: totalPrice,
       foodName: data.foodName,
       foodId: data.foodId,
       quantity: data.quantity,
       unit: data.unit,
     })
-
-    const savedDoc = await getDoc(docRef)
-    console.log("Verified Firestore document:", savedDoc.data())
 
     await success("Food shared successfully!")
     showShareModal.value = false
@@ -411,10 +414,7 @@ async function markAsDonated(item) {
       donated: true,
       donatedAt: serverTimestamp()
     })
-    // Continue anyway since we still want to log the donation
 
-
-    // Delete pending donation activities
     try {
       const pendingActivitiesQuery = query(
         collection(db, 'user', currentUser.value.uid, 'activities'),
@@ -432,25 +432,22 @@ async function markAsDonated(item) {
       console.warn('Failed to delete pending activities:', activityError)
     }
 
-    // Calculate food score for donation BEFORE logging activity
     const donationPrice = Number(item.price) || 0
     const donationQty = Number(item.quantity) || 1
 
     // manually updateFoodScore
     const baseScoreChange = (0.4 * donationQty) + (0.2 * donationPrice) + (0.5 * donationQty)
 
-    // Get current score
     const userDocRef = doc(db, 'user', currentUser.value.uid)
     const userSnap = await getDoc(userDocRef)
     const currentScore = userSnap.exists() ? (userSnap.data().foodScore || 0) : 0
     const newScore = Math.round(Math.max(0, currentScore + baseScoreChange))
 
-    // Update score in Firebase
     await updateDoc(userDocRef, {
       foodScore: newScore
     })
 
-    // Log donation activity WITH pointsEarned
+    // Log donation activity with points earned
     await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
       activityType: 'donFood',
       category: item.category,
@@ -459,7 +456,7 @@ async function markAsDonated(item) {
       price: donationPrice,
       quantity: donationQty,
       unit: item.unit,
-      pointsEarned: Math.round(baseScoreChange)  // Add this
+      pointsEarned: Math.round(baseScoreChange)
     })
 
     await success('Marked as donated!')
@@ -498,18 +495,6 @@ const getRemainingQuantity = (foodNameOrId) => {
     .reduce((sum, a) => sum + Number(a.quantity || 0), 0)
 
   const remaining = Math.max(0, total - shared)
-
-  // Debug logging
-  console.log('getRemainingQuantity for:', foodNameOrId, {
-    itemId: item.id,
-    itemName: item.name,
-    total,
-    shared,
-    remaining,
-    rawQuantity: item.quantity,
-    pendingActivities: donationActivities.value.filter(a => a.foodId === item.id && a.activityType === 'pendingDonFood')
-  })
-
   return remaining
 }
 
@@ -738,7 +723,7 @@ async function submitEdit() {
     const newQty = Number(editForm.value.quantity)
     const qtyDifference = newQty - originalQty
 
-    // Validate quantity if increasing
+
     if (qtyDifference > 0) {
       const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', editForm.value.foodItemId)
       const foodItemSnap = await getDoc(foodItemRef)
@@ -771,7 +756,7 @@ async function submitEdit() {
       }
     }
 
-    // Update the community listing first
+    // Update the community listing
     await updateDoc(listingRef, updateData)
 
     // Update the food item quantity if quantity changed
@@ -789,7 +774,7 @@ async function submitEdit() {
           })
         }
       } catch (foodItemError) {
-        // Rollback listing update
+
         await updateDoc(listingRef, {
           quantity: originalQty
         })
@@ -798,7 +783,7 @@ async function submitEdit() {
       }
     }
 
-    // Update the pending donation activity quantity
+    // Update the pending donation activity quantity and price
     try {
       const activitiesQuery = query(
         collection(db, 'user', currentUser.value.uid, 'activities'),
@@ -810,14 +795,27 @@ async function submitEdit() {
 
       if (!activitiesSnap.empty) {
         const activityDoc = activitiesSnap.docs[0]
+
+        // Get the food item from memory to calculate price
+        const foodItem = foodItems.value.find(f => f.id === editForm.value.foodItemId)
+
+        let updatedPrice = 0
+        if (foodItem) {
+          // Calculate price based on original total quantity and price
+          const originalTotalQty = Number(foodItem.quantity || 0) + originalQty
+          const pricePerUnit = Number(foodItem.price || 0) / originalTotalQty
+          updatedPrice = pricePerUnit * newQty
+        }
+
         await updateDoc(activityDoc.ref, {
           quantity: newQty,
-          unit: editForm.value.unit
+          unit: editForm.value.unit,
+          price: updatedPrice
         })
       }
     } catch (activityError) {
       console.warn('Failed to update activity, but listing and food item were updated:', activityError)
-      // Don't rollback for activity errors as they're not critical
+
     }
 
     await success("Listing updated successfully!")
@@ -831,7 +829,7 @@ async function submitEdit() {
   }
 }
 
-// Cancel donated function - with proper error handling and rollback
+// Cancel donated function
 async function canDonated(item) {
   const confirmed = await confirm(`Are you sure you want to cancel "${item.foodName}"? This will remove it from community listings.`, 'Cancel Donation')
 
@@ -839,12 +837,10 @@ async function canDonated(item) {
     return
   }
 
-  // Store original data for potential rollback
   let deletedListing = null
   let originalFoodQty = null
 
   try {
-    // Get the original listing quantity before deletion
     const listingRef = doc(db, 'communityListings', item.id)
     const listingSnap = await getDoc(listingRef)
 
@@ -856,7 +852,6 @@ async function canDonated(item) {
     deletedListing = { id: item.id, ...listingSnap.data() }
     const returnQty = Number(deletedListing.quantity || 0)
 
-    // Get original food item quantity
     const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', item.foodId)
     const foodItemSnap = await getDoc(foodItemRef)
 
@@ -868,16 +863,14 @@ async function canDonated(item) {
     originalFoodQty = Number(foodItemSnap.data().quantity || 0)
     const newQty = originalFoodQty + returnQty
 
-    // Delete the listing first
     await deleteDoc(listingRef)
 
-    // Return quantity back to food items
     try {
       await updateDoc(foodItemRef, {
         quantity: newQty
       })
     } catch (foodItemError) {
-      // Rollback: Recreate the listing
+
       await addDoc(collection(db, 'communityListings'), deletedListing)
       console.warn('Failed to return quantity to food item during cancel:', foodItemError)
       throw new Error('Failed to update food item quantity. Listing restored.')
@@ -899,12 +892,11 @@ async function canDonated(item) {
       }
     } catch (activityError) {
       console.warn('Failed to delete activities, but listing was cancelled:', activityError)
-      // Don't rollback for activity errors as they're not critical
+
     }
 
     await success('Donation cancelled successfully!')
 
-    // Reload all data to reflect changes
     await loadMyListings()
     await loadFoodItems()
     await loadDonationActivities()
@@ -912,11 +904,14 @@ async function canDonated(item) {
     console.error('Error canceling donation:', err)
     await error('Failed to cancel donation: ' + err.message)
 
-    // Reload to show current state
     await loadMyListings()
     await loadFoodItems()
     await loadDonationActivities()
   }
+}
+const getGoogleMapsUrl = (location) => {
+  if (!location?.lat || !location?.lng) return null
+  return `https://www.google.com/maps/search/?api=1&query=${location.lat},${location.lng}`
 }
 </script>
 
@@ -1138,7 +1133,7 @@ async function canDonated(item) {
                   <i class="bi bi-calendar-x me-1"></i>
                   <span v-if="item.donated">Was expiring in {{ item.daysUntilExpiration }} days</span>
                   <span v-else>Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : ''
-                    }}</span>
+                  }}</span>
                 </div>
 
                 <button v-if="!item.donated" @click="markAsDonated(item)" class="btn-mark-donated">
@@ -1347,6 +1342,20 @@ async function canDonated(item) {
               <div class="contact-info-content">
                 <label class="contact-info-label">Pickup Location</label>
                 <span class="contact-info-value">{{ selectedContact?.location?.address || 'Not specified' }}</span>
+
+                <!-- Clickable Map Preview -->
+                <a v-if="selectedContact?.location?.lat && selectedContact?.location?.lng"
+                  :href="getGoogleMapsUrl(selectedContact.location)" target="_blank" class="map-preview-link">
+                  <div class="map-preview">
+                    <iframe
+                      :src="`https://www.google.com/maps?q=${selectedContact.location.lat},${selectedContact.location.lng}&output=embed&z=15`"
+                      class="map-iframe" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+                    <div class="map-overlay">
+                      <i class="bi bi-box-arrow-up-right"></i>
+                      <span>Open in Google Maps</span>
+                    </div>
+                  </div>
+                </a>
               </div>
             </div>
 
@@ -1407,8 +1416,7 @@ async function canDonated(item) {
                 :key="foodItems.map(i => i.id + ':' + i.quantity).join('|') + '|' + donationActivities.length">
                 <option value="" disabled>Select a food item...</option>
                 <option v-for="item in foodItems" :key="item.id" :value="item.id"
-                  :disabled="getRemainingQuantity(item.id) <= 0 || isExpiredItem(item)"
-                  :title="getRemainingQuantity(item.id) <= 0
+                  :disabled="getRemainingQuantity(item.id) <= 0 || isExpiredItem(item)" :title="getRemainingQuantity(item.id) <= 0
                     ? 'No quantity left to share'
                     : isExpiredItem(item)
                       ? 'Item expired'
@@ -1442,9 +1450,8 @@ async function canDonated(item) {
               <div class="col-md-6">
                 <label class="form-label">Quantity *</label>
                 <input v-model.number="shareForm.quantity" type="number" class="form-control"
-                  :class="{ 'is-invalid': shareForm.quantity > maxShareQuantity }"
-                  min="1" step="1" :max="maxShareQuantity"
-                  required />
+                  :class="{ 'is-invalid': shareForm.quantity > maxShareQuantity }" min="1" step="1"
+                  :max="maxShareQuantity" required />
                 <small class="text-muted d-block">
                   Available: {{ maxShareQuantity }} {{ shareForm.unit }}
                 </small>
@@ -1487,8 +1494,7 @@ async function canDonated(item) {
           <button type="button" class="btn btn-secondary" @click="showShareModal = false">
             Cancel
           </button>
-          <button type="button" class="btn btn-primary" @click="submitShare"
-            :disabled="!isShareQuantityValid">
+          <button type="button" class="btn btn-primary" @click="submitShare" :disabled="!isShareQuantityValid">
             <i class="bi bi-share me-2"></i>
             Share Food
           </button>
@@ -2971,6 +2977,64 @@ async function canDonated(item) {
 .contact-location-card,
 .contact-notes-card {
   grid-column: 1 / -1;
+}
+
+/* Map Preview Styles */
+.map-preview-link {
+  display: block;
+  margin-top: 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.map-preview {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.map-preview:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  transform: scale(1.02);
+}
+
+.map-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  pointer-events: none;
+  display: block;
+}
+
+.map-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
+  padding: 1rem;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.map-preview:hover .map-overlay {
+  opacity: 1;
+}
+
+.map-overlay i {
+  font-size: 1.25rem;
 }
 
 /* Contact Modal Footer */

@@ -678,10 +678,36 @@ const analytics = computed(() => {
   const reductionPercentage =
     totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
 
+  // Calculate inventory value excluding pending donations
+  // For each food item, calculate its current value based on remaining quantity
   const inventoryValue = inventoryActivities.reduce((sum, item) => {
-    const price = Number(item.price) || 0
-    return sum + price
+    const originalPrice = Number(item.price) || 0
+    const currentQty = Number(item.quantity) || 0
+
+    // Find all pending donations for this specific food item
+    const itemPendingDonations = pendingDonations.filter(
+      (activity) => activity.foodId === item.id
+    )
+
+    // Calculate total quantity that's pending donation
+    const pendingQty = itemPendingDonations.reduce((total, activity) => {
+      return total + (Number(activity.quantity) || 0)
+    }, 0)
+
+    // Total quantity (current + pending) to calculate price per unit
+    const totalQty = currentQty + pendingQty
+
+    // Calculate the value of only the remaining quantity
+    let itemValue = originalPrice
+    if (totalQty > 0) {
+      const pricePerUnit = originalPrice / totalQty
+      itemValue = pricePerUnit * currentQty
+    }
+
+    return sum + itemValue
   }, 0)
+
+  const adjustedInventoryValue = Math.max(0, inventoryValue)
   const inventoryItems = inventoryActivities.length
 
   const streakDays = calculateActivityStreak()
@@ -691,7 +717,7 @@ const analytics = computed(() => {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
     reduction: reductionPercentage,
-    inventory: { value: inventoryValue, items: inventoryItems },
+    inventory: { value: adjustedInventoryValue, items: inventoryItems },
     streakDays: streakDays,
     foodDonated: foodDonated,
     pendingDonations: pendingDonations.length,
