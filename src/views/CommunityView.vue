@@ -9,6 +9,8 @@ import { useAlert } from '@/composables/useAlert'
 
 const { success, error, warning, confirm } = useAlert()
 
+// Ref for LocationPicker component to reset it
+const locationPickerRef = ref(null)
 
 const mySharedItems = ref([])
 const sharedItems = ref([])
@@ -428,7 +430,7 @@ async function markAsDonated(item) {
       }
     } catch (activityError) {
       console.warn('Failed to delete pending activities:', activityError)
-      // Continue anyway since we still want to log the donation
+
     }
 
     // Log donation in user's activities
@@ -520,6 +522,11 @@ function setPreferredLocation(place) {
     address: place.address || ''
   }
   savePreferredLocation()
+
+  // Reset the LocationPicker input after setting location
+  if (locationPickerRef.value) {
+    locationPickerRef.value.reset()
+  }
 }
 function clearPreferredLocation() {
   preferredLocation.value = null
@@ -963,7 +970,7 @@ async function canDonated(item) {
                       <i class="bi bi-arrow-repeat me-1"></i>
                       Change Location
                     </label>
-                    <LocationPicker @place-selected="setPreferredLocation" class="w-100" />
+                    <LocationPicker ref="locationPickerRef" @place-selected="setPreferredLocation" class="w-100" />
                   </div>
                 </div>
               </template>
@@ -2639,7 +2646,7 @@ async function canDonated(item) {
 
 /* Contact Modal Header with Gradient */
 .contact-modal-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #059669;
   padding: 1.5rem 2rem;
   display: flex;
   align-items: center;
@@ -2918,7 +2925,7 @@ async function canDonated(item) {
   padding: 0.75rem 2rem;
   border-radius: 12px;
   font-weight: 600;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: blue;
   border: none;
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
   transition: all 0.3s ease;

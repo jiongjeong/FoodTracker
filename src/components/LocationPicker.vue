@@ -10,11 +10,19 @@ let autocomplete = null
 
 const emit = defineEmits(['place-selected'])
 
+// Expose reset method to parent components
+defineExpose({
+  reset: () => {
+    if (inputRef.value) {
+      inputRef.value.value = ''
+    }
+    selectedPlace.value = null
+  }
+})
+
 async function initializeAutocomplete() {
   try {
-    // console.log('🔧 Starting initialization...')
 
-    // Load Google Maps
     const google = await loadGoogleMaps()
     await nextTick()
     await new Promise(resolve => setTimeout(resolve, 200))
@@ -80,9 +88,7 @@ onUnmounted(() => {
 
 <template>
   <div class="location-picker">
-    <!-- <label class="label" for="location-input">Search Location</label> -->
 
-    <!-- Always render input, just disable during loading -->
     <input
       id="location-input"
       ref="inputRef"
