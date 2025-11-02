@@ -2,7 +2,7 @@
   <Teleport to="body">
     <Transition name="modal-fade">
       <div 
-        v-if="true" 
+        
         class="modal fade show d-block" 
         tabindex="-1" 
         role="dialog"
