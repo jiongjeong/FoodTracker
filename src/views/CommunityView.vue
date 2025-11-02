@@ -83,13 +83,14 @@ const handleShareFood = async () => {
     expirationDate: '',
     pickupTime: '',
     notes: '',
-    location: null
+    location: null,
+    foodItemId: ''
   })
   showShareModal.value = true
   await nextTick()
   if (foodItems.value.length === 1) {
     const item = foodItems.value[0]
-    shareForm.value.foodName = item.name
+    shareForm.value.foodItemId = item.id
     onSelectFoodItem()
   }
 }
@@ -123,11 +124,8 @@ async function loadFoodItems() {
   if (!currentUser.value) return;
   const foodItemsRef = collection(db, "user", currentUser.value.uid, "foodItems");
   const snapshot = await getDocs(foodItemsRef);
-
-  // Get all items for name mapping (including 0 quantity)
   const allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
 
-  // Build name map from ALL items
   foodNameMap.value = {}
   allItems.forEach(item => {
     foodNameMap.value[item.id] = item.name
@@ -135,13 +133,14 @@ async function loadFoodItems() {
 
   // Only show items with quantity > 0 in the dropdown
   foodItems.value = allItems.filter(item => item.quantity > 0);
+  console.log('loadFoodItems - filtered items (qty > 0):', foodItems.value)
 }
 
 function onSelectFoodItem() {
-  const selected = foodItems.value.find(fi => fi.name === shareForm.value.foodName)
+  const selected = foodItems.value.find(fi => fi.id === shareForm.value.foodItemId)
   if (selected) {
     shareForm.value.category = selected.category || ''
-    shareForm.value.foodItemId = selected.id
+    shareForm.value.foodName = selected.name || ''
 
     if (selected.expirationDate) {
       if (typeof selected.expirationDate.toDate === 'function') {
@@ -155,7 +154,6 @@ function onSelectFoodItem() {
     } else {
       shareForm.value.expirationDate = ''
     }
-    shareForm.value.foodName = selected.name || ''
     shareForm.value.quantity = selected.quantity || ''
     shareForm.value.unit = selected.unit || ''
 
@@ -487,18 +485,46 @@ async function loadDonationActivities() {
   activitiesLoaded.value = true
 }
 
-const getRemainingQuantity = (foodName) => {
-  const item = foodItems.value.find(f => f.name === foodName)
+const getRemainingQuantity = (foodNameOrId) => {
+  let item = foodItems.value.find(f => f.id === foodNameOrId)
+  if (!item) {
+    item = foodItems.value.find(f => f.name === foodNameOrId)
+  }
   if (!item) return 0
 
   const total = Number(item.quantity) || 0
   const shared = donationActivities.value
-    .filter(a => a.foodName === foodName && a.activityType === 'pendingDonFood')
+    .filter(a => a.foodId === item.id && a.activityType === 'pendingDonFood')
     .reduce((sum, a) => sum + Number(a.quantity || 0), 0)
 
-  return Math.max(0, total - shared)
+  const remaining = Math.max(0, total - shared)
+
+  // Debug logging
+  console.log('getRemainingQuantity for:', foodNameOrId, {
+    itemId: item.id,
+    itemName: item.name,
+    total,
+    shared,
+    remaining,
+    rawQuantity: item.quantity,
+    pendingActivities: donationActivities.value.filter(a => a.foodId === item.id && a.activityType === 'pendingDonFood')
+  })
+
+  return remaining
 }
 
+// Computed property for max shareable quantity
+const maxShareQuantity = computed(() => {
+  if (!shareForm.value.foodItemId) return 0
+  return getRemainingQuantity(shareForm.value.foodItemId)
+})
+
+// Check if share quantity is valid
+const isShareQuantityValid = computed(() => {
+  const qty = Number(shareForm.value.quantity) || 0
+  const max = maxShareQuantity.value
+  return qty > 0 && qty <= max
+})
 
 const isExpiredItem = (item) => {
   if (!item || !item.expirationDate) return false
@@ -543,7 +569,6 @@ function setPreferredLocation(place) {
   }
   savePreferredLocation()
 
-  // Reset the LocationPicker input after setting location
   if (locationPickerRef.value) {
     locationPickerRef.value.reset()
   }
@@ -559,7 +584,6 @@ function loadPreferredLocation() {
   if (raw) {
     try {
       const parsed = JSON.parse(raw)
-      // ENSURE plain object
       preferredLocation.value = {
         lat: Number(parsed.lat),
         lng: Number(parsed.lng),
@@ -665,7 +689,7 @@ watch(preferredLocation, (newVal) => {
 
 // Edit donated item function
 async function editDonated(item) {
-  // Populate form with existing data
+
   editForm.value = {
     id: item.id,
     foodName: item.foodName,
@@ -1379,19 +1403,20 @@ async function canDonated(item) {
           <form @submit.prevent="submitShare">
             <div class="mb-3">
               <label class="form-label">Food Name *</label>
-              <select v-model="shareForm.foodName" class="form-select" @change="onSelectFoodItem" required
+              <select v-model="shareForm.foodItemId" class="form-select" @change="onSelectFoodItem" required
                 :key="foodItems.map(i => i.id + ':' + i.quantity).join('|') + '|' + donationActivities.length">
                 <option value="" disabled>Select a food item...</option>
-                <option v-for="item in foodItems" :key="item.id" :value="item.name"
-                  :disabled="getRemainingQuantity(item.name) <= 0 || isExpiredItem(item)" :title="getRemainingQuantity(item.name) <= 0
+                <option v-for="item in foodItems" :key="item.id" :value="item.id"
+                  :disabled="getRemainingQuantity(item.id) <= 0 || isExpiredItem(item)"
+                  :title="getRemainingQuantity(item.id) <= 0
                     ? 'No quantity left to share'
                     : isExpiredItem(item)
                       ? 'Item expired'
-                      : `Remaining: ${getRemainingQuantity(item.name)} ${item.unit}`
+                      : `Remaining: ${getRemainingQuantity(item.id)} ${item.unit}`
                     ">
                   {{ item.name }}
-                  <small v-if="getRemainingQuantity(item.name) > 0 && !isExpiredItem(item)" class="text-success ms-1">
-                    ({{ getRemainingQuantity(item.name) }} left)
+                  <small v-if="getRemainingQuantity(item.id) > 0 && !isExpiredItem(item)" class="text-success ms-1">
+                    ({{ getRemainingQuantity(item.id) }} left)
                   </small>
                   <small v-else-if="isExpiredItem(item)" class="text-danger ms-1">(expired)</small>
                   <small v-else class="text-muted ms-1">(none left)</small>
@@ -1415,12 +1440,17 @@ async function canDonated(item) {
 
             <div class="row g-3 mb-3">
               <div class="col-md-6">
-                <label class="form-label">Quantity *</label>
-                <input v-model.number="shareForm.quantity" type="number" class="form-control" min="1" step="1"
+                <label class="form-label">Quantity</label>
+                <input v-model.number="shareForm.quantity" type="number" class="form-control"
+                  :class="{ 'is-invalid': shareForm.quantity > maxShareQuantity }"
+                  min="1" step="1" :max="maxShareQuantity"
                   required />
-                <small class="text-muted">
-                  Max: {{ getRemainingQuantity(shareForm.foodName) }} {{ shareForm.unit }}
+                <small class="text-muted d-block">
+                  Available: {{ maxShareQuantity }} {{ shareForm.unit }}
                 </small>
+                <div v-if="shareForm.quantity > maxShareQuantity" class="invalid-feedback d-block">
+                  Cannot exceed {{ maxShareQuantity }} {{ shareForm.unit }}
+                </div>
               </div>
               <div class="col-md-6">
                 <label class="form-label">Unit</label>
@@ -1457,7 +1487,8 @@ async function canDonated(item) {
           <button type="button" class="btn btn-secondary" @click="showShareModal = false">
             Cancel
           </button>
-          <button type="button" class="btn btn-primary" @click="submitShare">
+          <button type="button" class="btn btn-primary" @click="submitShare"
+            :disabled="!isShareQuantityValid">
             <i class="bi bi-share me-2"></i>
             Share Food
           </button>
