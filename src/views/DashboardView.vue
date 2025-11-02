@@ -15,9 +15,9 @@ import {
   buildWasteVsSavingsData,
   buildWasteByCategoryChart,
   styleAsRing,
-  buildTop3Legend,
   WASTE_COLORS,
-  leaderboardNudge
+  leaderboardNudge,
+  getPercentageLabelPosition, createAllLegendItems, darkenColor
 } from '@/composables/dashboardDesign'
 import FlippedStatCard from '@/components/dashboard/flippedCard.vue'
 import { Bar, Pie, Line, Doughnut } from 'vue-chartjs'
@@ -70,7 +70,6 @@ const showUseModal = ref(false)
 const showToast = ref(false)
 const toastMessage = ref('')
 const overviewCollapsed = ref(false)
-const isFlipped = ref(false)
 
 const editForm = reactive({
   id: null,
@@ -175,8 +174,8 @@ const categoryUnits = {
 const wasteVsSavingsData = computed(() => buildWasteVsSavingsData(activities.value || []))
 const basePie = computed(() => buildWasteByCategoryChart(activities.value || [], WASTE_COLORS))
 const chartDataStyled = computed(() => styleAsRing(basePie.value))
-const legendTop3 = computed(() => buildTop3Legend(basePie.value.labels, basePie.value.datasets[0]?.data || [], basePie.value.datasets[0]?.backgroundColor || WASTE_COLORS))
 const leaderboardMessage = computed(() => leaderboardNudge(activities.value || []))
+const allLegendItems = computed(() => createAllLegendItems(chartDataStyled.value));
 // Functions
 function showToastFor(msg, ms = 2200) {
   toastMessage.value = msg
@@ -1111,7 +1110,7 @@ const confirmDelete = async () => {
     <div class="dashboard-overview">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <h1 class="h2 mb-2">Dashboard</h1>
+          <h1 class="h2 mb-2 fw-bold">Dashboard</h1>
           <p class="text-muted mb-0">Track your food inventory and reduce waste</p>
         </div>
         <div class="ms-3">
@@ -1156,8 +1155,8 @@ const confirmDelete = async () => {
 
             <!-- BACK content -->
             <template #back>
-              <p class="mb-0 text-white small text-center" style="font-size:10px">
-                Measures how effectively you save food, money, and help others. It rewards items and money saved,
+              <p class="mb-0 text-white small text-center mt-2" style="font-size:10px">
+                Rewards when food is consumed and money saved,
                 penalizes waste, and adds bonus points for food donations
               </p>
             </template>
@@ -1207,7 +1206,7 @@ const confirmDelete = async () => {
 
             <!-- BACK content -->
             <template #back>
-              <p class="mb-0 text-white small text-center mt-4" style="font-size:10px">
+              <p class="mb-0 text-white small text-center mt-3 mt-md-4" style="font-size:10px">
                 Measures the total value of food that’s at risk of expiring within the next 7 days.
               </p>
             </template>
@@ -1364,34 +1363,48 @@ const confirmDelete = async () => {
         </div>
 
         <div class="col-lg-4">
-          <div class="glass-card p-4">
-            <h5 class="mb-3 fw-bold">
-              <i class="bi bi-pie-chart me-2"></i>
-              Waste by Category
-            </h5>
-            <div class="mx-auto" style="width:240px;height:300px;" v-if="chartDataStyled.datasets[0].data.length">
-              <Pie :data="chartDataStyled" :options="wasteRingOpts" :plugins="[centerTextPlugin]" />
-            </div>
-            <p class="text-secondary small text-center my-4" v-else>No waste data yet</p>
+          <div class="card border-0 shadow-sm p-4" style="border-radius: 16px;">
+  <h5 class="mb-4 fw-bold text-dark">
+    <i class="bi bi-pie-chart me-2"></i>
+    Waste by Category
+  </h5>
+  
+  <!-- Chart Container with Total in Center -->
+  <div class="position-relative mx-auto mb-4" style="width: 240px; height: 300px;" v-if="chartDataStyled.datasets[0].data.length">
+    <Pie :data="chartDataStyled" :options="wasteRingOpts" :plugins="[centerTextPlugin]" />
+    
+    <!-- Dynamic Percentage Labels Outside Ring -->
+    <div v-for="(item, i) in allLegendItems" :key="i" 
+     class="position-absolute"
+     :style="getPercentageLabelPosition(i, allLegendItems)">
+  <div class="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold shadow-lg percentage-badge"
+           :style="{ 
+             width: '56px', 
+             height: '56px', 
+             background: `linear-gradient(135deg, ${item.color} 0%, ${darkenColor(item.color, 20)} 100%)`,
+             fontSize: '1.125rem',
+             border: '2px solid white'
+           }">
+    {{ item.pct }}%
+  </div>
+</div>
+  </div>
+  
+  <p class="text-muted small text-center my-4" v-else>No waste data yet</p>
 
-            <div class="row text-center mt-3 g-0" v-if="legendTop3.length">
-              <div class="col" v-for="(item, i) in legendTop3" :key="i">
-                <div class="fw-bold fs-3">
-                  {{ item.pct }}<span class="fs-6">%</span>
-                </div>
-                <div class="d-inline-flex align-items-center gap-1 text-secondary small">
-                  <span class="rounded-circle"
-                    :style="{ width: '8px', height: '8px', backgroundColor: item.color }"></span>
-                  {{ item.label }}
-                </div>
-              </div>
-            </div>
-
-
-
-
-
-          </div>
+  <!-- Dynamic Legend at Bottom -->
+  <div class="d-flex flex-wrap justify-content-center gap-3 mt-3" v-if="allLegendItems.length">
+    <div v-for="(item, i) in allLegendItems" :key="i" class="d-flex align-items-center gap-2">
+      <span class="rounded-circle flex-shrink-0" 
+            :style="{ 
+              width: '16px', 
+              height: '16px', 
+              backgroundColor: item.color,
+            }"></span>
+      <span class="text-secondary small fw-medium">{{ item.label }}</span>
+    </div>
+  </div>
+</div>
         </div>
       </div>
     </div>
@@ -1872,6 +1885,16 @@ const confirmDelete = async () => {
 .badge-transparent {
   background: #ede9e8;
   color: #333;
+}
+.percentage-badge {
+  transition: all 0.3s ease;
+  cursor: pointer;
+  font-size: 0.875rem;
+  letter-spacing: -0.5px;
+}
+
+.percentage-badge:hover {
+  transform: scale(1.15) rotate(5deg);
 }
 
 .flip-card-front,
