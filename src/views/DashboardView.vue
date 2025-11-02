@@ -1,10 +1,10 @@
 <script setup>
 import { useRouter } from 'vue-router';
 import { db } from '../firebase.js';
-import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp, query, where, getDoc } from 'firebase/firestore';
 import { ref, computed, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
-import { useAlert} from '@/composables/useAlert.js';
+import { useAlert } from '@/composables/useAlert.js';
 
 const { success, error, confirm } = useAlert();
 import {
@@ -19,7 +19,7 @@ import {
   WASTE_COLORS,
   leaderboardNudge
 } from '@/composables/dashboardDesign'
-import { Bar, Pie, Line, Doughnut  } from 'vue-chartjs'
+import { Bar, Pie, Line, Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   Title,
@@ -51,6 +51,7 @@ const user = ref(auth.currentUser)
 const userId = computed(() => user.value?.uid || null)
 
 // State variables
+const userFoodScore = ref(0);
 const foodItems = ref([])
 const recipes = ref([])
 const activities = ref([])
@@ -201,12 +202,63 @@ async function loadActivities() {
   }
 }
 
+// Helper function to calculate score change for an activity
+const calculateScoreChange = (activityType, price, quantity = 1, isDonation = false) => {
+  price = Number(price) || 0;
+  quantity = Number(quantity) || 1;
+
+  switch (activityType) {
+    case 'conFood': // Consumed/Saved
+      return (0.4 * quantity) + (0.2 * price); // +0.4 per item, +0.2*total_value for money
+    case 'expFood': // Expired/Wasted
+      return -((0.6 * quantity) + (0.2 * price)); // -0.6 per item, -0.2*total_value for money
+    case 'donFood': // Donated
+      return (0.4 * quantity) + (0.2 * price) + (0.5 * quantity); // +0.4 per item, +0.2*total_value, +0.5 per item donated
+    default:
+      return 0;
+  }
+};
+
+// Helper function to update food score in Firebase
+const updateFoodScore = async (activityType, price, uid, quantity = 1, isDonation = false) => {
+  if (!uid) return { newScore: null, pointsEarned: 0 };
+
+  try {
+    const userDocRef = doc(db, 'user', uid);
+    const streakDays = calculateActivityStreak();
+    const streakMultiplier = streakDays > 0 ? (1 + streakDays / 7) : 1;
+
+    // Calculate base score change
+    const baseScoreChange = calculateScoreChange(activityType, price, quantity, isDonation);
+
+    // Apply streak multiplier
+    const adjustedChange = Math.round(baseScoreChange * streakMultiplier);
+
+    // Get current score from Firebase (or initialize to 0)
+    const currentDoc = await getDoc(userDocRef);
+    const currentScore = currentDoc.exists() ? (currentDoc.data().foodScore || 0) : 0;
+
+    const newScore = Math.max(0, currentScore + adjustedChange);
+
+    await updateDoc(userDocRef, {
+      foodScore: newScore,
+      streak: streakDays
+    });
+
+    return { newScore, pointsEarned: adjustedChange };
+  } catch (err) {
+    console.error('Failed to update foodScore:', err);
+    return { newScore: null, pointsEarned: 0 };
+  }
+};
+
 // Auth state changed
 auth.onAuthStateChanged((u) => {
   user.value = u
 })
 
 // Watch userId changes
+// Watch userId changes and load user's food score
 watch(userId, async (val) => {
   if (val) {
     await loadFoodItems()
@@ -216,14 +268,27 @@ watch(userId, async (val) => {
     recipes.value = recipesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
 
     await loadActivities()
+
+    // Load user's food score from Firebase
+    try {
+      const userDocRef = doc(db, 'user', val);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        userFoodScore.value = userDoc.data().foodScore || 0;
+      }
+    } catch (err) {
+      console.error('Failed to load food score:', err);
+    }
   } else {
     foodItems.value = []
     recipes.value = []
     activities.value = []
+    userFoodScore.value = 0
   }
 }, { immediate: true })
 
 // Watch for expired foods and donations
+// Watch for expired foods
 watchEffect(async () => {
   if (!activitiesLoaded.value) return
   const uid = userId.value
@@ -244,6 +309,12 @@ watchEffect(async () => {
       )
       const snapshot = await getDocs(q)
       if (snapshot.empty) {
+        // Calculate points BEFORE creating activity
+        const { newScore, pointsEarned } = await updateFoodScore('expFood', food.price, uid, food.quantity);
+        if (newScore !== null) {
+          userFoodScore.value = newScore;
+        }
+
         const payload = {
           activityType: 'expFood',
           createdAt: new Date().toISOString(),
@@ -253,6 +324,7 @@ watchEffect(async () => {
           quantity: String(food.quantity || ''),
           unit: String(food.unit || ''),
           note: 'expired',
+          pointsEarned: pointsEarned // ← ADD THIS LINE
         }
         const docRef = await addDoc(actRef, payload)
         activities.value.unshift({
@@ -262,7 +334,6 @@ watchEffect(async () => {
       }
     }
   }
-
 })
 
 // Utility functions
@@ -590,7 +661,7 @@ const analytics = computed(() => {
 
   const totalSavedItems = activities.value.filter(
     (a) => (a.activityType === 'conFood' && a.note === 'fully consumed') ||
-           (a.activityType === 'donFood')
+      (a.activityType === 'donFood')
   ).length
 
   const totalSavedMoney = usedActivities.reduce((total, activity) => {
@@ -612,48 +683,97 @@ const analytics = computed(() => {
   const streakDays = calculateActivityStreak()
   const foodDonated = donatedActivities.length
 
-  const itemsScore = Math.max(0, totalSavedItems * 0.4 - totalWasteItems * 0.4)
-  const moneyScore = Math.max(0, totalSavedMoney * 0.2 - totalWasteMoney * 0.2)
-  const donationBonus = foodDonated * 0.5
-  const baseScore = Math.round(itemsScore + moneyScore + donationBonus)
-
-  const streakMulti = streakDays > 0 ? 1 + streakDays / 7 : 0
-  const foodScore = Math.round(baseScore * Math.max(1, streakMulti))
-
   return {
     totalWaste: { money: totalWasteMoney, items: totalWasteItems },
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
     reduction: reductionPercentage,
     inventory: { value: inventoryValue, items: inventoryItems },
-    foodScore: foodScore,
     streakDays: streakDays,
     foodDonated: foodDonated,
     pendingDonations: pendingDonations.length,
   }
 })
 
-// Watch foodScore and update Firebase
-watchEffect(async () => {
-  const score = analytics.value.foodScore;
-  const uid = userId.value;
-
-  if (uid && activitiesLoaded.value && foodItems.value.length >= 0) {
-    try {
-      const userDocRef = doc(db, 'user', uid);
-      await updateDoc(userDocRef, {
-        foodScore: score,
-        streak: analytics.value.streakDays
-      });
-    } catch (err) {
-      console.error('Failed to update foodScore:', err);
-    }
-  }
-});
 
 
 
 const toggleSortDirection = () => {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+}
+
+// Convert string to Title Case (e.g., "baby spinach" -> "Baby Spinach")
+const titleCase = (str) => {
+  if (!str || typeof str !== 'string') return ''
+  return str
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+const applyTitleCase = () => {
+  addForm.name = titleCase(addForm.name || '')
+}
+
+// Live input handler for addForm.name that title-cases as user types.
+const onAddNameInput = (event) => {
+  // Preserve cursor position (best-effort)
+  const el = event.target
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  const raw = el.value || ''
+  // Live title-casing that preserves all original spaces (including trailing)
+  // Use regex to transform only non-space runs so user can type spaces freely.
+  const transformed = raw.replace(/\S+/g, (w) => {
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+  })
+
+  // Update model when needed. If nothing changed, still keep model in sync.
+  if (transformed !== raw) {
+    addForm.name = transformed
+    // restore cursor (best-effort)
+    setTimeout(() => {
+      try {
+        el.selectionStart = start
+        el.selectionEnd = end
+      } catch (e) {
+        // ignore
+      }
+    }, 0)
+  } else {
+    addForm.name = raw
+  }
+}
+
+const applyTitleCaseEdit = () => {
+  editForm.name = titleCase(editForm.name || '')
+}
+
+// Live input handler for editForm.name that mirrors the addForm behavior
+const onEditNameInput = (event) => {
+  const el = event.target
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  const raw = el.value || ''
+
+  const transformed = raw.replace(/\S+/g, (w) => {
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+  })
+
+  if (transformed !== raw) {
+    editForm.name = transformed
+    setTimeout(() => {
+      try {
+        el.selectionStart = start
+        el.selectionEnd = end
+      } catch (e) {
+        // ignore
+      }
+    }, 0)
+  } else {
+    editForm.name = raw
+  }
 }
 
 const getSortButtonIcon = computed(() => {
@@ -667,6 +787,11 @@ const getSortButtonTitle = computed(() => {
 
 // Modal functions
 const openUse = (food) => {
+  // Prevent using expired food
+  if (getDaysLeft(food) < 0) {
+    showToastFor(`${food.name} is expired and cannot be used.`)
+    return
+  }
   useForm.id = food.id
   useForm.name = food.name
   useForm.quantity = 1
@@ -693,21 +818,32 @@ const saveUse = async () => {
     if (foodIndex === -1) return
 
     const food = foodItems.value[foodIndex]
-
     const usedQty = Math.min(useForm.quantity, food.quantity)
     const newQty = food.quantity - usedQty
+
+    // Price is per unit, so calculate the value consumed
+    const pricePerUnit = food.price || 0
+    const usedValue = pricePerUnit * usedQty
 
     const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id)
     const actRef = collection(db, 'user', uid, 'activities')
 
+    // Calculate points BEFORE creating activity
+    const { newScore, pointsEarned } = await updateFoodScore('conFood', usedValue, uid, usedQty);
+    if (newScore !== null) {
+      userFoodScore.value = newScore;
+    }
+
+    // ADD pointsEarned to the activity payload
     const activityPayload = {
       activityType: 'conFood',
       createdAt: new Date().toISOString(),
       foodName: food.name,
       category: food.category || '',
-      price: String(food.price || 0),
+      price: String(pricePerUnit),
       quantity: String(usedQty),
       unit: food.unit || '',
+      pointsEarned: pointsEarned // ← ADD THIS LINE
     }
     const docRef = await addDoc(actRef, activityPayload)
     activities.value.unshift({
@@ -719,15 +855,19 @@ const saveUse = async () => {
       await deleteDoc(refDoc)
       foodItems.value.splice(foodIndex, 1)
 
+      // Calculate points for fully consumed
+      const { pointsEarned: fullPoints } = await updateFoodScore('conFood', 0, uid, 0);
+
       const fullConsumedPayload = {
         activityType: 'conFood',
         createdAt: new Date().toISOString(),
         foodName: food.name,
         category: food.category || '',
-        price: String(food.price || 0),
-        quantity: '0',
+        price: String(pricePerUnit),
+        quantity: String(usedQty),
         unit: food.unit || '',
         note: 'fully consumed',
+        pointsEarned: fullPoints // ← ADD THIS LINE
       }
       const docRef2 = await addDoc(actRef, fullConsumedPayload)
       activities.value.unshift({
@@ -778,11 +918,15 @@ const saveAdd = async () => {
     return
   }
 
+  // Ensure the name is title-cased before saving
+  applyTitleCase()
+  const nameValue = addForm.name || ''
+
   const colRef = collection(db, 'user', userId.value, 'foodItems')
   const actRef = collection(db, 'user', userId.value, 'activities')
 
   const foodPayload = {
-    name: addForm.name || '',
+    name: nameValue,
     category: addForm.category || '',
     price: Number(addForm.price) || 0,
     quantity: Number(addForm.quantity) || 0,
@@ -802,7 +946,7 @@ const saveAdd = async () => {
     const activityPayload = {
       activityType: 'addFood',
       createdAt: new Date().toISOString(),
-      foodName: addForm.name || '',
+      foodName: nameValue,
       category: addForm.category || '',
       price: String(addForm.price || ''),
       quantity: String(addForm.quantity || ''),
@@ -829,6 +973,11 @@ const saveAdd = async () => {
 }
 
 const openEdit = (food) => {
+  // Prevent editing expired food
+  if (getDaysLeft(food) < 0) {
+    showToastFor(`${food.name} is expired and cannot be edited.`)
+    return
+  }
   editFormOriginal.value = JSON.parse(JSON.stringify(food))
   editForm.id = food.id || null
   editForm.name = food.name ?? ''
@@ -962,11 +1111,8 @@ const confirmDelete = async () => {
         </div>
         <div class="ms-3">
           <div style="transform: rotateY(9.20483deg)">
-            <button
-              @click="overviewCollapsed = !overviewCollapsed"
-              :aria-expanded="!overviewCollapsed"
-              class="btn btn-sm btn-outline-secondary header-collapse-btn"
-            >
+            <button @click="overviewCollapsed = !overviewCollapsed" :aria-expanded="!overviewCollapsed"
+              class="btn btn-sm btn-outline-secondary header-collapse-btn">
               <i :class="overviewCollapsed ? 'bi bi-chevron-up' : 'bi bi-chevron-down'"></i>
               <span class="visually-hidden">Toggle overview rows</span>
             </button>
@@ -989,47 +1135,40 @@ const confirmDelete = async () => {
                       );
                   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
                   height: 130px;
-                "
-              >
+                ">
                 <!-- Left: Icon + label -->
                 <div
-                      class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                      style="width: 90px"
-                    >
-                      <div
-                        class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                        style="width: 56px; height: 56px"
-                      >
-                        <i class="bi bi-graph-up-arrow fs-5 text-white"></i>
-                      </div>
-                      <small class="text-white text-center">Food Score</small>
-                    </div>
+                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+                  style="width: 90px">
+                  <div
+                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
+                    style="width: 56px; height: 56px">
+                    <i class="bi bi-graph-up-arrow fs-5 text-white"></i>
+                  </div>
+                  <small class="text-white text-center">Food Score</small>
+                </div>
 
                 <!-- Right: Count -->
                 <div class="text-end align-self-end pe-2 mt-2 position-relative">
-                      <h3 class="fw-bold mb-0 text-white">{{ analytics.foodScore }}</h3>
-                      <small class="text-white">points</small>
+                  <h3 class="fw-bold mb-0 text-white">{{ userFoodScore }}</h3>
+                  <small class="text-white">points</small>
 
-                      <!-- Streak badge -->
-                      <div v-if="analytics.streakDays > 0" class="mt-2">
-                        <span
-                          class="streak-fire"
-                          :class="{
-                            'fire-small': analytics.streakDays < 7,
-                            'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
-                            'fire-large': analytics.streakDays >= 14,
-                          }"
-                          >🔥</span
-                        >
-                        <span class="streak-text text-white">
-                          {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
-                        </span>
-                      </div>
-                    </div>
+                  <!-- Streak badge -->
+                  <div v-if="analytics.streakDays > 0" class="mt-2">
+                    <span class="streak-fire" :class="{
+                      'fire-small': analytics.streakDays < 7,
+                      'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
+                      'fire-large': analytics.streakDays >= 14,
+                    }">🔥</span>
+                    <span class="streak-text text-white">
+                      {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <!-- Back Side (Food Score Information) -->
-              <div 
+              <div
                 class="flip-card-back position-absolute p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
                 style="
                   background: linear-gradient(
@@ -1039,17 +1178,14 @@ const confirmDelete = async () => {
                       );
                   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
                   height: 130px;
-                "
-              >
+                ">
                 <!-- Left: Icon + label -->
                 <div
                   class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                  style="width: 90px"
-                >
+                  style="width: 90px">
                   <div
                     class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                    style="width: 56px; height: 56px"
-                  >
+                    style="width: 56px; height: 56px">
                     <i class="bi bi-info-circle fs-5 text-white"></i>
                   </div>
                   <small class="text-white text-center">Food Score</small>
@@ -1058,16 +1194,16 @@ const confirmDelete = async () => {
                 <!-- Right: Information -->
                 <div class="text-end align-self-end pe-2 position-relative" style="max-width: 55%;">
                   <p class="mb-0 text-white small text-center" style="font-size:10px">
-                    Measures how effectively you save food, money, and help others. It rewards items and money saved, penalizes waste, and adds bonus points for food donations
+                    Measures how effectively you save food, money, and help others. It rewards items and money saved,
+                    penalizes waste, and adds bonus points for food donations
                   </p>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      <div class="col-6 col-lg-3">
-          <div
-            class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
+        <div class="col-6 col-lg-3">
+          <div class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
             style="
               background: linear-gradient(
                 135deg,
@@ -1076,17 +1212,13 @@ const confirmDelete = async () => {
               );
               box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
               height: 130px;
-            "
-          >
+            ">
             <!-- Left: Icon + label -->
-            <div
-              class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-              style="width: 90px"
-            >
+            <div class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+              style="width: 90px">
               <div
                 class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                style="width: 56px; height: 56px"
-              >
+                style="width: 56px; height: 56px">
                 <i class="bi bi-exclamation-triangle fs-5 text-white"></i>
               </div>
               <small class="text-white text-center">Expiring Soon</small>
@@ -1102,10 +1234,10 @@ const confirmDelete = async () => {
         <div class="col-6 col-lg-3">
           <div class="flip-card" style="height: 130px;">
             <div class="flip-card-inner">
-      <!-- Front Side (Your Original Card) -->
-            <div
-              class="flip-card-front position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-              style="
+              <!-- Front Side (Your Original Card) -->
+              <div
+                class="flip-card-front position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
+                style="
                 background: linear-gradient(
                       135deg,
                       rgba(153, 27, 27, 0.9) 0%,
@@ -1113,70 +1245,63 @@ const confirmDelete = async () => {
                     );
                 box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
                 height: 130px;
-              "
-            >
-              <!-- Left: Icon + label -->
-              <div
-                    class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                    style="width: 90px"
-                  >
-                    <div
-                      class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-2"
-                      style="width: 56px; height: 56px"
-                    >
-                      <i class="bi bi-currency-dollar fs-5 text-white"></i>
-                    </div>
-                    <small class="text-white text-center">Potential Loss</small>
-                  </div>
-
-
-              <!-- Right: Count -->
-              <div class="text-end align-self-end pe-2 mt-2 position-relative">
-                    <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
-                    <small class="text-white">if expired</small>
-                  </div>
-            </div>
-
-            <!-- Back Side (Food Score Information) -->
-            <div 
-              class="flip-card-back position-absolute p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-              style="
-                background: linear-gradient(
-                      135deg,
-                      rgba(153, 27, 27, 0.9) 0%,
-                      rgba(239, 68, 68, 0.65) 100%
-                    );
-                box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-                height: 130px;
-              "
-            >
-              <!-- Left: Icon + label -->
-              <div
-                class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-                style="width: 90px"
-              >
+              ">
+                <!-- Left: Icon + label -->
                 <div
-                  class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                  style="width: 56px; height: 56px"
-                >
-                  <i class="bi bi-info-circle fs-5 text-white"></i>
+                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+                  style="width: 90px">
+                  <div
+                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-2"
+                    style="width: 56px; height: 56px">
+                    <i class="bi bi-currency-dollar fs-5 text-white"></i>
+                  </div>
+                  <small class="text-white text-center">Potential Loss</small>
                 </div>
-                <small class="text-white text-center">Potential Loss</small>
+
+
+                <!-- Right: Count -->
+                <div class="text-end align-self-end pe-2 mt-2 position-relative">
+                  <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
+                  <small class="text-white">if expired</small>
+                </div>
               </div>
 
-              <!-- Right: Information -->
-              <div class=" pe-2 d-flex flex-column align-self-end align-items-center mt-3" style="max-width: 55%;">
-                <p class="mb-0 text-white small text-center" style="font-size:10px">
-                  Measures the total value of food that’s at risk of expiring within the next 7 days.
-                </p>
+              <!-- Back Side (Food Score Information) -->
+              <div
+                class="flip-card-back position-absolute p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
+                style="
+                background: linear-gradient(
+                      135deg,
+                      rgba(153, 27, 27, 0.9) 0%,
+                      rgba(239, 68, 68, 0.65) 100%
+                    );
+                box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+                height: 130px;
+              ">
+                <!-- Left: Icon + label -->
+                <div
+                  class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+                  style="width: 90px">
+                  <div
+                    class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
+                    style="width: 56px; height: 56px">
+                    <i class="bi bi-info-circle fs-5 text-white"></i>
+                  </div>
+                  <small class="text-white text-center">Potential Loss</small>
+                </div>
+
+                <!-- Right: Information -->
+                <div class=" pe-2 d-flex flex-column align-self-end align-items-center mt-3" style="max-width: 55%;">
+                  <p class="mb-0 text-white small text-center" style="font-size:10px">
+                    Measures the total value of food that’s at risk of expiring within the next 7 days.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
         <div class="col-6 col-lg-3">
-          <div
-            class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
+          <div class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
             style="
               background: linear-gradient(
                 135deg,
@@ -1185,17 +1310,13 @@ const confirmDelete = async () => {
               );
               box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
               height: 130px;
-            "
-          >
+            ">
             <!-- Left: Icon + label -->
-            <div
-              class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-              style="width: 90px"
-            >
+            <div class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
+              style="width: 90px">
               <div
                 class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                style="width: 56px; height: 56px"
-              >
+                style="width: 56px; height: 56px">
                 <i class="bi bi-calendar-x fs-5 text-white"></i>
               </div>
               <small class="text-white text-center">Expired</small>
@@ -1271,7 +1392,8 @@ const confirmDelete = async () => {
               <!-- Total Waste -->
               <div class="col-6 col-xl-3">
                 <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
+                    style="width: 48px; height: 48px; background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
                     <i class="bi bi-trash fs-5"></i>
                   </div>
                   <div class="flex-grow-1 min-w-0">
@@ -1285,7 +1407,8 @@ const confirmDelete = async () => {
               <!-- Total Saved -->
               <div class="col-6 col-xl-3">
                 <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
+                    style="width: 48px; height: 48px; background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
                     <i class="bi bi-bag-check fs-5"></i>
                   </div>
                   <div class="flex-grow-1 min-w-0">
@@ -1299,7 +1422,8 @@ const confirmDelete = async () => {
               <!-- Reduction -->
               <div class="col-6 col-xl-3">
                 <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(37, 99, 235, 0.1); color: #2563eb;">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
+                    style="width: 48px; height: 48px; background-color: rgba(37, 99, 235, 0.1); color: #2563eb;">
                     <i class="bi bi-graph-down-arrow fs-5"></i>
                   </div>
                   <div class="flex-grow-1 min-w-0">
@@ -1313,7 +1437,8 @@ const confirmDelete = async () => {
               <!-- Inventory -->
               <div class="col-6 col-xl-3">
                 <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width: 48px; height: 48px; background-color: rgba(249, 115, 22, 0.1); color: #f97316;">
+                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
+                    style="width: 48px; height: 48px; background-color: rgba(249, 115, 22, 0.1); color: #f97316;">
                     <i class="bi bi-box-seam fs-5"></i>
                   </div>
                   <div class="flex-grow-1 min-w-0">
@@ -1344,7 +1469,8 @@ const confirmDelete = async () => {
                   {{ item.pct }}<span class="fs-6">%</span>
                 </div>
                 <div class="d-inline-flex align-items-center gap-1 text-secondary small">
-                  <span class="rounded-circle" :style="{width:'8px',height:'8px',backgroundColor:item.color}"></span>
+                  <span class="rounded-circle"
+                    :style="{ width: '8px', height: '8px', backgroundColor: item.color }"></span>
                   {{ item.label }}
                 </div>
               </div>
@@ -1369,12 +1495,7 @@ const confirmDelete = async () => {
           </div>
           <div class="row g-2 mb-3">
             <div class="col-12 col-md-4">
-              <input
-                v-model="searchText"
-                type="text"
-                class="form-control"
-                placeholder="Search food items..."
-              />
+              <input v-model="searchText" type="text" class="form-control" placeholder="Search food items..." />
             </div>
             <div class="col-12 col-sm-6 col-md-3">
               <select v-model="selectedCategory" class="form-select">
@@ -1391,12 +1512,8 @@ const confirmDelete = async () => {
               </select>
             </div>
             <div class="col-3 col-sm-2 col-md-2">
-              <button
-                @click="toggleSortDirection"
-
-                class="btn btn-outline-secondary sort-direction-btn w-100"
-                :title="getSortButtonTitle"
-              >
+              <button @click="toggleSortDirection" class="btn btn-outline-secondary sort-direction-btn w-100"
+                :title="getSortButtonTitle">
                 <i :class="getSortButtonIcon"></i>
               </button>
             </div>
@@ -1408,17 +1525,13 @@ const confirmDelete = async () => {
           </div>
           <div v-else class="food-scroll-container">
             <div class="food-scroll-section">
-              <div
-                v-for="food in filteredFoodItems"
-                :key="food.id"
-                :class="[
-                  'food-card',
-                  getFoodCardClass(food),
-                  'd-flex',
-                  'flex-column',
-                  'justify-content-between',
-                ]"
-              >
+              <div v-for="food in filteredFoodItems" :key="food.id" :class="[
+                'food-card',
+                getFoodCardClass(food),
+                'd-flex',
+                'flex-column',
+                'justify-content-between',
+              ]">
                 <div>
                   <div class="food-header">
                     <div>
@@ -1442,20 +1555,22 @@ const confirmDelete = async () => {
                   </div>
                 </div>
                 <div class="d-flex align-items-end justify-content-between mt-auto w-100">
-                  <button
-                    class="food-btn food-btn-recipe px-2 py-1"
-                    style="font-size: 0.92em; min-width: 0"
-                    @click.prevent="goToRecipes(food)"
-                  >
+                  <button class="food-btn food-btn-recipe px-2 py-1" style="font-size: 0.92em; min-width: 0"
+                    @click.prevent="goToRecipes(food)">
                     <i class="bi bi-book"></i> Recipes
                   </button>
                   <div class="food-actions d-flex gap-2">
-                    <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
-                      Edit</button>
-                    <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i>
-                      Consume</button>
-                    <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
-                        class="bi bi-trash"></i></button>
+                    <!-- If expired, only show delete. Otherwise allow edit and consume. -->
+                    <template v-if="getDaysLeft(food) < 0">
+                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i class="bi bi-trash"></i></button>
+                    </template>
+                    <template v-else>
+                      <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
+                        Edit</button>
+                      <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i>
+                        Consume</button>
+                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i class="bi bi-trash"></i></button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -1466,121 +1581,116 @@ const confirmDelete = async () => {
 
       <!-- Activities -->
       <div class="col-lg-4 d-none d-lg-block d-flex flex-column h-100">
-  <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0">
-    <h3 class="h5 mb-3 fw-bold">Recent Activity</h3>
+        <div class="glass-card p-4 d-flex flex-column flex-grow-1 h-100" style="min-height: 0">
+          <h3 class="h5 mb-3 fw-bold">Recent Activity</h3>
 
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <div class="d-flex gap-2 w-100">
-        <select
-          v-model="activityTypeFilter"
-          class="form-select form-select-sm"
-          style="width: auto; min-width: 110px"
-        >
-          <option disabled value="">Activity</option>
-          <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </select>
-        <select
-          v-model="activityTimeFrame"
-          class="form-select form-select-sm"
-          style="width: auto; min-width: 90px"
-        >
-          <option disabled value="">Time</option>
-          <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </select>
-        <button
-          class="btn btn-outline-secondary btn-sm"
-          :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'"
-          @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'"
-        >
-          <i
-            :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"
-          ></i>
-        </button>
-      </div>
-    </div>
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="d-flex gap-2 w-100">
+              <select v-model="activityTypeFilter" class="form-select form-select-sm"
+                style="width: auto; min-width: 110px">
+                <option disabled value="">Activity</option>
+                <option v-for="opt in activityTypeOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+              <select v-model="activityTimeFrame" class="form-select form-select-sm"
+                style="width: auto; min-width: 90px">
+                <option disabled value="">Time</option>
+                <option v-for="opt in activityTimeFrameOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+              <button class="btn btn-outline-secondary btn-sm"
+                :title="activitySortDirection === 'desc' ? 'Newest first' : 'Oldest first'"
+                @click="activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc'">
+                <i :class="activitySortDirection === 'desc' ? 'bi bi-sort-down' : 'bi bi-sort-up'"></i>
+              </button>
+            </div>
+          </div>
 
-    <div class="flex-grow-1 d-flex flex-column min-h-0">
-      <div v-if="filteredSortedActivities.length === 0" class="text-center py-5 flex-grow-1">
-        <i class="bi bi-activity display-1 text-muted opacity-25"></i>
-        <p class="text-muted mt-3">No recent activity</p>
-      </div>
-
-      <div v-else class="d-flex flex-column gap-3 activity-scroll flex-grow-1" style="overflow-y: auto; padding-right: 8px;">
-        <div
-          v-for="activity in filteredSortedActivities"
-          :key="activity.id"
-          class="activity-item"
-        >
-          <div class="d-flex align-items-start gap-3">
-            <!-- Icon Circle -->
-            <div class="flex-shrink-0">
-              <div
-                class="rounded-circle d-flex align-items-center justify-content-center"
-                :style="{
-                  width: '48px',
-                  height: '48px',
-                  background: getActivityGradient(activity.activityType)
-                }"
-              >
-                <i :class="getActivityIcon(activity.activityType)" class="text-white fs-5"></i>
-              </div>
+          <div class="flex-grow-1 d-flex flex-column min-h-0">
+            <div v-if="filteredSortedActivities.length === 0" class="text-center py-5 flex-grow-1">
+              <i class="bi bi-activity display-1 text-muted opacity-25"></i>
+              <p class="text-muted mt-3">No recent activity</p>
             </div>
 
-            <!-- Content -->
-            <div class="flex-grow-1 min-w-0">
-              <h6 class="mb-1 fw-bold small">{{ getActivityTitle(activity.activityType) }}</h6>
+            <div v-else class="d-flex flex-column gap-3 activity-scroll flex-grow-1"
+              style="overflow-y: auto; padding-right: 8px;">
+              <div v-for="activity in filteredSortedActivities" :key="activity.id" class="activity-item">
+                <div class="d-flex align-items-start gap-3 position-relative">
+                  <!-- Points Badge - Top Right -->
+                  <div v-if="activity.pointsEarned !== undefined && activity.pointsEarned !== 0"
+                    class="position-absolute top-0 end-0">
+                    <span class="badge d-flex align-items-center gap-1"
+                      :class="activity.pointsEarned > 0 ? 'bg-success' : 'bg-danger'" style="font-size: 0.7rem;">
+                      <i :class="activity.pointsEarned > 0 ? 'bi bi-arrow-up' : 'bi bi-arrow-down'"></i>
+                      {{ Math.abs(activity.pointsEarned) }} pts
+                    </span>
+                  </div>
 
-              <!-- Activity Details -->
-              <div v-if="activity.activityType === 'donFood'" class="mb-1">
-                <p class="mb-0 small text-secondary">
-                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} donated
-                </p>
+                  <!-- Icon Circle -->
+                  <div class="flex-shrink-0">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" :style="{
+                      width: '48px',
+                      height: '48px',
+                      background: getActivityGradient(activity.activityType)
+                    }">
+                      <i :class="getActivityIcon(activity.activityType)" class="text-white fs-5"></i>
+                    </div>
+                  </div>
+
+                  <!-- Content -->
+                  <div class="flex-grow-1 min-w-0">
+                    <h6 class="mb-1 fw-bold small">{{ getActivityTitle(activity.activityType) }}</h6>
+
+                    <!-- Activity Details -->
+                    <div v-if="activity.activityType === 'donFood'" class="mb-1">
+                      <p class="mb-0 small text-secondary">
+                        {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} donated
+                      </p>
+                    </div>
+
+                    <div v-else-if="activity.activityType === 'pendingDonFood'" class="mb-1">
+                      <p class="mb-0 small text-secondary">
+                        {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} pending donation
+                      </p>
+                    </div>
+
+                    <div v-else-if="activity.activityType === 'addFood'" class="mb-1">
+                      <p class="mb-0 small text-secondary">
+                        {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added
+                      </p>
+                    </div>
+
+                    <div v-else-if="activity.activityType === 'conFood'" class="mb-1">
+                      <p class="mb-0 small"
+                        :class="activity.note === 'fully consumed' ? 'text-success fw-semibold' : 'text-secondary'">
+                        <span v-if="activity.note === 'fully consumed'">
+                          All of {{ activity.foodName }} fully consumed
+                        </span>
+                        <span v-else>
+                          {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} consumed
+                        </span>
+                      </p>
+                    </div>
+
+                    <div v-else-if="activity.activityType === 'expFood'" class="mb-1">
+                      <p class="mb-0 small text-danger fw-semibold">
+                        {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
+                      </p>
+                    </div>
+
+                    <!-- Timestamp -->
+                    <small class="text-muted d-block" style="font-size: 0.75rem;">
+                      <i class="bi bi-clock me-1"></i>{{ getRelativeTime(activity.createdAt) }}
+                    </small>
+                  </div>
+                </div>
               </div>
-
-              <div v-else-if="activity.activityType === 'pendingDonFood'" class="mb-1">
-                <p class="mb-0 small text-secondary">
-                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} pending donation
-                </p>
-              </div>
-
-              <div v-else-if="activity.activityType === 'addFood'" class="mb-1">
-                <p class="mb-0 small text-secondary">
-                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added
-                </p>
-              </div>
-
-              <div v-else-if="activity.activityType === 'conFood'" class="mb-1">
-                <p class="mb-0 small" :class="activity.note === 'fully consumed' ? 'text-success fw-semibold' : 'text-secondary'">
-                  <span v-if="activity.note === 'fully consumed'">
-                    All of {{ activity.foodName }} fully consumed
-                  </span>
-                  <span v-else>
-                    {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} consumed
-                  </span>
-                </p>
-              </div>
-
-              <div v-else-if="activity.activityType === 'expFood'" class="mb-1">
-                <p class="mb-0 small text-danger fw-semibold">
-                  {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
-                </p>
-              </div>
-
-              <!-- Timestamp -->
-              <small class="text-muted d-block" style="font-size: 0.75rem;">
-                <i class="bi bi-clock me-1"></i>{{ getRelativeTime(activity.createdAt) }}
-              </small>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-</div>
     </div>
 
     <!-- Edit Food Modal -->
@@ -1589,17 +1699,13 @@ const confirmDelete = async () => {
         <h3 class="h5 mb-3">Edit Food Item</h3>
         <div class="mb-2">
           <label class="form-label">Name</label>
-          <input v-model="editForm.name" class="form-control" />
+          <input v-model="editForm.name" @input="onEditNameInput" @blur="applyTitleCaseEdit" class="form-control" />
         </div>
         <div class="mb-2">
           <label class="form-label">Category</label>
           <select v-model="editForm.category" class="form-select">
             <option disabled value="">{{ editForm.category || 'Select a category' }}</option>
-            <option
-              v-for="cat in categories.filter((c) => c !== 'All Categories')"
-              :key="cat"
-              :value="cat"
-            >
+            <option v-for="cat in categories.filter((c) => c !== 'All Categories')" :key="cat" :value="cat">
               {{ cat }}
             </option>
           </select>
@@ -1648,11 +1754,11 @@ const confirmDelete = async () => {
         <div class="row g-2 mt-2">
           <div class="col-6">
             <label class="form-label">Quantity</label>
-            <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" style="height: 45px"/>
+            <input v-model.number="useForm.quantity" type="number" min="1" class="form-control" style="height: 45px" />
           </div>
           <div class="col-6">
             <label class="form-label">Unit</label>
-            <input v-model="useForm.unit" type="text" class="form-control" disabled style="height: 45px;"/>
+            <input v-model="useForm.unit" type="text" class="form-control" disabled style="height: 45px;" />
           </div>
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
@@ -1663,8 +1769,8 @@ const confirmDelete = async () => {
     </div>
 
     <!-- Floating Add Button -->
-    <button class="fab-add" @click="openAdd" title="Add Food">
-      <i class="bi bi-plus-lg"></i>
+    <button class="fab-add d-flex align-items-center justify-content-center" @click="openAdd" title="Add Food">
+      <i class="bi bi-plus-lg d-flex align-items-center justify-content-center fs-3"></i>
       <span class="fab-text">Add Food</span>
     </button>
 
@@ -1674,17 +1780,13 @@ const confirmDelete = async () => {
         <h3 class="h5 mb-3">Add Food Item</h3>
         <div class="mb-2">
           <label class="form-label">Name</label>
-          <input v-model="addForm.name" class="form-control" />
+          <input v-model="addForm.name" @input="onAddNameInput" @blur="applyTitleCase" class="form-control" />
         </div>
         <div class="mb-2">
           <label class="form-label">Category</label>
           <select v-model="addForm.category" class="form-select">
             <option disabled value="">Select a category</option>
-            <option
-              v-for="cat in categories.filter((c) => c !== 'All Categories')"
-              :key="cat"
-              :value="cat"
-            >
+            <option v-for="cat in categories.filter((c) => c !== 'All Categories')" :key="cat" :value="cat">
               {{ cat }}
             </option>
           </select>
@@ -1729,8 +1831,7 @@ const confirmDelete = async () => {
     <div class="modal-card delete-modal">
       <h5>Delete Item</h5>
       <p>
-        Are you sure you want to delete <strong>{{ deleteTarget?.name }}</strong
-        >? This action cannot be undone.
+        Are you sure you want to delete <strong>{{ deleteTarget?.name }}</strong>? This action cannot be undone.
       </p>
       <div class="d-flex justify-content-end gap-2">
         <button class="btn btn-secondary" @click="closeDelete">Cancel</button>
@@ -1744,8 +1845,6 @@ const confirmDelete = async () => {
 </template>
 
 <style scoped>
-
-
 .dashboard-overview {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.08) 100%);
   border: 1px solid rgba(16, 185, 129, 0.1);
@@ -1755,6 +1854,7 @@ const confirmDelete = async () => {
   padding: 1.5rem;
   margin-bottom: 1.5rem;
 }
+
 .activity-item {
   padding: 12px;
   border-radius: 12px;
@@ -1776,6 +1876,7 @@ const confirmDelete = async () => {
     opacity: 0;
     transform: translateX(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -1785,6 +1886,7 @@ const confirmDelete = async () => {
 .activity-item {
   animation: slideIn 0.3s ease-out;
 }
+
 .food-scroll-container {
   max-width: 100%;
   margin: 0 auto;
@@ -1842,6 +1944,7 @@ const confirmDelete = async () => {
   background: #ede9e8;
   color: #333;
 }
+
 .flip-card-front,
 .flip-card-back {
   position: absolute;
@@ -1850,6 +1953,7 @@ const confirmDelete = async () => {
   left: 0;
   backface-visibility: hidden;
 }
+
 .flip-card {
   cursor: pointer;
   width: 100%;
@@ -1962,11 +2066,6 @@ const confirmDelete = async () => {
   padding: 0;
 }
 
-.sort-direction-btn i {
-  font-size: 16px;
-  line-height: 1;
-}
-
 /* Modal styles */
 .modal-backdrop {
   position: fixed;
@@ -1988,32 +2087,37 @@ const confirmDelete = async () => {
 }
 
 /* Floating Add button */
+
 .fab-add {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  min-width: 56px;
+  width: 56px;
   height: 56px;
-  border-radius: 28px;
+  border-radius: 50%;
   background: linear-gradient(180deg, #10b981, #059669);
   color: #fff;
   border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 16px;
-  font-size: 20px;
   box-shadow: 0 6px 18px rgba(5, 150, 105, 0.25);
   cursor: pointer;
   z-index: 2500;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   white-space: nowrap;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+.fab-add:hover {
+  width: 140px;
+  border-radius: 28px;
+  padding-right: 20px;
+}
+
+
 .fab-add i {
-  flex-shrink: 0;
   transition: transform 0.3s ease;
 }
 
@@ -2023,37 +2127,18 @@ const confirmDelete = async () => {
   max-width: 0;
   opacity: 0;
   overflow: hidden;
+  display: inline-block;
+  white-space: nowrap;
+  transform: translateX(-16px);
   transition:
-    max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.3s ease;
+    max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.25s ease,
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-.fab-add:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(5, 150, 105, 0.35);
-  padding-right: 20px;
-}
-
 .fab-add:hover .fab-text {
   max-width: 100px;
   opacity: 1;
-}
-
-.fab-add:hover i {
-  transform: rotate(90deg);
-}
-
-.fab-add:active {
-  transform: translateY(0);
-  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
-}
-
-.modal-card h5 {
-  margin-bottom: 8px;
-}
-
-.modal-card p {
-  margin-bottom: 12px;
+  transform: translateX(0);
 }
 
 /* Delete modal — white interior with pulsing red glow */
@@ -2146,12 +2231,10 @@ const confirmDelete = async () => {
   right: 0;
   bottom: 0;
   opacity: 0.08;
-  background: linear-gradient(
-    135deg,
-    rgba(251, 191, 36, 0.3) 0%,
-    rgba(245, 158, 11, 0.2) 50%,
-    rgba(239, 68, 68, 0.1) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(251, 191, 36, 0.3) 0%,
+      rgba(245, 158, 11, 0.2) 50%,
+      rgba(239, 68, 68, 0.1) 100%);
   animation: fireGlow 3s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
@@ -2166,15 +2249,14 @@ const confirmDelete = async () => {
 .streak-fire-bg.streak-blazing {
   opacity: 0.18;
   animation-duration: 1.5s;
-  background: linear-gradient(
-    135deg,
-    rgba(239, 68, 68, 0.3) 0%,
-    rgba(251, 146, 60, 0.2) 50%,
-    rgba(251, 191, 36, 0.1) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(239, 68, 68, 0.3) 0%,
+      rgba(251, 146, 60, 0.2) 50%,
+      rgba(251, 191, 36, 0.1) 100%);
 }
 
 @keyframes fireGlow {
+
   0%,
   100% {
     transform: scale(1);
@@ -2212,6 +2294,7 @@ const confirmDelete = async () => {
 }
 
 @keyframes fireFlicker {
+
   0%,
   100% {
     transform: scale(1) rotate(-2deg);
@@ -2234,6 +2317,4 @@ const confirmDelete = async () => {
   color: #92400e;
   font-weight: 600;
 }
-
-
 </style>

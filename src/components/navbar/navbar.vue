@@ -1,18 +1,18 @@
 <template>
-  <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top">
-    <div class="container-fluid d-flex justify-content-between align-items-center">
+  <nav class="navbar navbar-expand-md navbar-light bg-white border-bottom fixed-top shadow-sm">
+    <div class="container-fluid">
       <!-- Brand -->
       <RouterLink
         to="/dashboard"
-        class="navbar-brand fw-bold text-primary p-2 text-decoration-none"
+        class="navbar-brand fw-bold text-primary text-decoration-none d-flex align-items-center"
         exact-active-class="active"
         @click="closeNavbar"
       >
-        <img src="/bigbackicon.jpg" alt="Logo" class="me-2" style="height: 50px; border-radius: 50%;" />
+        <img src="/bigbackicon.jpg" alt="Logo" class="logo-img me-2 rounded-circle" />
         BigBacks
       </RouterLink>
 
-      <!-- Mobile hamburger button (auto-hidden on lg+) -->
+      <!-- Mobile hamburger button (auto-hidden on md+) -->
       <button
         class="navbar-toggler"
         type="button"
@@ -27,110 +27,112 @@
       </button>
 
       <!-- Collapsible navbar content -->
-      <div class="collapse navbar-collapse flex-grow-1" id="navbarNav" :class="{ show: navbarOpen }">
-        <ul class="navbar-nav mx-auto">
-          <li class="nav-item">
-            <RouterLink
-              to="/dashboard"
-              class="nav-link"
-              exact-active-class="active"
-              @click="closeNavbar"
-            >
-              <i class="bi bi-house-door me-1"></i>Dashboard
-            </RouterLink>
-          </li>
-          <li class="nav-item">
-            <RouterLink
-              to="/recipes"
-              class="nav-link"
-              exact-active-class="active"
-              @click="closeNavbar"
-            >
-              <i class="bi bi-egg-fried me-1"></i>Recipes
-            </RouterLink>
-          </li>
-          <li class="nav-item">
-            <RouterLink
-              to="/chatbot"
-              class="nav-link"
-              exact-active-class="active"
-              @click="closeNavbar"
-            >
-              <i class="bi bi-robot me-1"></i>AI Chat
-            </RouterLink>
-          </li>
-          <li class="nav-item">
-            <RouterLink
-              to="/community"
-              class="nav-link"
-              exact-active-class="active"
-              @click="closeNavbar"
-            >
-              <i class="bi bi-people me-1"></i>Community
-            </RouterLink>
-          </li>
-          <li class="nav-item">
-            <RouterLink
-              to="/leaderboard"
-              class="nav-link"
-              exact-active-class="active"
-              @click="closeNavbar"
-            >
-              <i class="bi bi-trophy me-1"></i>Leaderboard
-            </RouterLink>
-          </li>
-          <li class="nav-item">
-            <RouterLink
-              to="/village"
-              class="nav-link"
-              exact-active-class="active"
-              @click="closeNavbar"
-            >
-              <i class="bi bi-trophy me-1"></i>Monkey Village
-            </RouterLink>
-          </li>
-        </ul>
+      <div class="collapse navbar-collapse" id="navbarNav" :class="{ show: navbarOpen }">
+        <div class="d-flex align-items-center w-100">
+          <ul class="navbar-nav d-flex flex-column flex-md-row justify-content-center align-items-center flex-grow-1">
+            <li class="nav-item">
+              <RouterLink
+                to="/dashboard"
+                class="nav-link"
+                exact-active-class="active"
+                @click="closeNavbar"
+              >
+                <i class="bi bi-house-door me-1"></i>Dashboard
+              </RouterLink>
+            </li>
+            <li class="nav-item">
+              <RouterLink
+                to="/recipes"
+                class="nav-link"
+                exact-active-class="active"
+                @click="closeNavbar"
+              >
+                <i class="bi bi-egg-fried me-1"></i>Recipes
+              </RouterLink>
+            </li>
+            <li class="nav-item">
+              <RouterLink
+                to="/chatbot"
+                class="nav-link"
+                exact-active-class="active"
+                @click="closeNavbar"
+              >
+                <i class="bi bi-robot me-1"></i>AI Chat
+              </RouterLink>
+            </li>
+            <li class="nav-item">
+              <RouterLink
+                to="/community"
+                class="nav-link"
+                exact-active-class="active"
+                @click="closeNavbar"
+              >
+                <i class="bi bi-people me-1"></i>Community
+              </RouterLink>
+            </li>
+            <!-- <li class="nav-item">
+              <RouterLink
+                to="/leaderboard"
+                class="nav-link"
+                exact-active-class="active"
+                @click="closeNavbar"
+              >
+                <i class="bi bi-trophy me-1"></i>Leaderboard
+              </RouterLink>
+            </li> -->
+            <li class="nav-item">
+              <RouterLink
+                to="/village"
+                class="nav-link"
+                exact-active-class="active"
+                @click="closeNavbar"
+              >
+                <i class="bi bi-trophy me-1"></i>Monkey Village
+              </RouterLink>
+            </li>
+          </ul>
 
-        <!-- User section -->
-        <ul class="navbar-nav ms-auto">
-          <li class="nav-item dropdown" v-if="userName">
-            <a
-              class="nav-link dropdown-toggle"
-              href="#"
-              role="button"
-              @click.prevent="toggleDropdown"
-              :class="{ show: dropdownOpen }"
-              aria-haspopup="true"
-              :aria-expanded="dropdownOpen.toString()"
-            >
-              <span class="initials-avatar">{{ userInitials }}</span>{{ userName }}
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end" :class="{ show: dropdownOpen }">
-              <li>
-                <RouterLink to="/profile" class="dropdown-item" @click="closeNavbar">
-                  <i class="bi bi-person me-2"></i>My Profile
-                </RouterLink>
-              </li>
-              <li>
-                <a class="dropdown-item text-danger" href="#" @click.prevent="logout">
-                  <i class="bi bi-box-arrow-right me-2"></i>Logout
-                </a>
-              </li>
-            </ul>
-          </li>
-          <li class="nav-item" v-else>
-            <RouterLink to="/login" class="nav-link" exact-active-class="active" @click="closeNavbar">
-              <i class="bi bi-person-plus me-1"></i>Login/Sign Up
-            </RouterLink>
-          </li>
-        </ul>
+          <!-- User section -->
+          <ul class="navbar-nav ms-auto flex-shrink-0">
+            <li class="nav-item dropdown" v-if="userName" ref="dropdownRef">
+              <a
+                class="nav-link dropdown-toggle"
+                href="#"
+                role="button"
+                @click.prevent="toggleDropdown($event)"
+                :class="{ show: dropdownOpen }"
+                aria-haspopup="true"
+                :aria-expanded="dropdownOpen.toString()"
+              >
+                <span class="initials-avatar">{{ userInitials }}</span>{{ userName }}
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end" :class="{ show: dropdownOpen }">
+                <li>
+                  <RouterLink to="/profile" class="dropdown-item" @click="closeNavbar">
+                    <i class="bi bi-person me-2"></i>My Profile
+                  </RouterLink>
+                </li>
+                <li>
+                  <a class="dropdown-item text-danger" href="#" @click.prevent="logout">
+                    <i class="bi bi-box-arrow-right me-2"></i>Logout
+                  </a>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item" v-else>
+              <RouterLink to="/login" class="nav-link" exact-active-class="active" @click="closeNavbar">
+                <i class="bi bi-person-plus me-1"></i>Login/Sign Up
+              </RouterLink>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   </nav>
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { getAuth, signOut } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
@@ -144,6 +146,17 @@ const router = useRouter()
 
 const dropdownOpen = ref(false)
 const navbarOpen = ref(false)
+
+const dropdownRef = ref(null)
+
+function handleOutsideClick(e) {
+  // if dropdown is not open, nothing to do
+  if (!dropdownOpen.value) return
+  // if click is inside the dropdown, ignore
+  const el = dropdownRef.value
+  if (el && el.contains && el.contains(e.target)) return
+  dropdownOpen.value = false
+}
 
 // Auth and user state
 const auth = getAuth()
@@ -174,11 +187,16 @@ authListener()
 
 onUnmounted(() => {
   if (unsubscribeAuth) unsubscribeAuth()
+  document.removeEventListener('click', handleOutsideClick)
 })
 
 // Close navbar and dropdown on route change
 watch($route, () => {
   closeNavbar()
+})
+
+onMounted(() => {
+  document.addEventListener('click', handleOutsideClick)
 })
 
 function toggleNavbar() {
@@ -188,7 +206,9 @@ function closeNavbar() {
   navbarOpen.value = false
   dropdownOpen.value = false
 }
-function toggleDropdown() {
+function toggleDropdown(evt) {
+  // prevent the document click handler from immediately closing the dropdown
+  if (evt && typeof evt.stopPropagation === 'function') evt.stopPropagation()
   dropdownOpen.value = !dropdownOpen.value
 }
 async function logout() {
@@ -216,47 +236,62 @@ const userInitials = computed(() => {
 </script>
 
 <style scoped>
-/* Navbar layout reset */
-.navbar {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
+/* Navbar height variable for body padding */
+:root {
+  --navbar-height: 56px;
 }
 
-/* Custom active link styling */
+/* Logo sizing */
+.logo-img {
+  height: 36px;
+  width: 36px;
+}
+
+/* Navbar brand responsive font */
+.navbar-brand {
+  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+}
+
+/* Mobile overlay positioning */
+@media (max-width: 767.98px) {
+  .navbar-collapse {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+  }
+}
+
+/* Nav link responsive font and spacing */
+.nav-link {
+  font-size: clamp(0.9rem, 1.8vw, 1.12rem);
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .nav-link {
+    font-size: clamp(0.82rem, 1.4vw, 0.92rem);
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+  }
+}
+
+@media (min-width: 992px) {
+  .nav-link {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* Active link styling (enhance Bootstrap) */
 .nav-link.active {
-  color: #0d6efd !important;
   background-color: #e7f1ff;
   border-radius: 0.375rem;
 }
 
-/* Dropdown styling */
-.dropdown-menu {
-  border: 1px solid #dee2e6;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  right: 0;
-  left: auto;
-  min-width: 200px;
-  transform: translateX(0);
-}
-
-.dropdown-menu.dropdown-menu-end {
-  right: 0 !important;
-  left: auto !important;
-}
-
-/* Ensure navbar stays on top */
-.sticky-top {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.navbar-brand {
-  font-size: 1.35rem;
-}
-
-.nav-link {
-  font-size: 1.12rem;
-}
-
+/* User avatar */
 .initials-avatar {
   display: inline-flex;
   align-items: center;
@@ -265,12 +300,12 @@ const userInitials = computed(() => {
   color: #fff;
   font-weight: 700;
   border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  font-size: 1.1rem;
+  width: 32px;
+  height: 32px;
+  font-size: clamp(0.9rem, 1.6vw, 1.05rem);
   margin-right: 0.5rem;
   vertical-align: middle;
-  line-height: 1; /* Improved vertical alignment */
+  line-height: 1;
   user-select: none;
 }
 </style>

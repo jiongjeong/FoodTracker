@@ -1,26 +1,30 @@
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { auth } from '../firebase.js'
 import { onAuthStateChanged } from 'firebase/auth'
 import { useRecipesStore } from '../stores/recipes.js'
 import { db } from '../firebase.js'
-import { collection, getDocs, query, where } from 'firebase/firestore'
+import { collection, getDocs, query } from 'firebase/firestore'
+import HeroSection from '../components/recipes/HeroSection.vue'
+import RecipeGrid from '../components/recipes/RecipeGrid.vue'
+import EmptyState from '../components/recipes/EmptyState.vue'
+import RecipeModal from '../components/recipes/RecipeModal.vue'
 
 
 // Configuration constants
 const API_BASE_URL = 'https://www.themealdb.com/api/json/v1/1'
 const MAX_INGREDIENTS = 40
-const REQUEST_TIMEOUT = 10000 // 10 seconds
+const REQUEST_TIMEOUT = 10000
 const MAX_SUGGESTED_RECIPES = 10
 const EXPIRING_SOON_DAYS = 7
 
-
 // Reactive state
-const activeTab = ref('search')
+const activeTab = ref('suggested')
 const searchQuery = ref('')
+const searchFilter = ref('')
 const route = useRoute()
 const isLoading = ref(false)
 const searchResults = ref([])
@@ -38,21 +42,7 @@ const toggleBookmark = recipesStore.toggleBookmark
 
 // Computed properties
 const userId = computed(() => user.value?.uid || null)
-
 const bookmarkedRecipeObjects = ref([])
-
-const displayedRecipes = computed(() => {
-  switch (activeTab.value) {
-    case 'search':
-      return searchResults.value
-    case 'suggested':
-      return suggestedRecipes.value
-    case 'bookmarked':
-      return bookmarkedRecipeObjects.value
-    default:
-      return []
-  }
-})
 
 // Helper function to calculate days left until expiration
 const getDaysLeft = (food) => {
@@ -82,8 +72,11 @@ const fetchBookmarkedRecipes = async () => {
   const recipes = []
   for (const id of ids) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/lookup.php`, { params: { i: id }, timeout: REQUEST_TIMEOUT })
-      if (response.data.meals && response.data.meals[0]) {
+      const response = await axios.get(`${API_BASE_URL}/lookup.php`, { 
+        params: { i: id }, 
+        timeout: REQUEST_TIMEOUT 
+      })
+      if (response.data.meals?.[0]) {
         const meal = response.data.meals[0]
         recipes.push({
           id: meal.idMeal,
@@ -98,7 +91,7 @@ const fetchBookmarkedRecipes = async () => {
         })
       }
     } catch (e) {
-      // skip failed fetches
+      console.error('Error fetching bookmarked recipe:', e)
     }
   }
   bookmarkedRecipeObjects.value = recipes
@@ -180,34 +173,25 @@ const getSuggestedRecipes = async () => {
   errorMessage.value = ''
 
   try {
-    // Fetch food items from Firestore
     const q = query(collection(db, 'user', userId.value, 'foodItems'))
     const querySnapshot = await getDocs(q)
-    const foodItems = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }))
+    const foodItems = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
 
-    // Get expiring soon food items (similar to dashboard logic)
     const expiringFoods = foodItems.filter(food => {
       const daysLeft = getDaysLeft(food)
       return daysLeft >= 0 && daysLeft <= EXPIRING_SOON_DAYS
     })
-
-    console.log('Expiring food items:', expiringFoods)
 
     if (expiringFoods.length === 0) {
       suggestedRecipes.value = []
       return
     }
 
-    // Get unique ingredients from expiring foods (use last word as main ingredient)
     const ingredients = [...new Set(expiringFoods.map(food => {
-      const words = food.name.toLowerCase().split(' ');
-      return words[words.length - 1]; // take last word, e.g., "fresh tiger prawn" -> "prawn"
+      const words = food.name.toLowerCase().split(' ')
+      return words[words.length - 1]
     }))]
 
-    // Search recipes for each ingredient
     const recipePromises = ingredients.map(async (ingredient) => {
       try {
         const response = await axios.get(`${API_BASE_URL}/filter.php`, {
@@ -224,25 +208,22 @@ const getSuggestedRecipes = async () => {
     const recipeResults = await Promise.all(recipePromises)
     const allMeals = recipeResults.flat()
 
-    // Remove duplicates and limit
     const uniqueMeals = allMeals.filter((meal, index, self) =>
       index === self.findIndex(m => m.idMeal === meal.idMeal)
     ).slice(0, MAX_SUGGESTED_RECIPES)
 
-    // Fetch full details for each meal
     const fullRecipePromises = uniqueMeals.map(async (meal) => {
       try {
         const response = await axios.get(`${API_BASE_URL}/lookup.php`, {
           params: { i: meal.idMeal },
           timeout: REQUEST_TIMEOUT
         })
-        if (response.data.meals && response.data.meals[0]) {
+        if (response.data.meals?.[0]) {
           const fullMeal = response.data.meals[0]
-          // Find which foods suggested this recipe (by matching ingredient)
           const mealIngredients = getIngredientsList(fullMeal).map(ing => ing.toLowerCase())
           const suggestingFoods = expiringFoods.filter(food => {
-            const words = food.name.toLowerCase().split(' ');
-            const ingredient = words[words.length - 1];
+            const words = food.name.toLowerCase().split(' ')
+            const ingredient = words[words.length - 1]
             return mealIngredients.some(ing => ing.includes(ingredient))
           }).map(food => food.name)
 
@@ -256,7 +237,7 @@ const getSuggestedRecipes = async () => {
             ingredients: getIngredientsList(fullMeal),
             video: fullMeal.strYoutube,
             source: fullMeal.strSource,
-            suggestedBy: [...new Set(suggestingFoods)] // unique food names
+            suggestedBy: [...new Set(suggestingFoods)]
           }
         }
       } catch (error) {
@@ -267,7 +248,6 @@ const getSuggestedRecipes = async () => {
 
     const fullRecipes = (await Promise.all(fullRecipePromises)).filter(recipe => recipe !== null)
     suggestedRecipes.value = fullRecipes
-
   } catch (error) {
     console.error('Error getting suggested recipes:', error)
     errorMessage.value = handleApiError(error)
@@ -291,16 +271,14 @@ const getIngredientsList = (meal) => {
 }
 
 // User pantry foods (simplified keywords) - loaded from Firestore
-const userFoods = ref([]) // full food objects
+const userFoods = ref([])
 const userFoodKeywords = computed(() => {
-  // return a set of keywords derived from user food names (last word)
   const set = new Set()
   userFoods.value.forEach(f => {
-    if (!f || !f.name) return
+    if (!f?.name) return
     const words = f.name.toLowerCase().split(/\s+/)
     const kw = words[words.length - 1].replace(/[^a-z]/g, '')
     if (kw) set.add(kw)
-    // also add full name for substring matches
     set.add(f.name.toLowerCase())
   })
   return set
@@ -323,26 +301,55 @@ const loadUserFoods = async () => {
 
 // Count how many ingredients from a recipe the user has in their pantry
 const countUserIngredients = (recipe) => {
-  if (!recipe || !recipe.ingredients || !userFoodKeywords.value) return 0
+  if (!recipe?.ingredients || !userFoodKeywords.value) return 0
   let count = 0
   recipe.ingredients.forEach(ing => {
     if (!ing) return
-    // get last word of ingredient (e.g., "fresh tiger prawn" or "2 tbs olive oil" -> "oil" or "prawn")
     const words = ing.toLowerCase().split(/\s+/)
     const last = words[words.length - 1].replace(/[^a-z]/g, '')
-    // match against keywords: exact or substring
-    if (last && (userFoodKeywords.value.has(last) || [...userFoodKeywords.value].some(k => k.includes(last) || last.includes(k)))) {
+    if (last && (userFoodKeywords.value.has(last) || 
+        [...userFoodKeywords.value].some(k => k.includes(last) || last.includes(k)))) {
       count++
-    } else {
-      // also check if any pantry full-name contains the ingredient word
-      if ([...userFoodKeywords.value].some(k => k.includes(last))) count++
     }
   })
   return count
 }
 
+// Format instructions with step numbering (handles recipes that already have numbers)
+const formatInstructions = (instructions) => {
+  if (!instructions) return []
+  
+  const hasNumbers = /^\s*(\d+[\.\):]|\bSTEP\s+\d+)/im.test(instructions)
+  
+  if (hasNumbers) {
+    const steps = instructions
+      .split(/(?=\s*(?:\d+[\.\):]|\bSTEP\s+\d+))/i)
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+    
+    return steps.map(step => 
+      step.replace(/^\s*(\d+[\.\):]|\bSTEP\s+\d+[:\.\)]?)\s*/i, '')
+    )
+  } else {
+    const steps = instructions
+      .split(/[\r\n]+/)
+      .flatMap(line => {
+        if (line.length > 150) {
+          return line.split(/\.\s+/).filter(s => s.trim().length > 10)
+        }
+        return [line]
+      })
+      .map(s => s.trim())
+      .filter(s => s.length > 10)
+    
+    return steps
+  }
+}
+
 // Handle search
 const handleSearch = async () => {
+  activeTab.value = 'search'
+  searchFilter.value = ''
   await searchRecipes(searchQuery.value)
 }
 
@@ -352,18 +359,17 @@ const viewRecipe = (recipe) => {
   showRecipeModal.value = true
 }
 
+// Computed formatted instructions for modal
+const formattedInstructions = computed(() => 
+  selectedRecipe.value ? formatInstructions(selectedRecipe.value.instructions) : []
+)
 
-// Remove local toggleBookmark logic; use store's toggleBookmark
-
-
-// Remove local loadBookmarkedRecipes; use store's loadBookmarks
-
-
-// Initialize suggested recipes and load bookmarks
-const initializeRecipes = async () => {
-  await recipesStore.loadBookmarks()
-  await loadUserFoods()
-  await getSuggestedRecipes()
+// Handle tab change
+const handleTabChange = (tab) => {
+  activeTab.value = tab
+  if (tab === 'search') {
+    searchQuery.value = ''
+  }
 }
 
 // Watch for route query changes to auto-search
@@ -378,12 +384,6 @@ watch(
   },
   { immediate: true }
 )
-
-
-onMounted(async () => {
-
-})
-
 
 onAuthStateChanged(auth, async (u) => {
   user.value = u
@@ -504,225 +504,105 @@ onAuthStateChanged(auth, async (u) => {
       </div>
     </div>
 
-    <!-- Error Message -->
-    <div v-if="errorMessage" class="alert alert-danger d-flex align-items-center mb-4 rounded-4">
-      <i class="bi bi-exclamation-triangle-fill me-2"></i>
-      <span>{{ errorMessage }}</span>
-      <button type="button" class="btn-close ms-auto" @click="errorMessage = ''"></button>
-    </div>
-
-    <!-- Loading State -->
-    <div v-if="isLoading" class="text-center py-5">
-      <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-      <p class="text-muted mt-3 fw-semibold">Finding delicious recipes...</p>
-    </div>
-
-    <!-- Content based on active tab -->
-    <div v-else>
-      <!-- Search Results Tab -->
-      <div v-if="activeTab === 'search'">
-        <div v-if="searchResults.length === 0" class="text-center py-5">
-          <i class="bi bi-search display-1 text-muted opacity-25"></i>
-          <h5 class="mt-3">Search for recipes</h5>
-          <p class="text-muted">Enter a recipe name, ingredient, or cuisine type to get started</p>
-        </div>
-        <div v-else>
-          <div class="d-flex align-items-center mb-3">
-            <h4 class="fw-bold mb-0">Search Results</h4>
-            <span class="badge bg-primary mx-2">{{ searchResults.length }} recipes</span>
-          </div>
-          <div class="row g-3">
-            <div v-for="recipe in searchResults" :key="recipe.id" class="col-12 col-md-6 col-lg-4">
-              <div class="recipe-card position-relative shadow-sm" style="border-radius: 20px; overflow: hidden; background: white; cursor: pointer;" @click="viewRecipe(recipe)">
-                <div class="recipe-image-container position-relative" style="height: 250px;">
-                  <img :src="recipe.image" :alt="recipe.name" class="w-100 h-100" style="object-fit: cover;" />
-
-                  <button
-                    @click.stop="toggleBookmark(recipe)"
-                    class="position-absolute top-0 end-0 m-3 btn btn-light rounded-circle p-0"
-                    style="width: 40px; height: 40px;"
-                    :class="{ 'btn-warning': isRecipeBookmarked(recipe.id) }"
-                  >
-                    <i :class="isRecipeBookmarked(recipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'"></i>
-                  </button>
-                </div>
-
-                <div class="recipe-info p-3">
-                  <h6 class="fw-bold mb-2 text-truncate">{{ recipe.name }}</h6>
-                  <p class="text-muted small mb-2">{{ recipe.category }} • {{ recipe.area }}</p>
-                  <div class="mb-0">
-                    <small class="text-info">
-                      <i class="bi bi-check-circle me-1"></i>
-                      You have {{ countUserIngredients(recipe) }} of {{ recipe.ingredients.length }} ingredients
-                    </small>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <!-- Error Message -->
+      <div v-if="errorMessage" class="alert alert-danger d-flex align-items-center mb-4 rounded-4">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <span>{{ errorMessage }}</span>
+        <button type="button" class="btn-close ms-auto" @click="errorMessage = ''"></button>
       </div>
 
-      <!-- Suggested Recipes Tab -->
-      <div v-else-if="activeTab === 'suggested'">
-        <div v-if="suggestedRecipes.length === 0" class="text-center py-5">
-          <i class="bi bi-lightbulb display-1 text-muted opacity-25"></i>
-          <h5 class="mt-3">No suggested recipes</h5>
-          <p class="text-muted">No food items expiring soon, or no recipes found for your ingredients</p>
+      <!-- Loading State -->
+      <div v-if="isLoading" class="text-center py-5">
+        <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;">
+          <span class="visually-hidden">Loading...</span>
         </div>
-        <div v-else>
-          <div class="d-flex align-items-center mb-3">
-            <h4 class="fw-bold mb-0">Recommended For You</h4>
-            <span class="badge bg-success mx-2">{{ suggestedRecipes.length }} recipes</span>
-          </div>
-          <div class="row g-3">
-            <div v-for="recipe in suggestedRecipes" :key="recipe.id" class="col-12 col-md-6 col-lg-4">
-              <div class="recipe-card position-relative shadow-sm" style="border-radius: 20px; overflow: hidden; background: white; cursor: pointer;" @click="viewRecipe(recipe)">
-                <div class="recipe-image-container position-relative" style="height: 250px;">
-                  <img :src="recipe.image" :alt="recipe.name" class="w-100 h-100" style="object-fit: cover;" />
-
-                  <div class="position-absolute top-0 start-0 m-3 px-3 py-2 rounded-pill" style="background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px);">
-                    <span class="text-white small fw-semibold">
-                      <i class="bi bi-clock me-1"></i>30 mins
-                    </span>
-                  </div>
-
-                  <button
-                    @click.stop="toggleBookmark(recipe)"
-                    class="position-absolute top-0 end-0 m-3 btn btn-light rounded-circle p-0"
-                    style="width: 40px; height: 40px; backdrop-filter: blur(10px);"
-                    :class="{ 'btn-warning': isRecipeBookmarked(recipe.id) }"
-                  >
-                    <i :class="isRecipeBookmarked(recipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'"></i>
-                  </button>
-                </div>
-
-                <div class="recipe-info p-3">
-                  <h6 class="fw-bold mb-2 text-truncate">{{ recipe.name }}</h6>
-                  <p class="text-muted small mb-2 text-truncate">{{ recipe.category }} • {{ recipe.area }}</p>
-                  <div v-if="recipe.suggestedBy && recipe.suggestedBy.length" class="mb-0">
-                    <small class="text-danger">
-                      <i class="bi bi-lightbulb-fill me-1"></i>
-                      Expiring: {{ recipe.suggestedBy.slice(0, 2).join(', ') }}
-                    </small>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <p class="text-muted mt-3 fw-semibold">Finding delicious recipes...</p>
       </div>
 
-      <!-- Bookmarked Recipes Tab -->
-      <div v-else-if="activeTab === 'bookmarked'">
-        <div v-if="bookmarkedRecipeObjects.length === 0" class="text-center py-5">
-          <i class="bi bi-bookmark-heart display-1 text-muted opacity-25"></i>
-          <h5 class="mt-3">No bookmarked recipes</h5>
-          <p class="text-muted">Bookmark recipes you like to save them for later</p>
+      <!-- Content based on active tab -->
+      <div v-else>
+        <!-- Search Results Tab -->
+        <div v-if="activeTab === 'search'">
+          <EmptyState
+            v-if="searchResults.length === 0 && !searchQuery.trim()"
+            icon="bi-search"
+            title="Search for recipes"
+            message="Enter a recipe name, ingredient, or cuisine type to get started"
+          />
+          <EmptyState
+            v-else-if="searchResults.length === 0 && searchQuery.trim()"
+            icon="bi-emoji-frown"
+            title="No results found"
+            message="Try searching with different keywords or ingredients"
+          />
+          <RecipeGrid
+            v-else
+            v-model:search-filter="searchFilter"
+            :recipes="searchResults"
+            title="Search Results"
+            badge-variant="primary"
+            :show-filter="true"
+            :is-bookmarked-fn="isRecipeBookmarked"
+            :count-ingredients-fn="countUserIngredients"
+            @view-recipe="viewRecipe"
+            @toggle-bookmark="toggleBookmark"
+          />
         </div>
-        <div v-else>
-          <div class="d-flex align-items-center mb-3">
-            <h4 class="fw-bold mb-0">Your Bookmarks</h4>
-            <span class="badge bg-warning mx-2">{{ bookmarkedRecipeObjects.length }} recipes</span>
-          </div>
-          <div class="row g-3">
-            <div v-for="recipe in bookmarkedRecipeObjects" :key="recipe.id" class="col-12 col-md-6 col-lg-4">
-              <div class="recipe-card position-relative shadow-sm" style="border-radius: 20px; overflow: hidden; background: white; cursor: pointer;" @click="viewRecipe(recipe)">
-                <div class="recipe-image-container position-relative" style="height: 250px;">
-                  <img :src="recipe.image" :alt="recipe.name" class="w-100 h-100" style="object-fit: cover;" />
 
-                  <button
-                    @click.stop="toggleBookmark(recipe)"
-                    class="position-absolute top-0 end-0 m-3 btn btn-warning rounded-circle p-0"
-                    style="width: 40px; height: 40px;"
-                  >
-                    <i class="bi bi-bookmark-heart-fill"></i>
-                  </button>
-                </div>
+        <!-- Suggested Recipes Tab -->
+        <div v-else-if="activeTab === 'suggested'">
+          <EmptyState
+            v-if="suggestedRecipes.length === 0"
+            icon="bi-lightbulb"
+            title="No suggested recipes"
+            message="No food items expiring soon, or no recipes found for your ingredients"
+          />
+          <RecipeGrid
+            v-else
+            :recipes="suggestedRecipes"
+            title="Recommended For You"
+            badge-variant="success"
+            :show-time-estimate="true"
+            :show-suggested-by="true"
+            :is-bookmarked-fn="isRecipeBookmarked"
+            :count-ingredients-fn="countUserIngredients"
+            @view-recipe="viewRecipe"
+            @toggle-bookmark="toggleBookmark"
+          />
+        </div>
 
-                <div class="recipe-info p-3">
-                  <h6 class="fw-bold mb-2 text-truncate">{{ recipe.name }}</h6>
-                  <p class="text-muted small mb-0 text-truncate">{{ recipe.category }} • {{ recipe.area }}</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        <!-- Bookmarked Recipes Tab -->
+        <div v-else-if="activeTab === 'bookmarked'">
+          <EmptyState
+            v-if="bookmarkedRecipeObjects.length === 0"
+            icon="bi-bookmark-heart"
+            title="No bookmarked recipes"
+            message="Bookmark recipes you like to save them for later"
+          />
+          <RecipeGrid
+            v-else
+            :recipes="bookmarkedRecipeObjects"
+            title="Your Bookmarks"
+            badge-variant="warning"
+            :is-bookmarked-fn="isRecipeBookmarked"
+            :count-ingredients-fn="countUserIngredients"
+            @view-recipe="viewRecipe"
+            @toggle-bookmark="toggleBookmark"
+          />
         </div>
       </div>
     </div>
+
+    <!-- Recipe Detail Modal -->
+    <RecipeModal
+      v-if="showRecipeModal && selectedRecipe"
+      :recipe="selectedRecipe"
+      :is-bookmarked="isRecipeBookmarked(selectedRecipe.id)"
+      :formatted-instructions="formattedInstructions"
+      @close="showRecipeModal = false"
+      @toggle-bookmark="toggleBookmark"
+    />
   </div>
-
-  <!-- Recipe Detail Modal -->
-  <div v-if="showRecipeModal && selectedRecipe" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
-    <div class="modal-backdrop fade show" @click="showRecipeModal = false" style="z-index: 1050;"></div>
-    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style="z-index: 1060;">
-      <div class="modal-content rounded-4">
-        <div class="modal-body p-0">
-          <button type="button" class="btn-close position-absolute top-0 end-0 m-3" style="z-index: 10;" @click="showRecipeModal = false"></button>
-
-          <div class="row g-0">
-            <div class="col-md-5">
-              <div class="p-4">
-                <img :src="selectedRecipe.image" :alt="selectedRecipe.name" class="img-fluid rounded-3 mb-3 w-100" style="aspect-ratio: 1; object-fit: cover;" />
-
-                <div class="mb-3">
-                  <h6 class="fw-bold mb-2"><i class="bi bi-info-circle me-2"></i>Recipe Info</h6>
-                  <div class="d-flex gap-2 mb-2">
-                    <span class="badge bg-primary">{{ selectedRecipe.category }}</span>
-                    <span class="badge bg-success">{{ selectedRecipe.area }}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <h6 class="fw-bold mb-2"><i class="bi bi-list-ul me-2"></i>Ingredients</h6>
-                  <div style="max-height: 250px; overflow-y: auto;">
-                    <div v-for="ingredient in selectedRecipe.ingredients" :key="ingredient" class="d-flex align-items-center mb-2">
-                      <i class="bi bi-dot text-primary me-2"></i>
-                      <span class="small">{{ ingredient }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-md-7 d-flex flex-column">
-              <div class="p-4 flex-grow-1 d-flex flex-column">
-                <div class="mb-3">
-                  <h3 class="fw-bold">{{ selectedRecipe.name }}</h3>
-                  <p class="text-muted">Follow these step-by-step instructions</p>
-                </div>
-
-                <div class="flex-grow-1 mb-3" style="overflow-y: auto;">
-                  <h6 class="fw-bold mb-2"><i class="bi bi-clipboard-check me-2"></i>Instructions</h6>
-                  <p class="text-secondary" style="white-space: pre-line;">{{ selectedRecipe.instructions }}</p>
-                </div>
-
-                <div class="d-flex gap-2">
-                  <button
-                    @click="toggleBookmark(selectedRecipe)"
-                    class="btn btn-sm flex-fill"
-                    :class="isRecipeBookmarked(selectedRecipe.id) ? 'btn-warning' : 'btn-outline-warning'"
-                  >
-                    <i :class="isRecipeBookmarked(selectedRecipe.id) ? 'bi bi-bookmark-heart-fill' : 'bi bi-bookmark-heart'" class="me-1"></i>
-                    {{ isRecipeBookmarked(selectedRecipe.id) ? 'Saved' : 'Save' }}
-                  </button>
-                  <a v-if="selectedRecipe.video" :href="selectedRecipe.video" target="_blank" class="btn btn-outline-danger btn-sm flex-fill">
-                    <i class="bi bi-play-circle me-1"></i>Video
-                  </a>
-                  <a v-if="selectedRecipe.source" :href="selectedRecipe.source" target="_blank" class="btn btn-outline-primary btn-sm flex-fill">
-                    <i class="bi bi-link-45deg me-1"></i>Source
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 </template>
 <style scoped>
 @keyframes riseAndFloat {
