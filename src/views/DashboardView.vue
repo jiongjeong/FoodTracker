@@ -701,6 +701,81 @@ const toggleSortDirection = () => {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
 }
 
+// Convert string to Title Case (e.g., "baby spinach" -> "Baby Spinach")
+const titleCase = (str) => {
+  if (!str || typeof str !== 'string') return ''
+  return str
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+const applyTitleCase = () => {
+  addForm.name = titleCase(addForm.name || '')
+}
+
+// Live input handler for addForm.name that title-cases as user types.
+const onAddNameInput = (event) => {
+  // Preserve cursor position (best-effort)
+  const el = event.target
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  const raw = el.value || ''
+  // Live title-casing that preserves all original spaces (including trailing)
+  // Use regex to transform only non-space runs so user can type spaces freely.
+  const transformed = raw.replace(/\S+/g, (w) => {
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+  })
+
+  // Update model when needed. If nothing changed, still keep model in sync.
+  if (transformed !== raw) {
+    addForm.name = transformed
+    // restore cursor (best-effort)
+    setTimeout(() => {
+      try {
+        el.selectionStart = start
+        el.selectionEnd = end
+      } catch (e) {
+        // ignore
+      }
+    }, 0)
+  } else {
+    addForm.name = raw
+  }
+}
+
+const applyTitleCaseEdit = () => {
+  editForm.name = titleCase(editForm.name || '')
+}
+
+// Live input handler for editForm.name that mirrors the addForm behavior
+const onEditNameInput = (event) => {
+  const el = event.target
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  const raw = el.value || ''
+
+  const transformed = raw.replace(/\S+/g, (w) => {
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+  })
+
+  if (transformed !== raw) {
+    editForm.name = transformed
+    setTimeout(() => {
+      try {
+        el.selectionStart = start
+        el.selectionEnd = end
+      } catch (e) {
+        // ignore
+      }
+    }, 0)
+  } else {
+    editForm.name = raw
+  }
+}
+
 const getSortButtonIcon = computed(() => {
   return sortDirection.value === 'asc' ? 'bi bi-sort-up' : 'bi bi-sort-down'
 })
@@ -712,6 +787,11 @@ const getSortButtonTitle = computed(() => {
 
 // Modal functions
 const openUse = (food) => {
+  // Prevent using expired food
+  if (getDaysLeft(food) < 0) {
+    showToastFor(`${food.name} is expired and cannot be used.`)
+    return
+  }
   useForm.id = food.id
   useForm.name = food.name
   useForm.quantity = 1
@@ -838,11 +918,15 @@ const saveAdd = async () => {
     return
   }
 
+  // Ensure the name is title-cased before saving
+  applyTitleCase()
+  const nameValue = addForm.name || ''
+
   const colRef = collection(db, 'user', userId.value, 'foodItems')
   const actRef = collection(db, 'user', userId.value, 'activities')
 
   const foodPayload = {
-    name: addForm.name || '',
+    name: nameValue,
     category: addForm.category || '',
     price: Number(addForm.price) || 0,
     quantity: Number(addForm.quantity) || 0,
@@ -862,7 +946,7 @@ const saveAdd = async () => {
     const activityPayload = {
       activityType: 'addFood',
       createdAt: new Date().toISOString(),
-      foodName: addForm.name || '',
+      foodName: nameValue,
       category: addForm.category || '',
       price: String(addForm.price || ''),
       quantity: String(addForm.quantity || ''),
@@ -889,6 +973,11 @@ const saveAdd = async () => {
 }
 
 const openEdit = (food) => {
+  // Prevent editing expired food
+  if (getDaysLeft(food) < 0) {
+    showToastFor(`${food.name} is expired and cannot be edited.`)
+    return
+  }
   editFormOriginal.value = JSON.parse(JSON.stringify(food))
   editForm.id = food.id || null
   editForm.name = food.name ?? ''
@@ -1471,12 +1560,17 @@ const confirmDelete = async () => {
                     <i class="bi bi-book"></i> Recipes
                   </button>
                   <div class="food-actions d-flex gap-2">
-                    <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
-                      Edit</button>
-                    <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i>
-                      Consume</button>
-                    <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
-                        class="bi bi-trash"></i></button>
+                    <!-- If expired, only show delete. Otherwise allow edit and consume. -->
+                    <template v-if="getDaysLeft(food) < 0">
+                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i class="bi bi-trash"></i></button>
+                    </template>
+                    <template v-else>
+                      <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i class="bi bi-pencil"></i>
+                        Edit</button>
+                      <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i>
+                        Consume</button>
+                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i class="bi bi-trash"></i></button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -1605,7 +1699,7 @@ const confirmDelete = async () => {
         <h3 class="h5 mb-3">Edit Food Item</h3>
         <div class="mb-2">
           <label class="form-label">Name</label>
-          <input v-model="editForm.name" class="form-control" />
+          <input v-model="editForm.name" @input="onEditNameInput" @blur="applyTitleCaseEdit" class="form-control" />
         </div>
         <div class="mb-2">
           <label class="form-label">Category</label>
@@ -1675,8 +1769,8 @@ const confirmDelete = async () => {
     </div>
 
     <!-- Floating Add Button -->
-    <button class="fab-add" @click="openAdd" title="Add Food">
-      <i class="bi bi-plus-lg"></i>
+    <button class="fab-add d-flex align-items-center justify-content-center" @click="openAdd" title="Add Food">
+      <i class="bi bi-plus-lg d-flex align-items-center justify-content-center fs-3"></i>
       <span class="fab-text">Add Food</span>
     </button>
 
@@ -1686,7 +1780,7 @@ const confirmDelete = async () => {
         <h3 class="h5 mb-3">Add Food Item</h3>
         <div class="mb-2">
           <label class="form-label">Name</label>
-          <input v-model="addForm.name" class="form-control" />
+          <input v-model="addForm.name" @input="onAddNameInput" @blur="applyTitleCase" class="form-control" />
         </div>
         <div class="mb-2">
           <label class="form-label">Category</label>
@@ -1972,11 +2066,6 @@ const confirmDelete = async () => {
   padding: 0;
 }
 
-.sort-direction-btn i {
-  font-size: 16px;
-  line-height: 1;
-}
-
 /* Modal styles */
 .modal-backdrop {
   position: fixed;
@@ -1998,32 +2087,37 @@ const confirmDelete = async () => {
 }
 
 /* Floating Add button */
+
 .fab-add {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  min-width: 56px;
+  width: 56px;
   height: 56px;
-  border-radius: 28px;
+  border-radius: 50%;
   background: linear-gradient(180deg, #10b981, #059669);
   color: #fff;
   border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 16px;
-  font-size: 20px;
   box-shadow: 0 6px 18px rgba(5, 150, 105, 0.25);
   cursor: pointer;
   z-index: 2500;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   white-space: nowrap;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+.fab-add:hover {
+  width: 140px;
+  border-radius: 28px;
+  padding-right: 20px;
+}
+
+
 .fab-add i {
-  flex-shrink: 0;
   transition: transform 0.3s ease;
 }
 
@@ -2033,37 +2127,18 @@ const confirmDelete = async () => {
   max-width: 0;
   opacity: 0;
   overflow: hidden;
+  display: inline-block;
+  white-space: nowrap;
+  transform: translateX(-16px);
   transition:
-    max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.3s ease;
+    max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.25s ease,
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-.fab-add:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(5, 150, 105, 0.35);
-  padding-right: 20px;
-}
-
 .fab-add:hover .fab-text {
   max-width: 100px;
   opacity: 1;
-}
-
-.fab-add:hover i {
-  transform: rotate(90deg);
-}
-
-.fab-add:active {
-  transform: translateY(0);
-  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
-}
-
-.modal-card h5 {
-  margin-bottom: 8px;
-}
-
-.modal-card p {
-  margin-bottom: 12px;
+  transform: translateX(0);
 }
 
 /* Delete modal — white interior with pulsing red glow */

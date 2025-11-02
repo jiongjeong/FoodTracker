@@ -6,7 +6,9 @@
     </div>
     <template v-else>
       <navbar v-if="showNavbar" />
-      <router-view />
+      <div class="main-content">
+        <router-view />
+      </div>
     </template>
 
     <!-- Custom Alert Box -->
@@ -65,6 +67,10 @@ onMounted(() => {
 <style>
 #app {
   min-height: 100vh;
+}
+
+.main-content {
+  padding-top: 56px;
 }
 
 .auth-loading {
