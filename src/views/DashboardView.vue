@@ -309,6 +309,12 @@ watchEffect(async () => {
       )
       const snapshot = await getDocs(q)
       if (snapshot.empty) {
+        // Calculate points BEFORE creating activity
+        const { newScore, pointsEarned } = await updateFoodScore('expFood', food.price, uid, food.quantity);
+        if (newScore !== null) {
+          userFoodScore.value = newScore;
+        }
+
         const payload = {
           activityType: 'expFood',
           createdAt: new Date().toISOString(),
@@ -318,26 +324,16 @@ watchEffect(async () => {
           quantity: String(food.quantity || ''),
           unit: String(food.unit || ''),
           note: 'expired',
+          pointsEarned: pointsEarned // ← ADD THIS LINE
         }
         const docRef = await addDoc(actRef, payload)
         activities.value.unshift({
           id: docRef.id,
           ...payload,
         })
-        // Update score for fully consumed food
-        const { newScore, pointsEarned } = await updateFoodScore('conFood', food.price, uid, food.quantity);
-        if (newScore !== null) {
-          userFoodScore.value = newScore;
-          // Update the activity with points earned
-          const lastActivity = activities.value[0];
-          if (lastActivity && lastActivity.id === docRef2.id) {
-            lastActivity.pointsEarned = pointsEarned;
-          }
-        }
       }
     }
   }
-
 })
 
 // Utility functions
@@ -742,7 +738,6 @@ const saveUse = async () => {
     if (foodIndex === -1) return
 
     const food = foodItems.value[foodIndex]
-
     const usedQty = Math.min(useForm.quantity, food.quantity)
     const newQty = food.quantity - usedQty
 
@@ -753,14 +748,22 @@ const saveUse = async () => {
     const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id)
     const actRef = collection(db, 'user', uid, 'activities')
 
+    // Calculate points BEFORE creating activity
+    const { newScore, pointsEarned } = await updateFoodScore('conFood', usedValue, uid, usedQty);
+    if (newScore !== null) {
+      userFoodScore.value = newScore;
+    }
+
+    // ADD pointsEarned to the activity payload
     const activityPayload = {
       activityType: 'conFood',
       createdAt: new Date().toISOString(),
       foodName: food.name,
       category: food.category || '',
-      price: String(pricePerUnit), // Keep per-unit price in activity log
+      price: String(pricePerUnit),
       quantity: String(usedQty),
       unit: food.unit || '',
+      pointsEarned: pointsEarned // ← ADD THIS LINE
     }
     const docRef = await addDoc(actRef, activityPayload)
     activities.value.unshift({
@@ -768,20 +771,12 @@ const saveUse = async () => {
       ...activityPayload,
     })
 
-    // Always update score based on value consumed
-    const { newScore, pointsEarned } = await updateFoodScore('conFood', usedValue, uid, usedQty);
-    if (newScore !== null) {
-      userFoodScore.value = newScore;
-      // Update the activity with points earned
-      const lastActivity = activities.value[0];
-      if (lastActivity && lastActivity.id === docRef.id) {
-        lastActivity.pointsEarned = pointsEarned;
-      }
-    }
-
     if (newQty <= 0) {
       await deleteDoc(refDoc)
       foodItems.value.splice(foodIndex, 1)
+
+      // Calculate points for fully consumed
+      const { pointsEarned: fullPoints } = await updateFoodScore('conFood', 0, uid, 0);
 
       const fullConsumedPayload = {
         activityType: 'conFood',
@@ -792,6 +787,7 @@ const saveUse = async () => {
         quantity: String(usedQty),
         unit: food.unit || '',
         note: 'fully consumed',
+        pointsEarned: fullPoints // ← ADD THIS LINE
       }
       const docRef2 = await addDoc(actRef, fullConsumedPayload)
       activities.value.unshift({
@@ -801,7 +797,6 @@ const saveUse = async () => {
 
       showToastFor(`${food.name} fully consumed and removed`)
     } else {
-      // Just update quantity, price per unit stays the same
       await updateDoc(refDoc, { quantity: newQty })
       foodItems.value[foodIndex].quantity = newQty
       await success(`Consumed ${usedQty} ${food.unit} of ${food.name}`)
