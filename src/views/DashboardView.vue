@@ -311,9 +311,7 @@ watchEffect(async () => {
       )
       const snapshot = await getDocs(q)
       if (snapshot.empty) {
-        // Calculate points BEFORE creating activity
-        const foodPrice = food.price || 0
-        const foodQty = food.quantity || 1
+
         const { newScore, pointsEarned } = await updateFoodScore('expFood', food.price, uid, food.quantity);
         if (newScore !== null) {
           userFoodScore.value = newScore;
@@ -678,33 +676,12 @@ const analytics = computed(() => {
   const reductionPercentage =
     totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
 
-  // Calculate inventory value excluding pending donations
-  // For each food item, calculate its current value based on remaining quantity
+  // Calculate inventory value
+  // Since food item prices are already updated when sharing (remaining price after deduction),
+  // we can simply sum up the current prices
   const inventoryValue = inventoryActivities.reduce((sum, item) => {
-    const originalPrice = Number(item.price) || 0
-    const currentQty = Number(item.quantity) || 0
-
-    // Find all pending donations for this specific food item
-    const itemPendingDonations = pendingDonations.filter(
-      (activity) => activity.foodId === item.id
-    )
-
-    // Calculate total quantity that's pending donation
-    const pendingQty = itemPendingDonations.reduce((total, activity) => {
-      return total + (Number(activity.quantity) || 0)
-    }, 0)
-
-    // Total quantity (current + pending) to calculate price per unit
-    const totalQty = currentQty + pendingQty
-
-    // Calculate the value of only the remaining quantity
-    let itemValue = originalPrice
-    if (totalQty > 0) {
-      const pricePerUnit = originalPrice / totalQty
-      itemValue = pricePerUnit * currentQty
-    }
-
-    return sum + itemValue
+    const currentPrice = Number(item.price) || 0
+    return sum + currentPrice
   }, 0)
 
   const adjustedInventoryValue = Math.max(0, inventoryValue)
@@ -1398,19 +1375,19 @@ const confirmDelete = async () => {
     <i class="bi bi-pie-chart me-2"></i>
     Waste by Category
   </h5>
-  
+
   <!-- Chart Container with Total in Center -->
   <div class="position-relative mx-auto mb-4" style="width: 240px; height: 300px;" v-if="chartDataStyled.datasets[0].data.length">
     <Pie :data="chartDataStyled" :options="wasteRingOpts" :plugins="[centerTextPlugin]" />
-    
+
     <!-- Dynamic Percentage Labels Outside Ring -->
-    <div v-for="(item, i) in allLegendItems" :key="i" 
+    <div v-for="(item, i) in allLegendItems" :key="i"
      class="position-absolute"
      :style="getPercentageLabelPosition(i, allLegendItems)">
   <div class="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold shadow-lg percentage-badge"
-           :style="{ 
-             width: '56px', 
-             height: '56px', 
+           :style="{
+             width: '56px',
+             height: '56px',
              background: `linear-gradient(135deg, ${item.color} 0%, ${darkenColor(item.color, 20)} 100%)`,
              fontSize: '1.125rem',
              border: '2px solid white'
@@ -1419,16 +1396,16 @@ const confirmDelete = async () => {
   </div>
 </div>
   </div>
-  
+
   <p class="text-muted small text-center my-4" v-else>No waste data yet</p>
 
   <!-- Dynamic Legend at Bottom -->
   <div class="d-flex flex-wrap justify-content-center gap-3 mt-3" v-if="allLegendItems.length">
     <div v-for="(item, i) in allLegendItems" :key="i" class="d-flex align-items-center gap-2">
-      <span class="rounded-circle flex-shrink-0" 
-            :style="{ 
-              width: '16px', 
-              height: '16px', 
+      <span class="rounded-circle flex-shrink-0"
+            :style="{
+              width: '16px',
+              height: '16px',
               backgroundColor: item.color,
             }"></span>
       <span class="text-secondary small fw-medium">{{ item.label }}</span>
