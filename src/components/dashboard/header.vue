@@ -1,11 +1,7 @@
-<!-- src/components/DashboardHeader.vue -->
 <template>
   <section class="dashboard-hero">
-    <!-- Decorative Background Lines -->
     <div class="position-absolute top-0 start-0 w-100 h-100 dashboard-lines" style="z-index: 0; pointer-events: none; overflow: hidden;">
-      <!-- Curved lines -->
       <svg class="position-absolute w-100 h-100" style="top: 0; left: 0;" viewBox="0 0 1440 800" preserveAspectRatio="none">
-        <!-- Green gradient line -->
         <path 
           d="M-100,200 Q400,100 800,250 T1600,200" 
           fill="none" 
@@ -13,7 +9,6 @@
           stroke-width="3" 
           opacity="0.4"
         />
-        <!-- Cyan gradient line -->
         <path 
           d="M-100,400 Q300,500 700,350 T1600,450" 
           fill="none" 
@@ -21,7 +16,6 @@
           stroke-width="3" 
           opacity="0.4"
         />
-        <!-- Light green line -->
         <path 
           d="M-100,600 Q500,550 900,650 T1600,600" 
           fill="none" 
@@ -30,7 +24,6 @@
           opacity="0.3"
         />
         
-        <!-- Gradient definitions -->
         <defs>
           <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
@@ -47,7 +40,6 @@
         </defs>
       </svg>
       
-      <!-- Decorative dots -->
       <div class="position-absolute dashboard-dot" style="top: 15%; right: 20%; width: 8px; height: 8px; background: #10b981; border-radius: 50%; opacity: 0.5;"></div>
       <div class="position-absolute dashboard-dot" style="top: 45%; right: 15%; width: 6px; height: 6px; background: #06b6d4; border-radius: 50%; opacity: 0.4;"></div>
       <div class="position-absolute dashboard-dot" style="top: 70%; right: 25%; width: 10px; height: 10px; background: #34d399; border-radius: 50%; opacity: 0.3;"></div>
@@ -55,135 +47,151 @@
     </div>
 
     <div class="container-fluid px-4 h-100">
-      <div class="row g-4 w-100">
-        <!-- Title Section - Full Width -->
-        <div class="col-12 text-center text-md-start position-relative" style="z-index: 10; padding-top: 2rem;">
-          <h1 class="hero-title mb-2">Hello, 
+      <div class="row align-items-center w-100 g-4">
+
+       
+
+        <div class="col-12 col-lg-5 text-center text-lg-start position-relative my-auto py-0" style="z-index: 10; padding-top: 2rem;justify-items: center;">
+
+         
+
+          <h1 class="hero-title mb-2">Hello,
+
             <span class="text-success">
+
               {{ username }}
+
             </span>
-          
+
           </h1>
+
           <p class="hero-subtitle mb-0">
+
             <i class="bi bi-leaf me-2"></i>
+
             Track your impact, stats, and food inventory 🌿
+
           </p>
+
+         
+
+          <div class="floating-monkeys">
+
+            <img src="/monkey/monkey1.png" alt="" class="floating-monkey monkey-1" />
+
+            <img src="/monkey/monkey2.png" alt="" class="floating-monkey monkey-2" />
+
+            <img src="/monkey/monkey3.png" alt="" class="floating-monkey monkey-3" />
+
+            <img src="/monkey/monkey4.png" alt="" class="floating-monkey monkey-4" />
+
+            <img src="/monkey/monkey5.png" alt="" class="floating-monkey monkey-5" />
+
+          </div>
+
         </div>
 
-        <!-- Content Row: Cards on Left, Graph on Right -->
-        <div class="col-12">
-          <div class="row align-items-center g-4">
-            <!-- Left: Quick Stats Cards -->
-            <div class="col-12 col-lg-7 position-relative" style="z-index: 10;">
-              <div class="row g-3">
-              <div class="col-6 col-lg-6">
-                <StatCard
-                  title="Food Score"
-                  iconClass="bi bi-graph-up-arrow"
-                  :gradient="`linear-gradient(135deg, rgba(0, 102, 60, 0.85) 0%, rgba(50, 200, 120, 0.75) 100%)`"
-                  height="130px"
-                >
-                  <template #default>
-                    <h3 class="fw-bold mb-0 text-white">{{ userFoodScore }}</h3>
-                    <small class="text-white">points</small>
 
-                    <div v-if="analytics.streakDays > 0" class="mt-2">
-                      <span
-                        class="streak-fire"
-                        :class="{
-                          'fire-small': analytics.streakDays < 7,
-                          'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
-                          'fire-large': analytics.streakDays >= 14
-                        }"
-                      >🔥</span>
-                      <span class="streak-text text-white">
-                        {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }}
-                      </span>
-                    </div>
-                  </template>
 
-                  <template #back>
-                    <p class="mb-0 text-white small text-center mt-2" style="font-size:10px">
-                      Rewards when food is consumed and money saved,
-                      penalizes waste, and adds bonus points for food donations
-                    </p>
-                  </template>
-                </StatCard>
-              </div>
-
-              <div class="col-6 col-lg-6">
-                <StatCard
-                  title="Expiring Soon"
-                  iconClass="bi bi-exclamation-triangle"
-                  gradient="linear-gradient(135deg, rgba(0, 74, 173, 0.85) 0%, rgba(59, 130, 246, 0.75) 100%)"
-                >
-                  <h3 class="fw-bold mb-0 text-white">{{ expiringSoon }}</h3>
-                  <small class="text-white">items</small>
-                </StatCard>
-              </div>
-
-              <div class="col-6 col-lg-6">
-                <StatCard
-                  title="Potential Loss"
-                  iconClass="bi bi-currency-dollar"
-                  :gradient="`linear-gradient(135deg, rgba(153, 27, 27, 0.85) 0%, rgba(239, 68, 68, 0.75) 100%)`"
-                  height="130px"
-                >
-                  <template #default>
-                    <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
-                    <small class="text-white">if expired</small>
-                  </template>
-
-                  <template #back>
-                    <p class="mb-0 text-white small text-center mt-3 mt-md-4" style="font-size:10px">
-                      Measures the total value of food that's at risk of expiring within the next 7 days.
-                    </p>
-                  </template>
-                </StatCard>
-              </div>
-
-              <div class="col-6 col-lg-6">
-                <StatCard
-                  title="Expired"
-                  iconClass="bi bi-calendar-x"
-                  gradient="linear-gradient(135deg, rgba(202, 84, 0, 0.85) 0%, rgba(249, 115, 22, 0.75) 100%)"
-                >
-                  <h3 class="fw-bold mb-0 text-white">{{ expired }}</h3>
-                  <small class="text-white">items</small>
-                </StatCard>
-              </div>
-            </div>
-
-            <!-- Collapse Toggle Button - Below Cards -->
-            <div class="text-center mt-3">
-              <button 
-                @click="$emit('toggle-overview')" 
-                :aria-expanded="overviewCollapsed"
-                class="btn btn-collapse d-flex align-items-center justify-content-center gap-2 mx-auto"
+        <div class="col-12 col-lg-7 position-relative" style="z-index: 10; padding-top: 2rem;">
+          <div class="row g-3">
+            <div class="col-6 col-lg-6">
+              <StatCard
+                title="Food Score"
+                iconClass="bi bi-graph-up-arrow"
+                :gradient="`linear-gradient(135deg, rgba(0, 102, 60, 0.85) 0%, rgba(50, 200, 120, 0.75) 100%)`"
+                height="130px"
               >
-                <i :class="overviewCollapsed ? 'bi bi-chevron-up' : 'bi bi-chevron-down'"></i>
-                <span class="d-none d-sm-inline">{{ overviewCollapsed ? 'Hide' : 'Show' }} Details</span>
-                <span class="d-inline d-sm-none">{{ overviewCollapsed ? 'Hide' : 'Show' }}</span>
-              </button>
+                <template #default>
+                  <h3 class="fw-bold mb-0 text-white">{{ userFoodScore }}</h3>
+                  <small class="text-white">points</small>
+
+                  <div v-if="analytics.streakDays > 0" class="mt-2">
+                    <span
+                      class="streak-fire"
+                      :class="{
+                        'fire-small': analytics.streakDays < 7,
+                        'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
+                        'fire-large': analytics.streakDays >= 14
+                      }"
+                    >🔥</span>
+                    <span class="streak-text text-white">
+                      {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }}
+                    </span>
+                  </div>
+                </template>
+
+                <template #back>
+                  <p class="mb-0 text-white small text-center mt-2" style="font-size:10px">
+                    Rewards when food is consumed and money saved,
+                    penalizes waste, and adds bonus points for food donations
+                  </p>
+                </template>
+              </StatCard>
             </div>
+
+            <div class="col-6 col-lg-6">
+              <StatCard
+                title="Expiring Soon"
+                iconClass="bi bi-exclamation-triangle"
+                gradient="linear-gradient(135deg, rgba(0, 74, 173, 0.85) 0%, rgba(59, 130, 246, 0.75) 100%)"
+              >
+                <h3 class="fw-bold mb-0 text-white">{{ expiringSoon }}</h3>
+                <small class="text-white">items</small>
+              </StatCard>
+            </div>
+
+            <div class="col-6 col-lg-6">
+              <StatCard
+                title="Potential Loss"
+                iconClass="bi bi-currency-dollar"
+                :gradient="`linear-gradient(135deg, rgba(153, 27, 27, 0.85) 0%, rgba(239, 68, 68, 0.75) 100%)`"
+                height="130px"
+              >
+                <template #default>
+                  <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
+                  <small class="text-white">if expired</small>
+                </template>
+
+                <template #back>
+                  <p class="mb-0 text-white small text-center mt-3 mt-md-4" style="font-size:10px">
+                    Measures the total value of food that's at risk of expiring within the next 7 days.
+                  </p>
+                </template>
+              </StatCard>
+            </div>
+
+            <div class="col-6 col-lg-6">
+              <StatCard
+                title="Expired"
+                iconClass="bi bi-calendar-x"
+                gradient="linear-gradient(135deg, rgba(202, 84, 0, 0.85) 0%, rgba(249, 115, 22, 0.75) 100%)"
+              >
+                <h3 class="fw-bold mb-0 text-white">{{ expired }}</h3>
+                <small class="text-white">items</small>
+              </StatCard>
+            </div>
+          </div>
+
+          <div class="text-center mt-3">
+            <button 
+              @click="$emit('toggle-overview')" 
+              :aria-expanded="overviewCollapsed"
+              class="btn btn-collapse d-flex align-items-center justify-content-center gap-2 mx-auto"
+            >
+              <i :class="overviewCollapsed ? 'bi bi-chevron-up' : 'bi bi-chevron-down'"></i>
+              <span class="d-none d-sm-inline">{{ overviewCollapsed ? 'Hide' : 'Show' }} Details</span>
+              <span class="d-inline d-sm-none">{{ overviewCollapsed ? 'Hide' : 'Show' }}</span>
+            </button>
           </div>
         </div>
       </div>
     </div>
-  </div>
-  
-  <!-- Floating Monkey Avatars -->
-  <div class="floating-monkeys">
-    <img src="/monkey/monkey1.png" alt="" class="floating-monkey monkey-1" />
-    <img src="/monkey/monkey2.png" alt="" class="floating-monkey monkey-2" />
-    <img src="/monkey/monkey3.png" alt="" class="floating-monkey monkey-3" />
-    <img src="/monkey/monkey4.png" alt="" class="floating-monkey monkey-4" />
-    <img src="/monkey/monkey5.png" alt="" class="floating-monkey monkey-5" />
-  </div>
-  </section>
+    </section>
 </template>
 
 <script setup>
+// ... (Keep the script section as is)
 import StatCard from '@/components/dashboard/StatCard.vue'
 
 const props = defineProps({
@@ -221,6 +229,8 @@ defineEmits(['toggle-overview'])
 </script>
 
 <style scoped>
+/* ... (Keep CSS before Floating Monkeys as is) ... */
+
 /* === FULL-SCREEN HERO === */
 .dashboard-hero {
   background: #faf8f5;
@@ -502,15 +512,15 @@ defineEmits(['toggle-overview'])
   }
 }
 
-/* Floating Monkeys */
+/* Floating Monkeys - ADJUSTED FOR LEFT COLUMN */
 .floating-monkeys {
   position: absolute;
-  top: 0;
+  top: 10000;
   left: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 1;
+  z-index: -1; /* Place behind the greeting text */
 }
 
 .floating-monkey {
@@ -522,33 +532,42 @@ defineEmits(['toggle-overview'])
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
 }
 
+/* === NEW POSITIONS === */
+/* These coordinates are tweaked to cluster them 
+   around the text in the top-left area of the column. */
+
 .monkey-1 {
-  top: 15%;
-  right: 25%;
+  /* Top-right of text */
+  top: 10%; 
+  left: 50%;
   animation-delay: 0s;
 }
 
 .monkey-2 {
-  top: 35%;
-  right: 10%;
+  /* Mid-right of text */
+  top: 30%;
+  left: 70%;
   animation-delay: 1.2s;
 }
 
 .monkey-3 {
-  bottom: 25%;
-  right: 30%;
+  /* Bottom-right of text */
+  bottom: 40%; /* Use 'bottom' to position from the bottom up */
+  left: 60%;
   animation-delay: 2.4s;
 }
 
 .monkey-4 {
+  /* Far-right of text */
   top: 50%;
-  right: 5%;
+  left: 80%;
   animation-delay: 3.6s;
 }
 
 .monkey-5 {
-  bottom: 15%;
-  right: 15%;
+  /* Bottom-left of text */
+  bottom: 30%; /* Use 'bottom' to position from the bottom up */
+  left: 10%;
   animation-delay: 4.8s;
 }
 
