@@ -237,11 +237,20 @@ defineEmits(['toggle-overview'])
   position: relative;
   color: #2d3436;
   overflow: hidden;
-  margin: -1rem 0 2rem 0;
-  min-height: 300px;
+  /* avoid negative top margin so hero sits below fixed navbar on mobile */
+  margin: 0 0 1.5rem 0;
+  min-height: 260px;
   display: flex;
   align-items: center;
-  padding: 30px 0 40px 0;
+  padding: 18px 0 20px 0;
+}
+
+/* On smaller viewports, add top padding to avoid fixed navbar overlap */
+@media (max-width: 991.98px) {
+  .dashboard-hero {
+    padding-top: 72px;
+    min-height: 320px;
+  }
 }
 
 /* === FLOATING ANIMATIONS === */
