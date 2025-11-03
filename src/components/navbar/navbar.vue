@@ -12,22 +12,38 @@
         BigBacks
       </RouterLink>
 
-      <!-- Mobile hamburger button (auto-hidden on md+) -->
-      <button
-        class="navbar-toggler"
-        type="button"
-        data-bs-toggle="collapse"
-        data-bs-target="#navbarNav"
-        @click="toggleNavbar"
-        aria-controls="navbarNav"
-        :aria-expanded="navbarOpen.toString()"
-        aria-label="Toggle navigation"
-      >
-        <span class="navbar-toggler-icon"></span>
-      </button>
+      <!-- Mobile controls (hamburger + profile icon) - only visible on small screens -->
+      <div class="d-flex d-md-none align-items-center gap-2">
+        <!-- Profile icon button for mobile -->
+        <button
+          v-if="userName"
+          class="btn btn-link p-0 profile-icon-btn"
+          type="button"
+          @click.stop="toggleDropdown($event)"
+          aria-label="Profile menu"
+        >
+          <span class="initials-avatar-mobile">{{ userInitials }}</span>
+        </button>
+
+        <!-- Hamburger button -->
+        <button
+          class="navbar-toggler border-0 p-2"
+          type="button"
+          @click="toggleNavbar"
+          aria-controls="navbarNav"
+          :aria-expanded="navbarOpen.toString()"
+          aria-label="Toggle navigation"
+        >
+          <span class="hamburger-icon" :class="{ open: navbarOpen }">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+        </button>
+      </div>
 
       <!-- Collapsible navbar content -->
-      <div class="collapse navbar-collapse" id="navbarNav" :class="{ show: navbarOpen }">
+      <div class="navbar-collapse" :class="{ show: navbarOpen, collapse: !navbarOpen }" id="navbarNav">
         <div class="d-flex align-items-center w-100">
           <ul class="navbar-nav d-flex flex-column flex-md-row justify-content-center align-items-center flex-grow-1">
             <li class="nav-item">
@@ -37,7 +53,7 @@
                 exact-active-class="active"
                 @click="closeNavbar"
               >
-                <i class="bi bi-house-door me-1"></i>Dashboard
+                <i class="bi bi-house-door me-2"></i>Dashboard
               </RouterLink>
             </li>
             <li class="nav-item">
@@ -47,7 +63,7 @@
                 exact-active-class="active"
                 @click="closeNavbar"
               >
-                <i class="bi bi-egg-fried me-1"></i>Recipes
+                <i class="bi bi-egg-fried me-2"></i>Recipes
               </RouterLink>
             </li>
             <li class="nav-item">
@@ -57,7 +73,7 @@
                 exact-active-class="active"
                 @click="closeNavbar"
               >
-                <i class="bi bi-robot me-1"></i>AI Chat
+                <i class="bi bi-robot me-2"></i>AI Chat
               </RouterLink>
             </li>
             <li class="nav-item">
@@ -67,7 +83,7 @@
                 exact-active-class="active"
                 @click="closeNavbar"
               >
-                <i class="bi bi-people me-1"></i>Community
+                <i class="bi bi-people me-2"></i>Community
               </RouterLink>
             </li>
             <li class="nav-item">
@@ -77,13 +93,13 @@
                 exact-active-class="active"
                 @click="closeNavbar"
               >
-                <i class="bi bi-trophy me-1"></i>Monkey Village
+                <i class="bi bi-trophy me-2"></i>Monkey Village
               </RouterLink>
             </li>
           </ul>
 
-          <!-- User section -->
-          <ul class="navbar-nav ms-auto flex-shrink-0">
+          <!-- Desktop user section (hidden on mobile) -->
+          <ul class="navbar-nav ms-auto flex-shrink-0 d-none d-md-flex">
             <li class="nav-item dropdown" v-if="userName" ref="dropdownRef">
               <a
                 class="nav-link dropdown-toggle"
@@ -117,6 +133,21 @@
           </ul>
         </div>
       </div>
+
+      <!-- Mobile profile dropdown (positioned below profile icon) -->
+      <div
+        v-if="userName"
+        class="mobile-profile-dropdown d-md-none"
+        :class="{ show: dropdownOpen }"
+        ref="mobileDropdownRef"
+      >
+        <RouterLink to="/profile" class="mobile-dropdown-item" @click="closeNavbar">
+          <i class="bi bi-person me-2"></i>My Profile
+        </RouterLink>
+        <a class="mobile-dropdown-item text-danger" href="#" @click.prevent="logout">
+          <i class="bi bi-box-arrow-right me-2"></i>Logout
+        </a>
+      </div>
     </div>
   </nav>
 </template>
@@ -138,13 +169,18 @@ const dropdownOpen = ref(false)
 const navbarOpen = ref(false)
 
 const dropdownRef = ref(null)
+const mobileDropdownRef = ref(null)
 
 function handleOutsideClick(e) {
   // if dropdown is not open, nothing to do
   if (!dropdownOpen.value) return
-  // if click is inside the dropdown, ignore
-  const el = dropdownRef.value
-  if (el && el.contains && el.contains(e.target)) return
+  // if click is inside the desktop or mobile dropdown, ignore
+  const desktopEl = dropdownRef.value
+  const mobileEl = mobileDropdownRef.value
+  if ((desktopEl && desktopEl.contains && desktopEl.contains(e.target)) ||
+      (mobileEl && mobileEl.contains && mobileEl.contains(e.target))) {
+    return
+  }
   dropdownOpen.value = false
 }
 
@@ -235,32 +271,209 @@ const userInitials = computed(() => {
 .logo-img {
   height: 36px;
   width: 36px;
+  object-fit: cover;
 }
+
 /* Navbar brand responsive font */
 .navbar-brand {
   font-size: clamp(1.1rem, 2.5vw, 1.35rem);
 }
 
-.title{
-  color: #059669
+.title {
+  color: #059669;
 }
 
-/* Mobile overlay positioning */
+/* Custom hamburger icon with animation */
+.hamburger-icon {
+  display: inline-block;
+  width: 24px;
+  height: 20px;
+  position: relative;
+  cursor: pointer;
+}
+
+.hamburger-icon span {
+  display: block;
+  position: absolute;
+  height: 2.5px;
+  width: 100%;
+  background: #059669;
+  border-radius: 3px;
+  opacity: 1;
+  left: 0;
+  transform: rotate(0deg);
+  transition: 0.25s ease-in-out;
+}
+
+.hamburger-icon span:nth-child(1) {
+  top: 0px;
+}
+
+.hamburger-icon span:nth-child(2) {
+  top: 8.5px;
+}
+
+.hamburger-icon span:nth-child(3) {
+  top: 17px;
+}
+
+.hamburger-icon.open span:nth-child(1) {
+  top: 8.5px;
+  transform: rotate(135deg);
+}
+
+.hamburger-icon.open span:nth-child(2) {
+  opacity: 0;
+  left: -30px;
+}
+
+.hamburger-icon.open span:nth-child(3) {
+  top: 8.5px;
+  transform: rotate(-135deg);
+}
+
+/* Mobile profile icon button */
+.profile-icon-btn {
+  text-decoration: none;
+  transition: transform 0.2s ease;
+}
+
+.profile-icon-btn:hover,
+.profile-icon-btn:focus {
+  transform: scale(1.05);
+}
+
+.initials-avatar-mobile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #059669;
+  color: #fff;
+  font-weight: 700;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 0.9rem;
+  line-height: 1;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.profile-icon-btn:hover .initials-avatar-mobile {
+  background: #047857;
+}
+
+/* Mobile menu overlay with smooth slide animation */
 @media (max-width: 767.98px) {
   .navbar-collapse {
     position: absolute;
     top: 100%;
     left: 0;
     width: 100%;
-    background: #fff;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+    background: linear-gradient(135deg, #ffffff 0%, #f8fffe 100%);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    border-radius: 0 0 12px 12px;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: max-height 0.35s ease, opacity 0.3s ease, transform 0.3s ease;
   }
+
+  .navbar-collapse.show {
+    max-height: 500px;
+    opacity: 1;
+    transform: translateY(0);
+    padding: 1rem 0;
+  }
+
+  /* Nav items spacing and hover in mobile */
+  .navbar-nav .nav-item {
+    width: 100%;
+    padding: 0.25rem 0;
+  }
+
+  .navbar-nav .nav-link {
+    padding: 0.875rem 1.5rem;
+    border-radius: 8px;
+    margin: 0 1rem;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+  }
+
+  .navbar-nav .nav-link:hover {
+    background: rgba(5, 150, 105, 0.08);
+    transform: translateX(4px);
+  }
+
+  .navbar-nav .nav-link i {
+    font-size: 1.15rem;
+  }
+}
+
+/* Mobile profile dropdown - positioned below the profile icon */
+.mobile-profile-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  min-width: 180px;
+  opacity: 0;
+  transform: translateY(-10px) scale(0.95);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  margin-top: 0.5rem;
+  margin-right: 0.75rem;
+  z-index: 1050;
+}
+
+.mobile-profile-dropdown.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.mobile-dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  color: #1f2937;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.2s ease;
+  border-radius: 6px;
+  margin: 0.25rem 0.5rem;
+}
+
+.mobile-dropdown-item:first-child {
+  margin-top: 0.5rem;
+}
+
+.mobile-dropdown-item:last-child {
+  margin-bottom: 0.5rem;
+}
+
+.mobile-dropdown-item:hover {
+  background: rgba(5, 150, 105, 0.08);
+}
+
+.mobile-dropdown-item.text-danger {
+  color: #dc3545;
+}
+
+.mobile-dropdown-item.text-danger:hover {
+  background: rgba(220, 53, 69, 0.08);
 }
 
 /* Nav link responsive font and spacing */
 .nav-link {
   font-size: clamp(0.9rem, 1.8vw, 1.12rem);
   white-space: nowrap;
+  transition: all 0.2s ease;
 }
 
 @media (min-width: 768px) and (max-width: 991.98px) {
@@ -280,11 +493,21 @@ const userInitials = computed(() => {
 
 /* Active link styling (enhance Bootstrap) */
 .nav-link.active {
-  background-color: #e7f1ff;
-  border-radius: 0.375rem;
+  background: linear-gradient(135deg, #e0f5ef 0%, #d1f0e6 100%);
+  border-radius: 0.5rem;
+  color: #047857;
+  font-weight: 600;
 }
 
-/* User avatar */
+/* Desktop nav link hover */
+@media (min-width: 768px) {
+  .nav-link:hover:not(.active) {
+    background: rgba(5, 150, 105, 0.05);
+    border-radius: 0.5rem;
+  }
+}
+
+/* User avatar (desktop) */
 .initials-avatar {
   display: inline-flex;
   align-items: center;
@@ -300,5 +523,46 @@ const userInitials = computed(() => {
   vertical-align: middle;
   line-height: 1;
   user-select: none;
+  transition: background 0.2s ease;
+}
+
+.dropdown-toggle:hover .initials-avatar {
+  background: #047857;
+}
+
+/* Smooth dropdown animation */
+.dropdown-menu {
+  border: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  padding: 0.5rem;
+  margin-top: 0.5rem !important;
+  animation: dropdownSlideIn 0.25s ease;
+}
+
+@keyframes dropdownSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-item {
+  border-radius: 6px;
+  padding: 0.625rem 0.875rem;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background: rgba(5, 150, 105, 0.08);
+}
+
+.dropdown-item.text-danger:hover {
+  background: rgba(220, 53, 69, 0.08);
 }
 </style>

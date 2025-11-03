@@ -7,7 +7,13 @@
     <template v-else>
       <navbar v-if="showNavbar" />
       <div class="main-content" :class="{ 'with-navbar': showNavbar }">
-        <router-view />
+          <transition name="fade">
+            <!-- Wrap router-view in a single element so Transition can animate an element root.
+                 This avoids the Vue warning when a routed component renders a fragment/multiple roots. -->
+            <div :key="$route.fullPath" class="route-wrapper">
+              <router-view />
+            </div>
+          </transition>
       </div>
     </template>
 
@@ -93,5 +99,43 @@ onMounted(() => {
   margin-top: 1rem;
   color: #059669;
   font-weight: 600;
+}
+
+/* Page transitions for route changes (used when clicking navbar links) */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* optional slide transition if you set meta.transition = 'slide' on a route */
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.36s ease;
+}
+.slide-enter-from {
+  opacity: 0;
+  transform: translateX(26px);
+}
+.slide-leave-to {
+  opacity: 0;
+  transform: translateX(-26px);
+}
+.slide-enter-to,
+.slide-leave-from {
+  opacity: 1;
+  transform: translateX(0);
 }
 </style>
