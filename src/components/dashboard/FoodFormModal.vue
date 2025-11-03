@@ -67,7 +67,8 @@ const suggestWithGemini = async () => {
     const unit = sanitizeForPrompt(localForm.value.unit || '')
     const prompt = `Suggest a reasonable expiration period in days for this food item. Respond with a single integer number of days only.\n\nFood name: ${name}\nCategory: ${category}\nUnit: ${unit}`
     const resp = await generateResponse(prompt, {})
-    const m = resp && resp.match(/(\d{1,3})/)
+    const trimmedResp = resp && resp.trim()
+    const m = trimmedResp && trimmedResp.match(/^(\d{1,3})$/)
     if (m) {
       const days = parseInt(m[1], 10)
       const suggested = new Date()
