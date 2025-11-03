@@ -1,14 +1,12 @@
 <template>
   <div>
-    <!-- Section Header with Search -->
-    <div class="section-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+  <!-- Section Header with Search -->
+  <div v-if="showTitle" class="section-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
       <div class="d-flex align-items-center gap-2">
         <h4 class="fw-bold mb-0 h5 text-dark">
-          {{ title }}
+          {{ title }} 
         </h4>
-        <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-semibold shadow-sm">
-          {{ totalRecipes }}
-        </span>
+        <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-semibold shadow-sm">{{ totalRecipes }}</span>
       </div>
 
       <!-- Search Filter -->
@@ -76,7 +74,12 @@ const props = defineProps({
   },
   title: {
     type: String,
-    required: true
+    required: false,
+    default: ''
+  },
+  showTitle: {
+    type: Boolean,
+    default: true
   },
   showFilter: {
     type: Boolean,

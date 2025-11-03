@@ -26,19 +26,22 @@
         </div>
 
         <!-- Search Bar -->
-        <div class="input-group shadow-sm mb-3 search-bar bg-white">
+        <div class="input-group shadow-sm mb-2 search-bar bg-white">
           <input
             :value="searchQuery"
             @input="$emit('update:searchQuery', $event.target.value)"
             type="text"
             class="form-control border-0 px-4 py-3"
-            placeholder="Search any recipe..."
+            placeholder="Search recipes (e.g., pasta, chicken, tomato)"
             @keyup.enter="$emit('search')"
           />
           <button class="btn btn-gradient px-4 text-white" @click="$emit('search')">
             <i class="bi bi-arrow-right fs-5"></i>
           </button>
         </div>
+        <p class="text-muted small mb-3" style="font-size: 0.8rem;">
+          💡 Tip: Search multiple ingredients separated by commas (e.g., "fish, potato, lemon")
+        </p>
       </div>
 
       <!-- Right Content - Food Image -->
@@ -154,15 +157,15 @@ defineEmits(['update:searchQuery', 'update:activeTab', 'search', 'clear-search']
 
 /* Food plate */
 .food-plate {
-  width: 340px;
-  height: 340px;
+  width: 280px;
+  height: 280px;
   animation: plateRotate 20s linear infinite;
 }
 
 .food-image {
   object-fit: cover;
-  width: 360px;
-  height: 360px;
+  width: 300px;
+  height: 300px;
 }
 
 @keyframes plateRotate {

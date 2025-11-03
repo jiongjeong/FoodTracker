@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useGeminiAI } from '../../composables/useGeminiAI'
 
 const props = defineProps({
   show: {
@@ -38,6 +39,50 @@ watch(() => props.formData, (newVal) => {
 // Computed properties
 const modalTitle = computed(() => props.mode === 'add' ? 'Add Food Item' : 'Edit Food Item')
 const saveButtonText = computed(() => props.mode === 'add' ? 'Add' : 'Save')
+
+// Expiration suggestion state (Gemini only)
+const lastSuggestion = ref('')
+const { generateResponse, isLoading: geminiLoading, error: geminiError } = useGeminiAI()
+
+const formatDate = (date) => {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+// Helper to sanitize user input for prompt injection prevention
+function sanitizeForPrompt(str) {
+  if (typeof str !== 'string') return '';
+  // Remove newlines, carriage returns, and limit length
+  return str.replace(/[\r\n]+/g, ' ').replace(/[^\x20-\x7E]+/g, '').slice(0, 100);
+}
+
+const suggestWithGemini = async () => {
+  try {
+    // clear previous suggestion immediately and show spinner
+    lastSuggestion.value = ''
+    const name = sanitizeForPrompt(localForm.value.name || '')
+    const category = sanitizeForPrompt(localForm.value.category || '')
+    const unit = sanitizeForPrompt(localForm.value.unit || '')
+    const prompt = `Suggest a reasonable expiration period in days for this food item. Respond with a single integer number of days only.\n\nFood name: ${name}\nCategory: ${category}\nUnit: ${unit}`
+    const resp = await generateResponse(prompt, {})
+    const trimmedResp = resp && resp.trim()
+    const m = trimmedResp && trimmedResp.match(/^(\d{1,3})$/)
+    if (m) {
+      const days = parseInt(m[1], 10)
+      const suggested = new Date()
+      suggested.setDate(suggested.getDate() + days)
+      localForm.value.expirationDate = formatDate(suggested)
+      lastSuggestion.value = `AI suggested ${days} day(s) — ${localForm.value.expirationDate}`
+    } else {
+      lastSuggestion.value = 'AI returned an unclear suggestion.'
+    }
+  } catch (err) {
+    lastSuggestion.value = 'AI suggestion failed.'
+    console.error(err)
+  }
+}
 
 // Title case utility
 const titleCase = (str) => {
@@ -106,6 +151,13 @@ const unitPlaceholder = computed(() => {
   }
   return 'Select a unit'
 })
+
+// Clear suggestion when modal opens to avoid stale text remaining between opens
+watch(() => props.show, (val) => {
+  if (val) {
+    lastSuggestion.value = ''
+  }
+})
 </script>
 
 <template>
@@ -165,17 +217,35 @@ const unitPlaceholder = computed(() => {
                   <i class="bi bi-calendar-event me-1"></i>
                   Expiration Date
                 </label>
-                <input
-                  v-model="localForm.expirationDate"
-                  type="date"
-                  class="form-control"
-                />
+                <small class="text-muted expiry-helper d-block mb-1">No expiry? Click the lightbulb!</small>
+                <div class="position-relative expiry-input-container">
+                  <input
+                    v-model="localForm.expirationDate"
+                    type="date"
+                    class="form-control expiry-input"
+                  />
+                  <button
+                    class="btn btn-outline-success rounded-circle position-absolute top-50 translate-middle-y p-0 d-inline-flex align-items-center justify-content-center expiry-suggest-btn"
+                    type="button"
+                    @click.prevent="suggestWithGemini"
+                    :disabled="geminiLoading || !(localForm.name && localForm.name.trim())"
+                    :title="(localForm.name && localForm.name.trim()) ? 'Suggest expiration using AI' : 'Enter a name first'">
+                    <template v-if="geminiLoading">
+                      <span class="spinner-border spinner-border-sm text-success" role="status" aria-hidden="true"></span>
+                    </template>
+                    <template v-else>
+                      <i class="bi bi-lightbulb-fill"></i>
+                    </template>
+                  </button>
+                </div>
+                <small v-if="lastSuggestion" class="text-success last-suggestion">{{ lastSuggestion }}</small>
               </div>
               <div class="col-6">
                 <label class="form-label">
                   <i class="bi bi-calendar-check me-1"></i>
                   Created At
                 </label>
+                <small class="text-muted expiry-helper d-block mb-1" style="visibility: hidden;">Spacer</small>
                 <input
                   v-model="localForm.createdAt"
                   type="date"
@@ -185,7 +255,7 @@ const unitPlaceholder = computed(() => {
               </div>
             </div>
 
-            <div class="row g-3">
+            <div class="row g-3 mt-3">
               <div class="col-4">
                 <label class="form-label">
                   <i class="bi bi-currency-dollar me-1"></i>
@@ -327,7 +397,8 @@ const unitPlaceholder = computed(() => {
 
 /* Modal Header */
 .modal-header {
-  padding: 1.75rem 2rem 1.25rem;
+  /* reduced vertical padding to make the modal shorter */
+  padding: 1rem 1.5rem 0.75rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -379,8 +450,9 @@ const unitPlaceholder = computed(() => {
 
 /* Modal Body */
 .modal-body {
-  padding: 2rem;
-  max-height: 65vh;
+  /* tighter body padding and allow more vertical space for content */
+  padding: 1rem 1.25rem;
+  max-height: 75vh;
   overflow-y: auto;
 }
 
@@ -475,7 +547,8 @@ const unitPlaceholder = computed(() => {
 
 /* Modal Footer */
 .modal-footer {
-  padding: 1.25rem 2rem 1.75rem;
+  /* reduce footer vertical padding */
+  padding: 0.75rem 1.25rem 0.9rem;
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
@@ -582,4 +655,35 @@ const unitPlaceholder = computed(() => {
     font-size: 1.25rem;
   }
 }
+
+/* Small helper text for the expiry field */
+.expiry-helper {
+  font-size: 0.7rem;
+  margin-bottom: 0.25rem !important;
+}
+
+/* Expiry date input and button styling */
+.expiry-input-container .expiry-input {
+  padding-right: 3.5rem;
+}
+
+.expiry-suggest-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  right: 10px;
+}
+
+.expiry-suggest-btn i {
+  font-size: 0.9rem;
+}
+
+/* Smaller AI suggestion text */
+.last-suggestion {
+  font-size: 0.72rem;
+  line-height: 1.1;
+  display: block;
+  margin-top: 0.25rem;
+}
+
 </style>

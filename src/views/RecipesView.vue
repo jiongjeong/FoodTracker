@@ -23,6 +23,8 @@ const REQUEST_TIMEOUT = 10000
 const MAX_SUGGESTED_RECIPES = 10
 const EXPIRING_SOON_DAYS = 7
 const MIN_WORD_LENGTH_FOR_MATCHING = 3
+// For multi-ingredient lookups
+const MAX_LOOKUP_IDS = 30
 
 // Reactive state
 const activeTab = ref('suggested')
@@ -31,6 +33,16 @@ const searchFilter = ref('')
 const route = useRoute()
 const isLoading = ref(false)
 const searchResults = ref([])
+// Multi-ingredient search results: Any (OR) and All (AND)
+const searchResultsAny = ref([]) // union of ingredient searches (chicken OR rice)
+const searchResultsAll = ref([]) // intersection of ingredient searches (chicken AND rice)
+const searchAnyTotal = ref(0)
+const searchAllTotal = ref(0)
+const isLoadingAny = ref(false)
+const isLoadingAll = ref(false)
+
+// Simple in-memory cache for lookup.php results by idMeal
+const lookupCache = new Map()
 const suggestedRecipes = ref([])
 const selectedRecipe = ref(null)
 const showRecipeModal = ref(false)
@@ -143,6 +155,8 @@ const handleApiError = (error) => {
 const searchRecipes = async (query) => {
   if (!query.trim()) {
     searchResults.value = []
+    searchResultsAny.value = []
+    searchResultsAll.value = []
     errorMessage.value = ''
     return
   }
@@ -151,30 +165,166 @@ const searchRecipes = async (query) => {
   errorMessage.value = ''
 
   try {
-    const response = await axios.get(`${API_BASE_URL}/search.php`, {
-      params: { s: query },
-      timeout: REQUEST_TIMEOUT
-    })
+    // Check if user is searching for multiple ingredients (comma-separated)
+    const ingredients = query.split(',').map(i => i.trim()).filter(i => i.length > 0)
 
-    if (response.data.meals) {
-      searchResults.value = response.data.meals.map(meal => ({
-        id: meal.idMeal,
-        name: meal.strMeal,
-        image: meal.strMealThumb,
-        category: meal.strCategory,
-        area: meal.strArea,
-        instructions: meal.strInstructions,
-        ingredients: getIngredientsList(meal),
-        video: meal.strYoutube,
-        source: meal.strSource
+    // Reset multi-result refs
+    searchResultsAny.value = []
+    searchResultsAll.value = []
+
+    if (ingredients.length > 1) {
+      // For each ingredient, get the list of meal ids (try filter.php then fallback to search.php)
+      const perIngredientIds = await Promise.all(ingredients.map(async (ingredient) => {
+        try {
+          // Run both requests in parallel
+          const [filterResult, searchResult] = await Promise.allSettled([
+            axios.get(`${API_BASE_URL}/filter.php`, {
+              params: { i: ingredient },
+              timeout: REQUEST_TIMEOUT
+            }),
+            axios.get(`${API_BASE_URL}/search.php`, {
+              params: { s: ingredient },
+              timeout: REQUEST_TIMEOUT
+            })
+          ])
+
+          let meals = []
+          if (filterResult.status === 'fulfilled' && filterResult.value.data.meals && filterResult.value.data.meals.length) {
+            meals = filterResult.value.data.meals
+          } else if (searchResult.status === 'fulfilled' && searchResult.value.data.meals && searchResult.value.data.meals.length) {
+            meals = searchResult.value.data.meals
+          }
+
+          // Return set of ids for this ingredient
+          return new Set(meals.map(m => m.idMeal))
+        } catch (err) {
+          console.error(`Error searching for ${ingredient}:`, err)
+          return new Set()
+        }
       }))
-    } else {
+
+      // Compute union (any) and intersection (all)
+      const unionIds = new Set()
+      perIngredientIds.forEach(s => s.forEach(id => unionIds.add(id)))
+
+      // Intersection: start with first set, then keep only those present in all
+      let intersectionIds = new Set(perIngredientIds[0] || [])
+      for (let i = 1; i < perIngredientIds.length; i++) {
+        intersectionIds = new Set([...intersectionIds].filter(id => perIngredientIds[i].has(id)))
+      }
+
+      // Helper to fetch full recipe details for a set of ids
+      // This uses lookupCache to avoid duplicate network calls and annotates each recipe
+      // with `matchedIngredients` (which of the searched ingredients were found in the recipe)
+      const fetchFullDetailsForIds = async (idIterable, allIdsTotal = 0) => {
+        const ids = Array.from(idIterable)
+        const promises = ids.map(async (id) => {
+          try {
+            // Use cache when available
+            let fullMeal = lookupCache.get(id)
+            if (!fullMeal) {
+              const response = await axios.get(`${API_BASE_URL}/lookup.php`, {
+                params: { i: id },
+                timeout: REQUEST_TIMEOUT
+              })
+              fullMeal = response.data.meals?.[0] || null
+              if (fullMeal) lookupCache.set(id, fullMeal)
+            }
+
+            if (fullMeal) {
+              // compute matchedIngredients by comparing searchIngredients to meal name and ingredients
+              const mealIngredients = getIngredientsList(fullMeal).map(ing => ing.toLowerCase())
+              const recipeName = fullMeal.strMeal.toLowerCase()
+              const matched = searchIngredients.value.filter(si => {
+                const s = si.toLowerCase()
+                if (recipeName.includes(s)) return true
+                return mealIngredients.some(ing => ing.includes(s) || s.includes(ing))
+              })
+
+              return {
+                id: fullMeal.idMeal,
+                name: fullMeal.strMeal,
+                image: fullMeal.strMealThumb,
+                category: fullMeal.strCategory,
+                area: fullMeal.strArea,
+                instructions: fullMeal.strInstructions,
+                ingredients: getIngredientsList(fullMeal),
+                video: fullMeal.strYoutube,
+                source: fullMeal.strSource,
+                matchedIngredients: matched
+              }
+            }
+          } catch (err) {
+            console.error(`Error fetching recipe ${id}:`, err)
+          }
+          return null
+        })
+        return (await Promise.all(promises)).filter(r => r !== null)
+      }
+
+        // Prepare totals and cap IDs fetched to avoid too many lookup requests
+        searchAnyTotal.value = unionIds.size
+        searchAllTotal.value = intersectionIds.size
+
+        const unionIdsArray = Array.from(unionIds)
+        const intersectionIdsArray = Array.from(intersectionIds)
+
+        const unionToFetch = new Set(unionIdsArray.slice(0, MAX_LOOKUP_IDS))
+        const intersectionToFetch = new Set(intersectionIdsArray.slice(0, MAX_LOOKUP_IDS))
+
+        // Fetch union (any) results
+        if (unionToFetch.size > 0) {
+          isLoadingAny.value = true
+          searchResultsAny.value = await fetchFullDetailsForIds(unionToFetch, unionIds.size)
+          isLoadingAny.value = false
+        } else {
+          searchResultsAny.value = []
+        }
+
+        // Fetch intersection (all) results
+        if (intersectionToFetch.size > 0) {
+          isLoadingAll.value = true
+          searchResultsAll.value = await fetchFullDetailsForIds(intersectionToFetch, intersectionIds.size)
+          isLoadingAll.value = false
+        } else {
+          searchResultsAll.value = []
+        }
+
+      // Keep searchResults empty for multi-search to avoid confusion in template
       searchResults.value = []
+    } else {
+      // Single ingredient or free-text search - use original logic
+      const response = await axios.get(`${API_BASE_URL}/search.php`, {
+        params: { s: query },
+        timeout: REQUEST_TIMEOUT
+      })
+
+      if (response.data.meals) {
+        searchResults.value = response.data.meals.map(meal => ({
+          id: meal.idMeal,
+          name: meal.strMeal,
+          image: meal.strMealThumb,
+          category: meal.strCategory,
+          area: meal.strArea,
+          instructions: meal.strInstructions,
+          ingredients: getIngredientsList(meal),
+          video: meal.strYoutube,
+          source: meal.strSource
+        }))
+      } else {
+        searchResults.value = []
+      }
+
+      // clear multi-search results
+      searchResultsAny.value = []
+      searchResultsAll.value = []
     }
   } catch (error) {
     console.error('Error searching recipes:', error)
     errorMessage.value = handleApiError(error)
     searchResults.value = []
+    searchResultsAny.value = []
+    searchResultsAll.value = []
   } finally {
     isLoading.value = false
   }
@@ -354,6 +504,12 @@ const loadUserFoods = async () => {
   }
 }
 
+// Computed helpers for multi-ingredient detection
+const searchIngredients = computed(() =>
+  searchQuery.value.split(',').map(i => i.trim()).filter(i => i.length > 0)
+)
+const isMultiSearch = computed(() => searchIngredients.value.length > 1)
+
 // Count how many ingredients from a recipe the user has in their pantry
 const countUserIngredients = (recipe) => {
   if (!recipe?.ingredients || !userFoodKeywords.value) return 0
@@ -374,31 +530,51 @@ const countUserIngredients = (recipe) => {
 const formatInstructions = (instructions) => {
   if (!instructions) return []
   
-  const hasNumbers = /^\s*(\d+[\.\):]|\bSTEP\s+\d+)/im.test(instructions)
+  // Check if instructions have leading numbers like "01.", "1.", "1)", etc.
+  const hasLeadingNumbers = /^\s*0?\d+[\.\):]/.test(instructions)
   
-  if (hasNumbers) {
+  if (hasLeadingNumbers) {
+    // Split by line breaks first, then clean up step numbers
     const steps = instructions
-      .split(/(?=\s*(?:\d+[\.\):]|\bSTEP\s+\d+))/i)
+      .split(/[\r\n]+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .map(step => {
+        // Remove leading numbers like "01.", "1.", "02)", "STEP 1:", etc.
+        return step.replace(/^\s*0?(\d+)[\.\):]?\s*/i, '')
+      })
+      .filter(s => s.length > 10) // Keep only substantial steps
+    
+    return steps
+  }
+  
+  // Check for STEP format
+  const hasStepFormat = /\bSTEP\s+\d+/i.test(instructions)
+  
+  if (hasStepFormat) {
+    const steps = instructions
+      .split(/(?=\s*\bSTEP\s+\d+)/i)
       .map(s => s.trim())
       .filter(s => s.length > 0)
     
     return steps.map(step => 
-      step.replace(/^\s*(\d+[\.\):]|\bSTEP\s+\d+[:\.\)]?)\s*/i, '')
+      step.replace(/^\s*\bSTEP\s+\d+[:\.\)]?\s*/i, '')
     )
-  } else {
-    const steps = instructions
-      .split(/[\r\n]+/)
-      .flatMap(line => {
-        if (line.length > 150) {
-          return line.split(/\.\s+/).filter(s => s.trim().length > 10)
-        }
-        return [line]
-      })
-      .map(s => s.trim())
-      .filter(s => s.length > 10)
-    
-    return steps
   }
+  
+  // No numbers - split by line breaks or sentences
+  const steps = instructions
+    .split(/[\r\n]+/)
+    .flatMap(line => {
+      if (line.length > 150) {
+        return line.split(/\.\s+/).filter(s => s.trim().length > 10)
+      }
+      return [line]
+    })
+    .map(s => s.trim())
+    .filter(s => s.length > 10)
+  
+  return steps
 }
 
 // Handle search
@@ -474,30 +650,119 @@ onAuthStateChanged(auth, async (u) => {
       <div v-if="!isLoading" key="content">
         <!-- Search Results Tab -->
         <div v-if="activeTab === 'search'">
-          <EmptyState
-            v-if="searchResults.length === 0 && !searchQuery.trim()"
-            icon="bi-search"
-            title="Search for recipes"
-            message="Enter a recipe name, ingredient, or cuisine type to get started"
-          />
-          <EmptyState
-            v-else-if="searchResults.length === 0 && searchQuery.trim()"
-            icon="bi-emoji-frown"
-            title="No results found"
-            message="Try searching with different keywords or ingredients"
-          />
-          <RecipeGrid
-            v-else
-            v-model:search-filter="searchFilter"
-            :recipes="searchResults"
-            title="Search Results"
-            badge-variant="primary"
-            :show-filter="true"
-            :is-bookmarked-fn="isRecipeBookmarked"
-            :count-ingredients-fn="countUserIngredients"
-            @view-recipe="viewRecipe"
-            @toggle-bookmark="toggleBookmark"
-          />
+          <!-- Single-term or free-text search -->
+          <div v-if="!isMultiSearch">
+            <EmptyState
+              v-if="searchResults.length === 0 && !searchQuery.trim()"
+              icon="bi-search"
+              title="Search for recipes"
+              message="Enter a recipe name, ingredient, or cuisine type to get started"
+            />
+            <EmptyState
+              v-else-if="searchResults.length === 0 && searchQuery.trim()"
+              icon="bi-emoji-frown"
+              title="No results found"
+              message="Try searching with different keywords or ingredients"
+            />
+            <RecipeGrid
+              v-else
+              v-model:search-filter="searchFilter"
+              :recipes="searchResults"
+              title="Search Results"
+              badge-variant="primary"
+              :show-filter="true"
+              :is-bookmarked-fn="isRecipeBookmarked"
+              :count-ingredients-fn="countUserIngredients"
+              @view-recipe="viewRecipe"
+              @toggle-bookmark="toggleBookmark"
+            />
+          </div>
+
+          <!-- Multi-ingredient search: show BOTH intersection (AND) and union (ANY) -->
+          <div v-else>
+            <!-- Combined title for multi-search -->
+            <div class="mb-4">
+              <h4 class="mb-1">
+                Recipes for <strong>{{ searchIngredients.join(' + ') }}</strong>
+              </h4>
+              <small class="text-muted">Showing recipes that match all ingredients, or any of them below.</small>
+            </div>
+
+            <!-- Match All Section -->
+            <div class="mb-5">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                  <div class="d-flex align-items-center gap-2">
+                    <h4 class="fw-bold mb-0 h5 text-dark">Match All Ingredients</h4>
+                    <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-semibold shadow-sm">{{ searchAllTotal }}</span>
+                  </div>
+                  <small v-if="searchResultsAll.length && searchAllTotal > searchResultsAll.length" class="text-muted">
+                    Showing {{ searchResultsAll.length }} of {{ searchAllTotal }}
+                  </small>
+                </div>
+
+              <div v-if="isLoadingAll" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted mt-2 mb-0">Finding recipes...</p>
+              </div>
+
+              <EmptyState
+                v-else-if="searchResultsAll.length === 0"
+                icon="bi-emoji-frown"
+                title="No recipes contain all ingredients"
+                message="Try fewer ingredients or broader keywords"
+              />
+
+              <RecipeGrid
+                v-else
+                :recipes="searchResultsAll"
+                :show-title="false"
+                badge-variant="primary"
+                :is-bookmarked-fn="isRecipeBookmarked"
+                :count-ingredients-fn="countUserIngredients"
+                @view-recipe="viewRecipe"
+                @toggle-bookmark="toggleBookmark"
+              />
+            </div>
+
+            <!-- Any Ingredient Section -->
+            <div class="mt-5">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                  <div class="d-flex align-items-center gap-2">
+                    <h4 class="fw-bold mb-0 h5 text-dark">Any Ingredient</h4>
+                    <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-semibold shadow-sm">{{ searchAnyTotal }}</span>
+                  </div>
+                </div>
+
+              <div v-if="isLoadingAny" class="text-center py-5">
+                <div class="spinner-border text-secondary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted mt-2 mb-0">Finding recipes...</p>
+              </div>
+
+              <EmptyState
+                v-else-if="searchResultsAny.length === 0"
+                icon="bi-emoji-frown"
+                title="No results found"
+                message="Try different keywords or check your network connection"
+              />
+
+              <RecipeGrid
+                v-else
+                v-model:search-filter="searchFilter"
+                :recipes="searchResultsAny"
+                :show-title="false"
+                badge-variant="secondary"
+                :show-filter="true"
+                :is-bookmarked-fn="isRecipeBookmarked"
+                :count-ingredients-fn="countUserIngredients"
+                @view-recipe="viewRecipe"
+                @toggle-bookmark="toggleBookmark"
+              />
+            </div>
+          </div>
         </div>
 
         <!-- Suggested Recipes Tab -->
