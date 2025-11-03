@@ -29,7 +29,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'submit', 'select-food', 'location-selected'])
+const emit = defineEmits(['close', 'submit', 'select-food', 'location-selected', 'update:quantity'])
 
 // Local form state
 const localForm = ref({
@@ -55,6 +55,11 @@ watch(() => props.formData, (newVal) => {
     }
   })
 }, { deep: true, immediate: true })
+
+// Watch for quantity changes and emit to parent for validation
+watch(() => localForm.value.quantity, (newQty) => {
+  emit('update:quantity', newQty)
+})
 
 // Handle close
 const handleClose = () => {
@@ -263,20 +268,6 @@ const quantityExceeded = computed(() => {
                 <i class="bi bi-exclamation-circle-fill me-1"></i>
                 Please select a location
               </small>
-            </div>
-
-            <!-- Notes -->
-            <div class="form-group mb-0">
-              <label class="form-label">
-                <i class="bi bi-chat-left-text-fill me-1"></i>
-                Additional Notes
-              </label>
-              <textarea
-                v-model="localForm.notes"
-                class="form-control"
-                rows="3"
-                placeholder="Any special instructions or notes about the food item..."
-              ></textarea>
             </div>
           </div>
 
