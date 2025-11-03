@@ -131,7 +131,6 @@ const startWalking = () => {
       m.pos.x = clamped.x
       m.pos.y = clamped.y
 
-      // Check for banana collection (player only)
       if (m.isYou) {
         checkBananaCollection(m)
       }

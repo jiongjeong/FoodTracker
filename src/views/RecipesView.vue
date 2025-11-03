@@ -628,15 +628,18 @@ onAuthStateChanged(auth, async (u) => {
 
 <template>
 <div class="bg-light min-vh-100">
-  <div class="container-fluid px-4 py-3">
-    <!-- Hero Section -->
-    <HeroSection
-      v-model:search-query="searchQuery"
-      v-model:active-tab="activeTab"
-      @search="handleSearch"
-      @clear-search="searchQuery = ''"
-    />
+  <div class="recipes-page">
+    <!-- Hero Section - Full Width -->
+    <div class="hero-full-width">
+      <HeroSection
+        v-model:search-query="searchQuery"
+        v-model:active-tab="activeTab"
+        @search="handleSearch"
+        @clear-search="searchQuery = ''"
+      />
+    </div>
 
+  <div class="container-fluid px-3 px-md-4 py-3">
     <!-- Error Message -->
     <ErrorAlert :message="errorMessage" @close="errorMessage = ''" />
 
@@ -818,10 +821,25 @@ onAuthStateChanged(auth, async (u) => {
       @close="showRecipeModal = false"
       @toggle-bookmark="toggleBookmark"
     />
+    </div>
   </div>
 </div>
 </template>
 <style scoped>
+/* Main page layout */
+.recipes-page {
+  min-height: 100vh;
+  background: #f8f9fa;
+}
+
+/* Hero section - full width */
+.hero-full-width {
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+
 /* Fade transition for content switching */
 .fade-enter-active,
 .fade-leave-active {

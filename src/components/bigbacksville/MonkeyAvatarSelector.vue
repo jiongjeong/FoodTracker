@@ -246,7 +246,7 @@ onMounted(() => {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  overflow: hidden;
+  overflow: visible;
   border: 3px solid transparent;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   transition: all 0.2s ease;

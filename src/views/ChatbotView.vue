@@ -153,7 +153,7 @@ onMounted(() => {
   <div class="chatbot-page">
     <!-- Hero Section - Full Width -->
     <div class="hero-full-width">
-      <div class="compact-hero position-relative py-2 py-md-3 mb-4">
+      <div class="compact-hero position-relative py-4 py-md-5 mb-4">
         <!-- Subtle Color Splashes Background -->
         <div class="color-splashes position-absolute w-100 h-100" style="z-index: 1;">
           <div class="color-splash splash-1"></div>

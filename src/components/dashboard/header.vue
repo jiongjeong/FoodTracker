@@ -1,5 +1,5 @@
 <template>
-  <section class="dashboard-hero">
+  <section class="compact-hero position-relative py-4 py-md-5 mb-4">
     <div class="position-absolute top-0 start-0 w-100 h-100 dashboard-lines" style="z-index: 0; pointer-events: none; overflow: hidden;">
       <svg class="position-absolute w-100 h-100" style="top: 0; left: 0;" viewBox="0 0 1440 800" preserveAspectRatio="none">
         <path 
@@ -46,8 +46,8 @@
       <div class="position-absolute dashboard-dot" style="top: 30%; right: 8%; width: 7px; height: 7px; background: #059669; border-radius: 50%; opacity: 0.5;"></div>
     </div>
 
-    <div class="container-fluid px-4 h-100">
-      <div class="row align-items-center w-100 g-4">
+    <div class="container-fluid px-3 px-md-4">
+      <div class="row align-items-center g-4 position-relative">
 
        
 
@@ -231,26 +231,11 @@ defineEmits(['toggle-overview'])
 <style scoped>
 /* ... (Keep CSS before Floating Monkeys as is) ... */
 
-/* === FULL-SCREEN HERO === */
-.dashboard-hero {
+/* === COMPACT HERO === */
+.compact-hero {
   background: #faf8f5;
-  position: relative;
   color: #2d3436;
   overflow: hidden;
-  /* avoid negative top margin so hero sits below fixed navbar on mobile */
-  margin: 0 0 1.5rem 0;
-  min-height: 260px;
-  display: flex;
-  align-items: center;
-  padding: 18px 0 20px 0;
-}
-
-/* On smaller viewports, add top padding to avoid fixed navbar overlap */
-@media (max-width: 991.98px) {
-  .dashboard-hero {
-    padding-top: 72px;
-    min-height: 320px;
-  }
 }
 
 /* === FLOATING ANIMATIONS === */

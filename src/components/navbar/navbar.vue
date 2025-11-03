@@ -73,7 +73,7 @@
                 exact-active-class="active"
                 @click="closeNavbar"
               >
-                <i class="bi bi-robot me-2"></i>AI Chat
+                <i class="bi bi-robot me-2"></i>Learn More
               </RouterLink>
             </li>
             <li class="nav-item">
@@ -93,7 +93,7 @@
                 exact-active-class="active"
                 @click="closeNavbar"
               >
-                <i class="bi bi-trophy me-2"></i>Monkey Village
+                <i class="bi bi-trophy me-2"></i>BigBacksVille
               </RouterLink>
             </li>
           </ul>

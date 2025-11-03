@@ -1,5 +1,6 @@
 <template>
-  <div class="compact-hero position-relative py-2 py-md-3">
+  <div class="compact-hero position-relative py-4 py-md-5 mb-4">
+    <div class="container-fluid px-3 px-md-4">
     <!-- Decorative Blobs -->
     <div class="position-absolute top-0 end-0 h-100 w-50 recipe-blobs pe-none" style="z-index: 0;">
       <div class="blob blob-pink position-absolute top-0 end-0 rounded-circle opacity-75 shadow"></div>
@@ -20,9 +21,17 @@
             Discover
             <span class="text-success">fresh recipes</span>
           </h1>
-          <p class="lead text-muted mb-0">
+          <p class="lead text-muted mb-3">
             to cut waste and boost flavor 🌿
           </p>
+          
+          <!-- Recipe Categories -->
+          <div class="recipe-categories d-flex flex-wrap gap-2 mb-4">
+            <span class="category-badge">Quick Meals</span>
+            <span class="category-badge">Healthy Options</span>
+            <span class="category-badge">Zero Waste</span>
+            <span class="category-badge">Seasonal</span>
+          </div>
         </div>
 
         <!-- Search Bar -->
@@ -72,6 +81,7 @@
         :class="activeTab === 'bookmarked' ? 'btn-success text-white shadow-active' : 'btn-light shadow-soft'">
         <span class="me-2">❤️</span>Bookmarked
       </button>
+    </div>
     </div>
   </div>
 </template>
@@ -191,6 +201,27 @@ defineEmits(['update:searchQuery', 'update:activeTab', 'search', 'clear-search']
 .category-pills .btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Recipe category badges */
+.category-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.category-badge:hover {
+  background: rgba(16, 185, 129, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
 }
 
 /* Mobile responsive */

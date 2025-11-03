@@ -1092,7 +1092,7 @@ const getGoogleMapsUrl = (location) => {
 
 <template>
   <!-- Hero Section with Gradient Background -->
-  <div class="hero-section">
+  <div class="compact-hero position-relative py-4 py-md-5 mb-4 hero-section">
     <!-- Community Connection Background -->
     <div class="position-absolute top-0 start-0 w-100 h-100 community-connections" style="z-index: 0;">
       <!-- Decorative Blobs - matching recipe page style -->
@@ -1149,15 +1149,15 @@ const getGoogleMapsUrl = (location) => {
       </svg>
     </div>
 
-  <div class="container-fluid px-4 py-3 position-relative" style="z-index: 10;">
+  <div class="container-fluid px-3 px-md-4 position-relative" style="z-index: 10;">
     <div class="row align-items-center g-5">
       <!-- Left: Title & Description -->
       <div class="col-lg-6">
         <div class="hero-content">
-          <h1 class="display-5 fw-bold mb-3" style="line-height: 1.2;">
-            <span class="text-success"> Community </span> <br>
-  <span class="typing-line-1">Food Sharing</span>
-</h1>
+          <h1 class="display-5 fw-bold mb-3" style="line-height: 1.3; white-space: nowrap;">
+            <span class="text-success">Community</span><br>
+            <span class="typing-line-1">Food Sharing</span>
+          </h1>
           <p class="lead text-dark mb-4">
             Share expiring food with neighbours<br>
             to reduce waste and build community
@@ -1623,11 +1623,6 @@ const getGoogleMapsUrl = (location) => {
 /* Hero Section */
 .hero-section {
   background: linear-gradient(135deg, #fefefe 0%, #f9f7f4 40%, #f5f2ed 100%);
-  padding: 40px 20px;
-  min-height: 550px;
-  display: flex;
-  align-items: center;
-  position: relative;
   overflow: hidden;
 }
 
@@ -1830,13 +1825,15 @@ const getGoogleMapsUrl = (location) => {
   overflow: hidden;
   display: inline-block;
   border-right: 3px solid #666;
-  animation: typing 1.5s steps(20, end), blink 0.75s step-end infinite 1.5s, cursorFade 0.5s ease-out 3s forwards;
+  white-space: nowrap;
+  width: 0;
+  animation: typing 1.5s steps(12, end) forwards, blink 0.75s step-end infinite 1.5s, cursorFade 0.5s ease-out 3s forwards;
 }
 
 /* Keyframes for typing effect */
 @keyframes typing {
   from { width: 0 }
-  to { width: 100% }
+  to { width: 12ch }
 }
 
 /* Cursor blink - only for 1.5 seconds after typing starts */
