@@ -241,7 +241,7 @@ defineEmits(['toggle-overview'])
   min-height: 600px;
   display: flex;
   align-items: center;
-  padding: 80px 0 40px 0;
+  padding: 30px 0 40px 0;
 }
 
 /* === FLOATING ANIMATIONS === */
@@ -512,10 +512,10 @@ defineEmits(['toggle-overview'])
   }
 }
 
-/* Floating Monkeys - ADJUSTED FOR LEFT COLUMN */
+/* Floating Monkeys - 2 TOP, 3 BOTTOM */
 .floating-monkeys {
   position: absolute;
-  top: 10000;
+  top: 0;
   left: 0;
   width: 100%;
   height: 100%;
@@ -532,42 +532,40 @@ defineEmits(['toggle-overview'])
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
 }
 
-/* === NEW POSITIONS === */
-/* These coordinates are tweaked to cluster them 
-   around the text in the top-left area of the column. */
-
+/* === TOP MONKEYS (2) === */
+/* Monkey 1 - Top Left */
 .monkey-1 {
-  /* Top-right of text */
-  top: 10%; 
-  left: 50%;
+  top: -55%; /* Above the greeting */
+  left: 15%;
   animation-delay: 0s;
 }
 
+/* Monkey 2 - Top Right */
 .monkey-2 {
-  /* Mid-right of text */
-  top: 30%;
-  left: 70%;
+  top: -55%; /* Above the greeting */
+  left: 75%;
   animation-delay: 1.2s;
 }
 
+/* === BOTTOM MONKEYS (3) === */
+/* Monkey 3 - Bottom Left */
 .monkey-3 {
-  /* Bottom-right of text */
-  bottom: 40%; /* Use 'bottom' to position from the bottom up */
-  left: 60%;
+  bottom: -65%; /* Below the greeting */
+  left: 10%;
   animation-delay: 2.4s;
 }
 
+/* Monkey 4 - Bottom Center */
 .monkey-4 {
-  /* Far-right of text */
-  top: 50%;
-  left: 80%;
+  bottom: -80%; /* Below the greeting */
+  left: 45%;
   animation-delay: 3.6s;
 }
 
+/* Monkey 5 - Bottom Right */
 .monkey-5 {
-  /* Bottom-left of text */
-  bottom: 30%; /* Use 'bottom' to position from the bottom up */
-  left: 10%;
+  bottom: -65%; /* Below the greeting */
+  left: 80%;
   animation-delay: 4.8s;
 }
 
@@ -590,80 +588,66 @@ defineEmits(['toggle-overview'])
   }
 }
 
+/* Responsive adjustments */
 @media (max-width: 575px) {
-  .dashboard-lines,
-  .dashboard-lines > * {
-    z-index: 0 !important;
-    pointer-events: none !important;
+  .floating-monkey {
+    width: 30px;
+    height: 30px;
   }
   
-  .dashboard-dot {
+  /* Hide 2 monkeys on mobile for cleaner look */
+  .monkey-4,
+  .monkey-5 {
     display: none;
   }
   
+  /* Adjust remaining monkeys */
+  .monkey-1 {
+    top: -8%;
+    left: 10%;
+  }
+  
+  .monkey-2 {
+    top: -10%;
+    left: 70%;
+  }
+  
+  .monkey-3 {
+    bottom: -20%;
+    left: 35%;
+  }
+}
+
+@media (min-width: 576px) and (max-width: 991px) {
   .floating-monkey {
     width: 40px;
     height: 40px;
   }
   
-  .monkey-4,
+  /* Adjust positions for tablets */
+  .monkey-1 {
+    top: -8%;
+    left: 7%;
+  }
+  
+  .monkey-2 {
+    top: -12%;
+    left: 88%;
+  }
+  
+  .monkey-3 {
+    bottom: -50%;
+    left: 0%;
+  }
+  
+  .monkey-4 {
+    bottom: -50%;
+    left: 42%;
+  }
+  
   .monkey-5 {
-    display: none;
-  }
-}
-
-/* === RESPONSIVE === */
-@media (max-width: 991.98px) {
-  .dashboard-hero {
-    padding: 70px 0 40px 0;
-    min-height: 550px;
-  }
-  
-  .hero-title { 
-    font-size: 2.5rem; 
-  }
-  
-  .btn-collapse {
-    font-size: 0.9rem;
-    padding: 0.65rem 1rem;
-  }
-}
-
-@media (max-width: 767.98px) {
-  .dashboard-hero {
-    min-height: 620px;
-    padding: 80px 0 40px 0;
-  }
-  
-  .hero-title { 
-    font-size: 2.2rem; 
-  }
-  
-  .hero-subtitle { 
-    font-size: 1.1rem;
-    margin-left: auto;
-    margin-right: auto;
-  }
-}
-
-@media (max-width: 575.98px) {
-  .dashboard-hero {
-    min-height: 600px;
-    padding: 70px 0 40px 0;
-  }
-  
-  .hero-title {
-    font-size: 1.8rem;
-  }
-  
-  .hero-subtitle {
-    font-size: 1rem;
-  }
-  
-  .btn-collapse {
-    max-width: 240px;
-    font-size: 0.85rem;
-    padding: 0.6rem 1rem;
+    bottom: -50%;
+    left: 95%;
   }
 }
 </style>
