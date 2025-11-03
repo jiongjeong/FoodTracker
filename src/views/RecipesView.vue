@@ -176,19 +176,23 @@ const searchRecipes = async (query) => {
       // For each ingredient, get the list of meal ids (try filter.php then fallback to search.php)
       const perIngredientIds = await Promise.all(ingredients.map(async (ingredient) => {
         try {
-          let response = await axios.get(`${API_BASE_URL}/filter.php`, {
-            params: { i: ingredient },
-            timeout: REQUEST_TIMEOUT
-          })
-          let meals = response.data.meals || []
-
-          if (!meals.length) {
-            // fallback to search.php
-            response = await axios.get(`${API_BASE_URL}/search.php`, {
+          // Run both requests in parallel
+          const [filterResult, searchResult] = await Promise.allSettled([
+            axios.get(`${API_BASE_URL}/filter.php`, {
+              params: { i: ingredient },
+              timeout: REQUEST_TIMEOUT
+            }),
+            axios.get(`${API_BASE_URL}/search.php`, {
               params: { s: ingredient },
               timeout: REQUEST_TIMEOUT
             })
-            meals = response.data.meals || []
+          ])
+
+          let meals = []
+          if (filterResult.status === 'fulfilled' && filterResult.value.data.meals && filterResult.value.data.meals.length) {
+            meals = filterResult.value.data.meals
+          } else if (searchResult.status === 'fulfilled' && searchResult.value.data.meals && searchResult.value.data.meals.length) {
+            meals = searchResult.value.data.meals
           }
 
           // Return set of ids for this ingredient
