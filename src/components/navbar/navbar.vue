@@ -177,8 +177,8 @@ function handleOutsideClick(e) {
   // if click is inside the desktop or mobile dropdown, ignore
   const desktopEl = dropdownRef.value
   const mobileEl = mobileDropdownRef.value
-  if ((desktopEl && desktopEl.contains && desktopEl.contains(e.target)) ||
-      (mobileEl && mobileEl.contains && mobileEl.contains(e.target))) {
+  if ((desktopEl && desktopEl.contains(e.target)) ||
+      (mobileEl && mobileEl.contains(e.target))) {
     return
   }
   dropdownOpen.value = false
