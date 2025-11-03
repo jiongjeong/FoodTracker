@@ -960,4 +960,8 @@ onAuthStateChanged(auth, async (u) => {
 .modal-header .btn-close:hover {
   opacity: 1;
 }
+
+.recipe-discovery-page {
+    background: url('/recipe-bg.jpg');
+}
 </style>

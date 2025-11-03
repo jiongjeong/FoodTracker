@@ -2,8 +2,8 @@
 import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { db, auth } from '@/firebase'
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
-import LeaderboardSidebar from '@/components/LeaderboardSidebar.vue'
-import VillageHeader from '@/components/VillageHeader.vue'
+import LeaderboardSidebar from '@/components/bigbacksville/LeaderboardSidebar.vue'
+import VillageHeader from '@/components/bigbacksville/VillageHeader.vue'
 
 /* ---------- REFS ---------- */
 const panContainer = ref(null)
@@ -205,7 +205,6 @@ const monkeySrc = (monkey) => {
   return isHovered ? banana : normal
 }
 
-const onMonkeyClick = m => alert(`${m.name} – ${m.monkeyId}`)
 const onHover = (uid) => { hoveredMonkey.value = uid }
 const onHoverLeave = () => { hoveredMonkey.value = null }
 </script>

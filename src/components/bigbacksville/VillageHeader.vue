@@ -38,8 +38,8 @@
 </template>
 
 <script setup>
-import MonkeyAvatarSelector from '@/components/MonkeyAvatarSelector.vue'
-import PodiumLeaderboard from '@/components/PodiumLeaderboard.vue'
+import MonkeyAvatarSelector from '@/components/bigbacksville/MonkeyAvatarSelector.vue'
+import PodiumLeaderboard from '@/components/bigbacksville/PodiumLeaderboard.vue'
 </script>
 
 <style scoped>

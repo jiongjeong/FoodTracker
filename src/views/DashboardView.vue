@@ -5,46 +5,15 @@ import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp, quer
 import { ref, computed, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
 import { useAlert } from '@/composables/useAlert.js';
+import DashboardHeader from '@/components/dashboard/header.vue'
+import StatCard from '@/components/dashboard/StatCard.vue'
+// import FlippedStatCard from '@/components/dashboard/flippedCard.vue'
+import WasteVsSavingsChart from '@/components/dashboard/WasteVsSavingsChart.vue'
+import WasteByCategoryChart from '@/components/dashboard/WasteByCategoryChart.vue'
+import FoodCard from '@/components/dashboard/FoodCard.vue'
+import ActivityItem from '@/components/dashboard/ActivityItem.vue'
 
 const { success, error, confirm } = useAlert();
-import {
-  chartOptions,
-  wasteVsSavingsOpts,
-  wasteRingOpts,
-  centerTextPlugin,
-  buildWasteVsSavingsData,
-  buildWasteByCategoryChart,
-  styleAsRing,
-  WASTE_COLORS,
-  leaderboardNudge,
-  getPercentageLabelPosition, createAllLegendItems, darkenColor
-} from '@/composables/dashboardDesign'
-import FlippedStatCard from '@/components/dashboard/flippedCard.vue'
-import { Bar, Pie, Line, Doughnut } from 'vue-chartjs'
-import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  ArcElement,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-} from 'chart.js'
-// Register Chart.js components
-ChartJS.register(
-  Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  ArcElement,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-)
 
 const router = useRouter()
 const auth = getAuth()
@@ -170,12 +139,7 @@ const categoryUnits = {
   'Breakfast & Cereal': ['box(es)', 'bag(s)', 'pack(s)', 'kg(s)', 'gram(s)', 'bottle(s)'],
   Other: ['piece(s)', 'unit(s)', 'pack(s)', 'box(es)', 'kg(s)', 'gram(s)'],
 }
-// Build charts and leaderboard from the local `activities` ref using shared builders
-const wasteVsSavingsData = computed(() => buildWasteVsSavingsData(activities.value || []))
-const basePie = computed(() => buildWasteByCategoryChart(activities.value || [], WASTE_COLORS))
-const chartDataStyled = computed(() => styleAsRing(basePie.value))
-const leaderboardMessage = computed(() => leaderboardNudge(activities.value || []))
-const allLegendItems = computed(() => createAllLegendItems(chartDataStyled.value));
+
 // Functions
 function showToastFor(msg, ms = 2200) {
   toastMessage.value = msg
@@ -439,36 +403,6 @@ const getBadgeClass = (food) => {
   } else {
     return 'badge-transparent'
   }
-}
-const getActivityIcon = (type) => {
-  const icons = {
-    'donFood': 'bi bi-heart-fill',
-    'pendingDonFood': 'bi bi-clock-history',
-    'addFood': 'bi bi-plus-circle-fill',
-    'conFood': 'bi bi-check-circle-fill',
-    'expFood': 'bi bi-x-circle-fill'
-  }
-  return icons[type] || 'bi bi-circle-fill'
-}
-const getActivityTitle = (type) => {
-  const titles = {
-    'donFood': 'Food Donated',
-    'pendingDonFood': 'Donation Pending',
-    'addFood': 'Food Added',
-    'conFood': 'Food Consumed',
-    'expFood': 'Food Expired'
-  }
-  return titles[type] || 'Activity'
-}
-const getActivityGradient = (type) => {
-  const gradients = {
-    'donFood': 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
-    'pendingDonFood': 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-    'addFood': 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-    'conFood': 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-    'expFood': 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-  }
-  return gradients[type] || 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
 }
 const calculateActivityStreak = () => {
   if (!activitiesLoaded.value || activities.value.length === 0) return 0
@@ -1136,311 +1070,43 @@ const confirmDelete = async () => {
 </script>
 
 <template>
-  <div class="container-fluid p-4">
-    <div class="dashboard-overview">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h1 class="h2 mb-2 fw-bold">Dashboard</h1>
-          <p class="text-muted mb-0">Track your food inventory and reduce waste</p>
-        </div>
-        <div class="ms-3">
-          <div style="transform: rotateY(9.20483deg)">
-            <button @click="overviewCollapsed = !overviewCollapsed" :aria-expanded="!overviewCollapsed"
-              class="btn btn-sm btn-outline-secondary header-collapse-btn">
-              <i :class="overviewCollapsed ? 'bi bi-chevron-up' : 'bi bi-chevron-down'"></i>
-              <span class="visually-hidden">Toggle overview rows</span>
-            </button>
-          </div>
-        </div>
-      </div>
+  <div class="container-fluid p-0">
+    <!-- Dashboard Header with Stats Cards -->
+    <DashboardHeader 
+      :userFoodScore="userFoodScore"
+      :expiringSoon="expiringSoon"
+      :potentialLoss="potentialLoss"
+      :expired="expired"
+      :analytics="analytics"
+      :overviewCollapsed="overviewCollapsed"
+      @toggle-overview="overviewCollapsed = !overviewCollapsed"
+    />
 
-      <div class="row g-3 mb-3">
-        <div class="col-6 col-lg-3">
-          <FlippedStatCard
-            title="Food Score"
-            iconClass="bi bi-graph-up-arrow"
-            :gradient="`linear-gradient(135deg, rgba(0, 102, 60, 0.85) 0%, rgba(50, 200, 120, 0.6) 100%)`"
-            height="130px"
-          >
-            <!-- FRONT content -->
-            <template #default>
-              <h3 class="fw-bold mb-0 text-white">{{ userFoodScore }}</h3>
-              <small class="text-white">points</small>
-
-              <!-- Streak badge -->
-              <div v-if="analytics.streakDays > 0" class="mt-2">
-                <span
-                  class="streak-fire"
-                  :class="{
-                    'fire-small': analytics.streakDays < 7,
-                    'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
-                    'fire-large': analytics.streakDays >= 14
-                  }"
-                >🔥</span>
-                <span class="streak-text text-white">
-                  {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
-                </span>
-              </div>
-            </template>
-
-            <!-- BACK content -->
-            <template #back>
-              <p class="mb-0 text-white small text-center mt-2" style="font-size:10px">
-                Rewards when food is consumed and money saved,
-                penalizes waste, and adds bonus points for food donations
-              </p>
-            </template>
-          </FlippedStatCard>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-            style="
-              background: linear-gradient(
-                135deg,
-                rgba(0, 74, 173, 0.85) 0%,
-                rgba(59, 130, 246, 0.65) 100%
-              );
-              box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-              height: 130px;
-            ">
-            <!-- Left: Icon + label -->
-            <div class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-              style="width: 90px">
-              <div
-                class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                style="width: 56px; height: 56px">
-                <i class="bi bi-exclamation-triangle fs-5 text-white"></i>
-              </div>
-              <small class="text-white text-center">Expiring Soon</small>
+    <!-- Charts Section - Seamless with header -->
+    <transition name="charts-slide">
+      <div v-show="overviewCollapsed" class="charts-wrapper">
+        <div class="container-fluid px-4 py-4">
+          <div class="row g-4">
+            <div class="col-lg-8">
+              <WasteVsSavingsChart
+                :activities="activities"
+                :analytics="analytics"
+              />
             </div>
 
-            <!-- Right: Count -->
-            <div class="text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0 text-white">{{ expiringSoon }}</h3>
-              <small class="text-white">items</small>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-         <FlippedStatCard
-            title="Potential Loss"
-            iconClass="bi bi-currency-dollar"
-            :gradient="`linear-gradient(135deg, rgba(153, 27, 27, 0.9) 0%, rgba(239, 68, 68, 0.65) 100%)`"
-            height="130px"
-          >
-            <!-- FRONT content -->
-            <template #default>
-              <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
-              <small class="text-white">if expired</small>
-            </template>
-
-            <!-- BACK content -->
-            <template #back>
-              <p class="mb-0 text-white small text-center mt-3 mt-md-4" style="font-size:10px">
-                Measures the total value of food that’s at risk of expiring within the next 7 days.
-              </p>
-            </template>
-          </FlippedStatCard>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-            style="
-              background: linear-gradient(
-                135deg,
-                rgba(202, 84, 0, 0.9) 0%,
-                rgba(249, 115, 22, 0.65) 100%
-              );
-              box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-              height: 130px;
-            ">
-            <!-- Left: Icon + label -->
-            <div class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-              style="width: 90px">
-              <div
-                class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                style="width: 56px; height: 56px">
-                <i class="bi bi-calendar-x fs-5 text-white"></i>
-              </div>
-              <small class="text-white text-center">Expired</small>
-            </div>
-
-            <!-- Right: Count -->
-            <div class="text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0 text-white">{{ expired }}</h3>
-              <small class="text-white">items</small>
+            <div class="col-lg-4">
+              <WasteByCategoryChart
+                :activities="activities"
+              />
             </div>
           </div>
         </div>
       </div>
-      <!-- Charts Section -->
-      <div class="row g-4 mb-3" v-show="overviewCollapsed">
-        <div class="col-lg-8">
-          <div class="glass-card p-4 charts-left-card h-100 d-flex flex-column">
-            <div class="row g-0">
-              <!-- Left panel -->
-              <div class="col-md-4">
-                <div class="card shadow-sm h-100 position-relative overflow-visible leaderboard-card">
+    </transition>
 
-                  <div class="card-body text-center pt-4">
-                    <!-- Icon Circle -->
-                    <div
-                      class="d-flex align-items-center justify-content-center mx-auto mb-3 rounded-circle icon-circle-hover"
-                      style="width: 80px; height: 80px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #f59e0b; transition: all 0.3s ease;">
-                      <i class="bi bi-trophy fs-1"></i>
-                    </div>
-
-                    <!-- Title -->
-                    <h6 class="fw-bold mb-3 title-hover" style="font-size: 1.25rem; transition: color 0.3s ease;">
-                      Leaderboard Insights
-                    </h6>
-
-                    <!-- Description -->
-                    <p class="text-secondary small mb-0 lh-base">
-                      {{ leaderboardMessage }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Right panel -->
-              <div class="col-md-8 p-3 p-md-4">
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                  <h5 class="mb-0 fw-bold">
-                    <i class="bi bi-activity me-2"></i>
-                    Waste vs Savings
-                  </h5>
-                  <div class="d-flex align-items-center small fw-semibold">
-                    <span class="me-3 d-inline-flex align-items-center">
-                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #FFA449"></span>
-                      Savings
-                    </span>
-                    <span class="d-inline-flex align-items-center">
-                      <span class="me-2"
-                        style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
-                      Waste
-                    </span>
-                  </div>
-                </div>
-                <div style="height:220px">
-                  <Line :data="wasteVsSavingsData" :options="wasteVsSavingsOpts" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Bottom KPI row -->
-            <div class="row g-3 mt-3 border-top">
-              <!-- Total Waste -->
-              <div class="col-6 col-xl-3">
-                <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
-                    style="width: 48px; height: 48px; background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
-                    <i class="bi bi-trash fs-5"></i>
-                  </div>
-                  <div class="flex-grow-1 min-w-0">
-                    <div class="text-muted small mb-1">Total Waste</div>
-                    <div class="fw-bold h6 mb-0">${{ analytics.totalWaste.money.toFixed(2) }}</div>
-                    <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Total Saved -->
-              <div class="col-6 col-xl-3">
-                <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
-                    style="width: 48px; height: 48px; background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
-                    <i class="bi bi-bag-check fs-5"></i>
-                  </div>
-                  <div class="flex-grow-1 min-w-0">
-                    <div class="text-muted small mb-1">Total Saved</div>
-                    <div class="fw-bold h6 mb-0">${{ analytics.totalSaved.money.toFixed(2) }}</div>
-                    <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Reduction -->
-              <div class="col-6 col-xl-3">
-                <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
-                    style="width: 48px; height: 48px; background-color: rgba(37, 99, 235, 0.1); color: #2563eb;">
-                    <i class="bi bi-graph-down-arrow fs-5"></i>
-                  </div>
-                  <div class="flex-grow-1 min-w-0">
-                    <div class="text-muted small mb-1">Reduction</div>
-                    <div class="fw-bold h6 mb-0">{{ analytics.reduction }}%</div>
-                    <small class="text-muted">waste reduction</small>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Inventory -->
-              <div class="col-6 col-xl-3">
-                <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
-                    style="width: 48px; height: 48px; background-color: rgba(249, 115, 22, 0.1); color: #f97316;">
-                    <i class="bi bi-box-seam fs-5"></i>
-                  </div>
-                  <div class="flex-grow-1 min-w-0">
-                    <div class="text-muted small mb-1">Inventory</div>
-                    <div class="fw-bold h6 mb-0">${{ analytics.inventory.value.toFixed(2) }}</div>
-                    <small class="text-muted">{{ analytics.inventory.items }} items</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-lg-4">
-          <div class="card border-0 shadow-sm p-4" style="border-radius: 16px;">
-  <h5 class="mb-4 fw-bold text-dark">
-    <i class="bi bi-pie-chart me-2"></i>
-    Waste by Category
-  </h5>
-  
-  <!-- Chart Container with Total in Center -->
-  <div class="position-relative mx-auto mb-4" style="width: 240px; height: 300px;" v-if="chartDataStyled.datasets[0].data.length">
-    <Pie :data="chartDataStyled" :options="wasteRingOpts" :plugins="[centerTextPlugin]" />
-    
-    <!-- Dynamic Percentage Labels Outside Ring -->
-    <div v-for="(item, i) in allLegendItems" :key="i" 
-     class="position-absolute"
-     :style="getPercentageLabelPosition(i, allLegendItems)">
-  <div class="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold shadow-lg percentage-badge"
-           :style="{ 
-             width: '56px', 
-             height: '56px', 
-             background: `linear-gradient(135deg, ${item.color} 0%, ${darkenColor(item.color, 20)} 100%)`,
-             fontSize: '1.125rem',
-             border: '2px solid white'
-           }">
-    {{ item.pct }}%
-  </div>
-</div>
-  </div>
-  
-  <p class="text-muted small text-center my-4" v-else>No waste data yet</p>
-
-  <!-- Dynamic Legend at Bottom -->
-  <div class="d-flex flex-wrap justify-content-center gap-3 mt-3" v-if="allLegendItems.length">
-    <div v-for="(item, i) in allLegendItems" :key="i" class="d-flex align-items-center gap-2">
-      <span class="rounded-circle flex-shrink-0" 
-            :style="{ 
-              width: '16px', 
-              height: '16px', 
-              backgroundColor: item.color,
-            }"></span>
-      <span class="text-secondary small fw-medium">{{ item.label }}</span>
-    </div>
-  </div>
-</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Food Inventory -->
-    <div class="row g-4">
+    <!-- Food Inventory - with spacing from above -->
+    <div class="container-fluid p-4">
+      <div class="row g-4">
       <div class="col-lg-8">
         <div class="glass-card p-4">
           <div class="d-flex align-items-center gap-2 mb-4">
@@ -1479,58 +1145,15 @@ const confirmDelete = async () => {
           </div>
           <div v-else class="food-scroll-container">
             <div class="food-scroll-section">
-              <div v-for="food in filteredFoodItems" :key="food.id" :class="[
-                'food-card',
-                getFoodCardClass(food),
-                'd-flex',
-                'flex-column',
-                'justify-content-between',
-              ]">
-                <div>
-                  <div class="food-header">
-                    <div>
-                      <div class="food-title-group align-items-center d-flex gap-2">
-                        <span class="food-name">{{ food.name }}</span>
-
-                        <!-- expired badge -->
-                        <span class="expired-badge" :class="getBadgeClass(food)">
-                          <span v-if="getDaysLeft(food) < 0">Expired</span>
-                          <span v-else-if="getDaysLeft(food) == 0">Today</span>
-                          <span v-else>{{ getDaysLeft(food) }} days</span>
-                        </span>
-                      </div>
-                      <div class="food-category">{{ food.category }}</div>
-                      <div class="food-expiry">Expires: {{ formatDate(food.expirationDate) }}</div>
-                    </div>
-                    <div class="food-right">
-                      <div class="food-price">${{ food.price }}</div>
-                      <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
-                    </div>
-                  </div>
-                </div>
-                <div class="d-flex align-items-end justify-content-between mt-auto w-100">
-                  <button class="food-btn food-btn-recipe px-2 py-1" style="font-size: 0.92em; min-width: 0"
-                    @click.prevent="goToRecipes(food)">
-                    <i class="bi bi-book"></i> Recipes
-                  </button>
-                  <div class="food-actions d-flex gap-2">
-                    <!-- If expired, only show delete. Otherwise allow edit and consume. -->
-                    <template v-if="getDaysLeft(food) < 0">
-                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
-                          class="bi bi-trash"></i></button>
-                    </template>
-                    <template v-else>
-                      <button class="food-btn food-btn-edit" @click.prevent="openEdit(food)"><i
-                          class="bi bi-pencil"></i>
-                        Edit</button>
-                      <button class="food-btn food-btn-use" @click.prevent="openUse(food)"><i class="bi bi-check2"></i>
-                        Consume</button>
-                      <button class="food-btn food-btn-delete" @click.prevent="openDelete(food)"><i
-                          class="bi bi-trash"></i></button>
-                    </template>
-                  </div>
-                </div>
-              </div>
+              <FoodCard
+                v-for="food in filteredFoodItems"
+                :key="food.id"
+                :food="food"
+                @go-to-recipes="goToRecipes"
+                @edit="openEdit"
+                @use="openUse"
+                @delete="openDelete"
+              />
             </div>
           </div>
         </div>
@@ -1573,85 +1196,20 @@ const confirmDelete = async () => {
 
             <div v-else class="d-flex flex-column gap-3 activity-scroll flex-grow-1"
               style="overflow-y: auto; padding-right: 8px;">
-              <div v-for="activity in filteredSortedActivities" :key="activity.id" class="activity-item">
-                <div class="d-flex align-items-start gap-3 position-relative">
-                  <!-- Points Badge - Top Right -->
-                  <div v-if="activity.pointsEarned !== undefined && activity.pointsEarned !== 0"
-                    class="position-absolute top-0 end-0">
-                    <span class="badge d-flex align-items-center gap-1"
-                      :class="activity.pointsEarned > 0 ? 'bg-success' : 'bg-danger'" style="font-size: 0.7rem;">
-                      <i :class="activity.pointsEarned > 0 ? 'bi bi-arrow-up' : 'bi bi-arrow-down'"></i>
-                      {{ Math.abs(activity.pointsEarned) }} pts
-                    </span>
-                  </div>
-
-                  <!-- Icon Circle -->
-                  <div class="flex-shrink-0">
-                    <div class="rounded-circle d-flex align-items-center justify-content-center" :style="{
-                      width: '48px',
-                      height: '48px',
-                      background: getActivityGradient(activity.activityType)
-                    }">
-                      <i :class="getActivityIcon(activity.activityType)" class="text-white fs-5"></i>
-                    </div>
-                  </div>
-
-                  <!-- Content -->
-                  <div class="flex-grow-1 min-w-0">
-                    <h6 class="mb-1 fw-bold small">{{ getActivityTitle(activity.activityType) }}</h6>
-
-                    <!-- Activity Details -->
-                    <div v-if="activity.activityType === 'donFood'" class="mb-1">
-                      <p class="mb-0 small text-secondary">
-                        {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} donated
-                      </p>
-                    </div>
-
-                    <div v-else-if="activity.activityType === 'pendingDonFood'" class="mb-1">
-                      <p class="mb-0 small text-secondary">
-                        {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} pending donation
-                      </p>
-                    </div>
-
-                    <div v-else-if="activity.activityType === 'addFood'" class="mb-1">
-                      <p class="mb-0 small text-secondary">
-                        {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} added
-                      </p>
-                    </div>
-
-                    <div v-else-if="activity.activityType === 'conFood'" class="mb-1">
-                      <p class="mb-0 small"
-                        :class="activity.note === 'fully consumed' ? 'text-success fw-semibold' : 'text-secondary'">
-                        <span v-if="activity.note === 'fully consumed'">
-                          All of {{ activity.foodName }} fully consumed
-                        </span>
-                        <span v-else>
-                          {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} consumed
-                        </span>
-                      </p>
-                    </div>
-
-                    <div v-else-if="activity.activityType === 'expFood'" class="mb-1">
-                      <p class="mb-0 small text-danger fw-semibold">
-                        {{ activity.quantity }} {{ activity.unit }} of {{ activity.foodName }} expired
-                      </p>
-                    </div>
-
-                    <!-- Timestamp -->
-                    <small class="text-muted d-block" style="font-size: 0.75rem;">
-                      <i class="bi bi-clock me-1"></i>{{ getRelativeTime(activity.createdAt) }}
-                    </small>
-                  </div>
-                </div>
-              </div>
+              <ActivityItem
+                v-for="activity in filteredSortedActivities"
+                :key="activity.id"
+                :activity="activity"
+              />
             </div>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Edit Food Modal -->
-    <div v-if="showEditModal" class="modal-backdrop">
+  <!-- Edit Food Modal -->
+  <div v-if="showEditModal" class="modal-backdrop">
       <div class="modal-card">
         <h3 class="h5 mb-3">Edit Food Item</h3>
         <div class="mb-2">
@@ -1820,6 +1378,45 @@ const confirmDelete = async () => {
 </template>
 
 <style scoped>
+/* Charts wrapper - seamless with header */
+.charts-wrapper {
+  background: #faf8f5;
+  margin-top: -2rem; /* Pull up to remove gap */
+}
+
+/* Smooth slide animation */
+.charts-slide-enter-active {
+  transition: all 0.4s ease-out;
+}
+
+.charts-slide-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.charts-slide-enter-from {
+  opacity: 0;
+  transform: translateY(-20px);
+  max-height: 0;
+}
+
+.charts-slide-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 1000px;
+}
+
+.charts-slide-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 1000px;
+}
+
+.charts-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+  max-height: 0;
+}
+
 .dashboard-overview {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.08) 100%);
   border: 1px solid rgba(16, 185, 129, 0.1);
@@ -1828,38 +1425,6 @@ const confirmDelete = async () => {
   position: relative;
   padding: 1.5rem;
   margin-bottom: 1.5rem;
-}
-
-.activity-item {
-  padding: 12px;
-  border-radius: 12px;
-  background: #ffffff;
-  border: 1px solid #f1f5f9;
-  transition: all 0.2s ease;
-}
-
-.activity-item:hover {
-  background: #f8fafc;
-  border-color: #e2e8f0;
-  transform: translateX(4px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.activity-item {
-  animation: slideIn 0.3s ease-out;
 }
 
 .food-scroll-container {
@@ -1875,171 +1440,6 @@ const confirmDelete = async () => {
   max-height: 500px;
   overflow-y: auto;
   padding: 8px;
-}
-
-.food-card {
-  margin-bottom: 16px;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.expired-card {
-  background: #f5dcdc;
-}
-
-.warning-card {
-  background: #fff9c4;
-}
-
-.normal-card {
-  background: #fff;
-}
-
-.expired-badge {
-  border-radius: 6px;
-  padding: 2px 10px;
-  font-weight: bold;
-  transition:
-    background 0.2s,
-    color 0.2s;
-}
-
-.badge-expired {
-  background: #e53935;
-  color: #fff;
-}
-
-.badge-warning {
-  background-color: #ff9800;
-  color: #fff;
-}
-
-.badge-transparent {
-  background: #ede9e8;
-  color: #333;
-}
-.percentage-badge {
-  transition: all 0.3s ease;
-  cursor: pointer;
-  font-size: 0.875rem;
-  letter-spacing: -0.5px;
-}
-
-.percentage-badge:hover {
-  transform: scale(1.15) rotate(5deg);
-}
-
-.flip-card-front,
-.flip-card-back {
-  position: absolute;
-  height: 100%;
-  top: 0;
-  left: 0;
-  backface-visibility: hidden;
-}
-
-.flip-card {
-  cursor: pointer;
-  width: 100%;
-  height: 130px;
-}
-
-.flip-card-inner {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transition: transform 0.6s;
-  transform-style: preserve-3d;
-}
-
-.flip-card-inner.is-flipped {
-  transform: rotateY(180deg);
-}
-
-.flip-card-back {
-  transform: rotateY(180deg);
-}
-
-.food-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.food-title-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sub-details {
-  margin-top: 8px;
-  display: flex;
-  gap: 16px;
-  font-size: 0.9rem;
-  color: #555;
-}
-
-.food-name {
-  font-size: 1.25rem;
-  /* reduced slightly */
-  font-weight: bold;
-}
-
-.food-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-
-.food-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-  margin-top: 16px;
-}
-
-.food-btn {
-  border: none;
-  background: #f5f5f5;
-  color: #333;
-  padding: 6px 16px;
-  border-radius: 6px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition:
-    background 0.2s,
-    color 0.2s;
-}
-
-.food-btn-edit {
-  background: #e0e0e0;
-}
-
-.food-btn-use {
-  background: #e8f5e9;
-  color: #388e3c;
-}
-
-.food-btn-delete {
-  background: #ffebee;
-  color: #e53935;
-}
-
-.food-btn:hover {
-  filter: brightness(0.95);
-}
-
-.food-price {
-  font-size: 1.1rem;
-  /* reduced slightly */
-  font-weight: bold;
-  margin-left: 12px;
 }
 
 .sort-direction-btn {
@@ -2172,31 +1572,6 @@ const confirmDelete = async () => {
       0 8px 30px rgba(229, 57, 53, 0.06),
       0 0 0 rgba(229, 57, 53, 0);
   }
-}
-
-.overflow-visible {
-  overflow: visible;
-}
-
-.leaderboard-card {
-  transition: all 0.3s ease;
-  border: 1px solid white;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06)
-}
-
-.leaderboard-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.04);
-  border: 1px solid #f59e0b;
-}
-
-.leaderboard-card:hover .icon-circle:hover {
-  transform: scale(1.1);
-  background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
-}
-
-.leaderboard-card:hover .title-hover {
-  color: #f59e0b;
 }
 
 /* Make activity card scrollable and match inventory height */

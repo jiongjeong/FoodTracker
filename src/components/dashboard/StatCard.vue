@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, computed, useSlots } from 'vue'
 
 const props = defineProps({
   title: { type: String, required: true },
@@ -10,8 +10,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:flipped'])
+const slots = useSlots()
 const internalFlipped = ref(false)
 
+const hasBackSlot = computed(() => !!slots.back)
 const isControlled = computed(() => props.flipped !== undefined)
 const isFlipped = computed({
   get: () => (isControlled.value ? props.flipped : internalFlipped.value),
@@ -25,15 +27,20 @@ const toggle = () => (isFlipped.value = !isFlipped.value)
 </script>
 
 <template>
-  <div class="flip-card" :style="{ height }" @click="toggle">
+  <div 
+    class="flip-card" 
+    :style="{ height, cursor: hasBackSlot ? 'pointer' : 'default' }" 
+    @click="hasBackSlot ? toggle() : null"
+  >
     <div class="flip-card-inner" :class="{ 'is-flipped': isFlipped }">
       <!-- FRONT -->
       <div
         class="flip-card-front position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
         :style="{
           background: gradient,
-          boxShadow: '0 6px 14px rgba(0, 0, 0, 0.1)',
-          height
+          boxShadow: '0 6px 14px rgba(0, 0, 0, 0.12)',
+          height,
+          opacity: 0.95
         }"
       >
         <!-- Left: Icon + label -->
@@ -53,16 +60,20 @@ const toggle = () => (isFlipped.value = !isFlipped.value)
         <!-- Right: FRONT content -->
         <div class="text-end align-self-end pe-2 mt-2 position-relative" >
           <!-- Default slot becomes the FRONT right content (e.g., numbers, badges) -->
-          <slot />
+          <slot/>
         </div>
 
-        <!-- Front info icon -->
-        <i class="bi bi-info-circle position-absolute top-0 start-0 m-2 text-white opacity-75"
-           style="font-size: 0.875rem;"></i>
+        <!-- Front info icon - only show if has back content -->
+        <i 
+          v-if="hasBackSlot"
+          class="bi bi-info-circle position-absolute top-0 start-0 m-2 text-white opacity-75"
+          style="font-size: 0.875rem;"
+        ></i>
       </div>
 
-      <!-- BACK -->
+      <!-- BACK - only render if has back content -->
       <div
+        v-if="hasBackSlot"
         class="flip-card-back position-absolute p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
         :style="{
           background: gradient,
@@ -104,14 +115,16 @@ const toggle = () => (isFlipped.value = !isFlipped.value)
 .flip-card-back {
   position: absolute;
   height: 100%;
+  width: 100%;
   top: 0;
   left: 0;
   backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .flip-card {
-  cursor: pointer;
   width: 100%;
+  perspective: 1000px;
 }
 
 .flip-card-inner {
