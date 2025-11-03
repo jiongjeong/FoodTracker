@@ -1,10 +1,9 @@
 <template>
-  <div class="recipe-card rounded-3 shadow-sm overflow-hidden h-100 bg-white border">
+  <div class="recipe-card rounded-3 shadow-sm overflow-hidden h-100 bg-white border d-flex flex-column">
     <!-- Recipe Image -->
     <div
-      class="recipe-image-container position-relative overflow-hidden"
-      @click.stop="$emit('view', recipe)"
-    >
+      class="recipe-image-container position-relative overflow-hidden flex-shrink-0"
+      @click.stop="$emit('view', recipe)">
       <img :src="recipe.image" :alt="recipe.name" class="recipe-img" />
       
       <!-- Bookmark Button -->
@@ -22,7 +21,7 @@
     </div>
 
     <!-- Recipe Info -->
-      <div class="p-2 cursor-pointer" @click="$emit('view', recipe)">
+    <div class="p-2 cursor-pointer recipe-info flex-grow-1 d-flex flex-column" @click="$emit('view', recipe)">
       <h6 class="recipe-title fw-bold mb-2 text-dark" style="font-size: 1.06rem;">
         {{ recipe.name }}
       </h6>
@@ -45,8 +44,8 @@
         </span>
       </div>
 
-      <!-- Suggested By -->
-      <div v-if="showSuggestedBy && recipe.suggestedBy?.length" class="mt-2">
+      <!-- Suggested By (pushed to bottom) -->
+      <div v-if="showSuggestedBy && recipe.suggestedBy?.length" class="mt-auto pt-2">
         <p class="mb-1 text-muted fw-semibold" style="font-size: 0.75rem;">Expiring soon:</p>
         <div class="d-flex flex-wrap gap-1">
           <span
