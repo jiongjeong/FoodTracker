@@ -14,44 +14,6 @@ import FoodCard from '@/components/dashboard/FoodCard.vue'
 import ActivityItem from '@/components/dashboard/ActivityItem.vue'
 
 const { success, error, confirm } = useAlert();
-import {
-  chartOptions,
-  wasteVsSavingsOpts,
-  wasteRingOpts,
-  centerTextPlugin,
-  buildWasteVsSavingsData,
-  buildWasteByCategoryChart,
-  styleAsRing,
-  WASTE_COLORS,
-  leaderboardNudge,
-  getPercentageLabelPosition, createAllLegendItems, darkenColor
-} from '@/composables/dashboardDesign'
-import FlippedStatCard from '@/components/dashboard/flippedCard.vue'
-import { Bar, Pie, Line, Doughnut } from 'vue-chartjs'
-import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  ArcElement,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-} from 'chart.js'
-// Register Chart.js components
-ChartJS.register(
-  Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  ArcElement,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-)
 
 const router = useRouter()
 const auth = getAuth()
@@ -249,7 +211,7 @@ const updateFoodScore = async (activityType, price, uid, quantity = 1, isDonatio
       streak: streakDays
     });
 
-    return { newScore, pointsEarned: Math.round(adjustedChange) };
+    return { newScore, pointsEarned: adjustedChange };
   } catch (err) {
     console.error('Failed to update foodScore:', err);
     return { newScore: null, pointsEarned: 0 };
@@ -313,7 +275,9 @@ watchEffect(async () => {
       )
       const snapshot = await getDocs(q)
       if (snapshot.empty) {
-
+        // Calculate points BEFORE creating activity
+        const foodPrice = food.price || 0
+        const foodQty = food.quantity || 1
         const { newScore, pointsEarned } = await updateFoodScore('expFood', food.price, uid, food.quantity);
         if (newScore !== null) {
           userFoodScore.value = newScore;
@@ -328,7 +292,7 @@ watchEffect(async () => {
           quantity: String(food.quantity || ''),
           unit: String(food.unit || ''),
           note: 'expired',
-          pointsEarned: pointsEarned 
+          pointsEarned: pointsEarned // ← ADD THIS LINE
         }
         const docRef = await addDoc(actRef, payload)
         activities.value.unshift({
@@ -648,12 +612,33 @@ const analytics = computed(() => {
   const reductionPercentage =
     totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
 
-  // Calculate inventory value
-  // Since food item prices are already updated when sharing (remaining price after deduction),
-  // we can simply sum up the current prices
+  // Calculate inventory value excluding pending donations
+  // For each food item, calculate its current value based on remaining quantity
   const inventoryValue = inventoryActivities.reduce((sum, item) => {
-    const currentPrice = Number(item.price) || 0
-    return sum + currentPrice
+    const originalPrice = Number(item.price) || 0
+    const currentQty = Number(item.quantity) || 0
+
+    // Find all pending donations for this specific food item
+    const itemPendingDonations = pendingDonations.filter(
+      (activity) => activity.foodId === item.id
+    )
+
+    // Calculate total quantity that's pending donation
+    const pendingQty = itemPendingDonations.reduce((total, activity) => {
+      return total + (Number(activity.quantity) || 0)
+    }, 0)
+
+    // Total quantity (current + pending) to calculate price per unit
+    const totalQty = currentQty + pendingQty
+
+    // Calculate the value of only the remaining quantity
+    let itemValue = originalPrice
+    if (totalQty > 0) {
+      const pricePerUnit = originalPrice / totalQty
+      itemValue = pricePerUnit * currentQty
+    }
+
+    return sum + itemValue
   }, 0)
 
   const adjustedInventoryValue = Math.max(0, inventoryValue)
@@ -825,7 +810,7 @@ const saveUse = async () => {
       price: String(pricePerUnit),
       quantity: String(usedQty),
       unit: food.unit || '',
-      pointsEarned: pointsEarned
+      pointsEarned: pointsEarned // ← ADD THIS LINE
     }
     const docRef = await addDoc(actRef, activityPayload)
     activities.value.unshift({
@@ -1085,308 +1070,39 @@ const confirmDelete = async () => {
 </script>
 
 <template>
-  <div class="container-fluid p-4">
-    <div class="dashboard-overview">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h1 class="h2 mb-2 fw-bold">Dashboard</h1>
-          <p class="text-muted mb-0">Track your food inventory and reduce waste</p>
-        </div>
-        <div class="ms-3">
-          <div style="transform: rotateY(9.20483deg)">
-            <button @click="overviewCollapsed = !overviewCollapsed" :aria-expanded="!overviewCollapsed"
-              class="btn btn-sm btn-outline-secondary header-collapse-btn">
-              <i :class="overviewCollapsed ? 'bi bi-chevron-up' : 'bi bi-chevron-down'"></i>
-              <span class="visually-hidden">Toggle overview rows</span>
-            </button>
-          </div>
-        </div>
-      </div>
+  <div class="container-fluid p-0">
+    <!-- Dashboard Header with Stats Cards -->
+    <DashboardHeader 
+      :userFoodScore="userFoodScore"
+      :expiringSoon="expiringSoon"
+      :potentialLoss="potentialLoss"
+      :expired="expired"
+      :analytics="analytics"
+      :overviewCollapsed="overviewCollapsed"
+      @toggle-overview="overviewCollapsed = !overviewCollapsed"
+    />
 
-      <div class="row g-3 mb-3">
-        <div class="col-6 col-lg-3">
-          <FlippedStatCard
-            title="Food Score"
-            iconClass="bi bi-graph-up-arrow"
-            :gradient="`linear-gradient(135deg, rgba(0, 102, 60, 0.85) 0%, rgba(50, 200, 120, 0.6) 100%)`"
-            height="130px"
-          >
-            <!-- FRONT content -->
-            <template #default>
-              <h3 class="fw-bold mb-0 text-white">{{ userFoodScore }}</h3>
-              <small class="text-white">points</small>
-
-              <!-- Streak badge -->
-              <div v-if="analytics.streakDays > 0" class="mt-2">
-                <span
-                  class="streak-fire"
-                  :class="{
-                    'fire-small': analytics.streakDays < 7,
-                    'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
-                    'fire-large': analytics.streakDays >= 14
-                  }"
-                >🔥</span>
-                <span class="streak-text text-white">
-                  {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }} streak
-                </span>
-              </div>
-            </template>
-
-            <!-- BACK content -->
-            <template #back>
-              <p class="mb-0 text-white small text-center mt-2" style="font-size:10px">
-                Rewards when food is consumed and money saved,
-                penalizes waste, and adds bonus points for food donations
-              </p>
-            </template>
-          </FlippedStatCard>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-            style="
-              background: linear-gradient(
-                135deg,
-                rgba(0, 74, 173, 0.85) 0%,
-                rgba(59, 130, 246, 0.65) 100%
-              );
-              box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-              height: 130px;
-            ">
-            <!-- Left: Icon + label -->
-            <div class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-              style="width: 90px">
-              <div
-                class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                style="width: 56px; height: 56px">
-                <i class="bi bi-exclamation-triangle fs-5 text-white"></i>
-              </div>
-              <small class="text-white text-center">Expiring Soon</small>
+    <!-- Charts Section - Seamless with header -->
+    <transition name="charts-slide">
+      <div v-show="overviewCollapsed" class="charts-wrapper">
+        <div class="container-fluid px-4 py-4">
+          <div class="row g-4">
+            <div class="col-lg-8">
+              <WasteVsSavingsChart
+                :activities="activities"
+                :analytics="analytics"
+              />
             </div>
 
-            <!-- Right: Count -->
-            <div class="text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0 text-white">{{ expiringSoon }}</h3>
-              <small class="text-white">items</small>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-         <FlippedStatCard
-            title="Potential Loss"
-            iconClass="bi bi-currency-dollar"
-            :gradient="`linear-gradient(135deg, rgba(153, 27, 27, 0.9) 0%, rgba(239, 68, 68, 0.65) 100%)`"
-            height="130px"
-          >
-            <!-- FRONT content -->
-            <template #default>
-              <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
-              <small class="text-white">if expired</small>
-            </template>
-
-            <!-- BACK content -->
-            <template #back>
-              <p class="mb-0 text-white small text-center mt-3 mt-md-4" style="font-size:10px">
-                Measures the total value of food that’s at risk of expiring within the next 7 days.
-              </p>
-            </template>
-          </FlippedStatCard>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="position-relative p-3 rounded-4 text-white shadow d-flex flex-column justify-content-between"
-            style="
-              background: linear-gradient(
-                135deg,
-                rgba(202, 84, 0, 0.9) 0%,
-                rgba(249, 115, 22, 0.65) 100%
-              );
-              box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-              height: 130px;
-            ">
-            <!-- Left: Icon + label -->
-            <div class="position-absolute top-50 start-0 translate-middle-y ms-3 d-flex flex-column align-items-center"
-              style="width: 90px">
-              <div
-                class="rounded-circle bg-white bg-opacity-25 d-flex justify-content-center align-items-center mb-1 p-2"
-                style="width: 56px; height: 56px">
-                <i class="bi bi-calendar-x fs-5 text-white"></i>
-              </div>
-              <small class="text-white text-center">Expired</small>
-            </div>
-
-            <!-- Right: Count -->
-            <div class="text-end align-self-end pe-2 mt-2 position-relative">
-              <h3 class="fw-bold mb-0 text-white">{{ expired }}</h3>
-              <small class="text-white">items</small>
+            <div class="col-lg-4">
+              <WasteByCategoryChart
+                :activities="activities"
+              />
             </div>
           </div>
         </div>
       </div>
-      <!-- Charts Section -->
-      <div class="row g-4 mb-3" v-show="overviewCollapsed">
-        <div class="col-lg-8">
-          <div class="glass-card p-4 charts-left-card h-100 d-flex flex-column">
-            <div class="row g-0">
-              <!-- Left panel -->
-              <div class="col-md-4">
-                <div class="card shadow-sm h-100 position-relative overflow-visible leaderboard-card">
-
-                  <div class="card-body text-center pt-4">
-                    <!-- Icon Circle -->
-                    <div
-                      class="d-flex align-items-center justify-content-center mx-auto mb-3 rounded-circle icon-circle-hover"
-                      style="width: 80px; height: 80px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #f59e0b; transition: all 0.3s ease;">
-                      <i class="bi bi-trophy fs-1"></i>
-                    </div>
-
-                    <!-- Title -->
-                    <h6 class="fw-bold mb-3 title-hover" style="font-size: 1.25rem; transition: color 0.3s ease;">
-                      Leaderboard Insights
-                    </h6>
-
-                    <!-- Description -->
-                    <p class="text-secondary small mb-0 lh-base">
-                      {{ leaderboardMessage }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Right panel -->
-              <div class="col-md-8 p-3 p-md-4">
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                  <h5 class="mb-0 fw-bold">
-                    <i class="bi bi-activity me-2"></i>
-                    Waste vs Savings
-                  </h5>
-                  <div class="d-flex align-items-center small fw-semibold">
-                    <span class="me-3 d-inline-flex align-items-center">
-                      <span class="me-2" style="width:10px; height:10px; border-radius:50%; background: #FFA449"></span>
-                      Savings
-                    </span>
-                    <span class="d-inline-flex align-items-center">
-                      <span class="me-2"
-                        style="width:10px; height:10px; border-radius:50%; background: #7B61FF;"></span>
-                      Waste
-                    </span>
-                  </div>
-                </div>
-                <div style="height:220px">
-                  <Line :data="wasteVsSavingsData" :options="wasteVsSavingsOpts" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Bottom KPI row -->
-            <div class="row g-3 mt-3 border-top">
-              <!-- Total Waste -->
-              <div class="col-6 col-xl-3">
-                <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
-                    style="width: 48px; height: 48px; background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
-                    <i class="bi bi-trash fs-5"></i>
-                  </div>
-                  <div class="flex-grow-1 min-w-0">
-                    <div class="text-muted small mb-1">Total Waste</div>
-                    <div class="fw-bold h6 mb-0">${{ analytics.totalWaste.money.toFixed(2) }}</div>
-                    <small class="text-muted">{{ analytics.totalWaste.items }} items</small>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Total Saved -->
-              <div class="col-6 col-xl-3">
-                <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
-                    style="width: 48px; height: 48px; background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
-                    <i class="bi bi-bag-check fs-5"></i>
-                  </div>
-                  <div class="flex-grow-1 min-w-0">
-                    <div class="text-muted small mb-1">Total Saved</div>
-                    <div class="fw-bold h6 mb-0">${{ analytics.totalSaved.money.toFixed(2) }}</div>
-                    <small class="text-muted">{{ analytics.totalSaved.items }} items</small>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Reduction -->
-              <div class="col-6 col-xl-3">
-                <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
-                    style="width: 48px; height: 48px; background-color: rgba(37, 99, 235, 0.1); color: #2563eb;">
-                    <i class="bi bi-graph-down-arrow fs-5"></i>
-                  </div>
-                  <div class="flex-grow-1 min-w-0">
-                    <div class="text-muted small mb-1">Reduction</div>
-                    <div class="fw-bold h6 mb-0">{{ analytics.reduction }}%</div>
-                    <small class="text-muted">waste reduction</small>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Inventory -->
-              <div class="col-6 col-xl-3">
-                <div class="d-flex align-items-center">
-                  <div class="rounded-3 d-flex justify-content-center align-items-center flex-shrink-0 me-3"
-                    style="width: 48px; height: 48px; background-color: rgba(249, 115, 22, 0.1); color: #f97316;">
-                    <i class="bi bi-box-seam fs-5"></i>
-                  </div>
-                  <div class="flex-grow-1 min-w-0">
-                    <div class="text-muted small mb-1">Inventory</div>
-                    <div class="fw-bold h6 mb-0">${{ analytics.inventory.value.toFixed(2) }}</div>
-                    <small class="text-muted">{{ analytics.inventory.items }} items</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-lg-4">
-          <div class="card border-0 shadow-sm p-4" style="border-radius: 16px;">
-  <h5 class="mb-4 fw-bold text-dark">
-    <i class="bi bi-pie-chart me-2"></i>
-    Waste by Category
-  </h5>
-  
-  <!-- Chart Container with Total in Center -->
-  <div class="position-relative mx-auto mb-4" style="width: 240px; height: 300px;" v-if="chartDataStyled.datasets[0].data.length">
-    <Pie :data="chartDataStyled" :options="wasteRingOpts" :plugins="[centerTextPlugin]" />
-    
-    <!-- Dynamic Percentage Labels Outside Ring -->
-    <div v-for="(item, i) in allLegendItems" :key="i" 
-     class="position-absolute"
-     :style="getPercentageLabelPosition(i, allLegendItems)">
-  <div class="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold shadow-lg percentage-badge"
-           :style="{ 
-             width: '56px', 
-             height: '56px', 
-             background: `linear-gradient(135deg, ${item.color} 0%, ${darkenColor(item.color, 20)} 100%)`,
-             fontSize: '1.125rem',
-             border: '2px solid white'
-           }">
-    {{ item.pct }}%
-  </div>
-</div>
-  </div>
-  
-  <p class="text-muted small text-center my-4" v-else>No waste data yet</p>
-
-  <!-- Dynamic Legend at Bottom -->
-  <div class="d-flex flex-wrap justify-content-center gap-3 mt-3" v-if="allLegendItems.length">
-    <div v-for="(item, i) in allLegendItems" :key="i" class="d-flex align-items-center gap-2">
-      <span class="rounded-circle flex-shrink-0" 
-            :style="{ 
-              width: '16px', 
-              height: '16px', 
-              backgroundColor: item.color,
-            }"></span>
-      <span class="text-secondary small fw-medium">{{ item.label }}</span>
-    </div>
-  </div>
-</div>
-        </div>
-      </div>
-    </div>
+    </transition>
 
     <!-- Food Inventory - with spacing from above -->
     <div class="container-fluid p-4">
