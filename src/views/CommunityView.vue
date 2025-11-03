@@ -156,7 +156,8 @@ function onSelectFoodItem() {
     } else {
       shareForm.value.expirationDate = ''
     }
-    shareForm.value.quantity = selected.quantity || ''
+    // Don't auto-fill quantity - let user enter the amount they want to share
+    shareForm.value.quantity = ''
     shareForm.value.unit = selected.unit || ''
 
     console.log('Updated shareForm:', shareForm.value)
@@ -347,6 +348,7 @@ async function submitShare(formData) {
     const payload = {
       ownerId: currentUser.value.uid,
       foodId: data.foodItemId,
+      foodName: data.foodName, // Store food name for reference
       category: data.category,
       quantity: qtyToShare,
       unit: data.unit,
@@ -369,11 +371,14 @@ async function submitShare(formData) {
     const currentQty = Number(currentItem?.quantity || 0)
     const totalPrice = Number(currentItem?.price || 0)
 
+    // Store the original quantity (before donation) for percentage calculation later
+    const originalQty = currentQty
+
     // Calculate price per unit from total price
-    const pricePerUnit = currentQty > 0 ? totalPrice / currentQty : 0
+    const pricePerUnit = currentQty > 0 ? Math.round((totalPrice / currentQty) * 100) / 100 : 0
     const newQty = Math.max(0, currentQty - qtyToShare)
-    const remainingPrice = pricePerUnit * newQty
-    const sharedPrice = pricePerUnit * qtyToShare
+    const remainingPrice = Math.round(pricePerUnit * newQty * 100) / 100
+    const sharedPrice = Math.round(pricePerUnit * qtyToShare * 100) / 100
 
     if (currentQty < qtyToShare) {
 
@@ -401,6 +406,7 @@ async function submitShare(formData) {
       foodId: payload.foodId,
       quantity: payload.quantity,
       unit: payload.unit,
+      originalQuantity: originalQty, // Store original quantity for percentage calculation
     })
 
     await success("Food shared successfully!")
@@ -410,57 +416,6 @@ async function submitShare(formData) {
   } catch (err) {
     console.error("Error adding listing:", err)
     await error('Failed to share food: ' + (err.message || err))
-  }
-}
-
-// Helper function to get streak days
-const getStreakDays = async (uid) => {
-  if (!uid) return 0
-
-  try {
-    const activityRef = collection(db, 'user', uid, 'activities')
-    const activitySnapshot = await getDocs(activityRef)
-    const activities = activitySnapshot.docs.map((doc) => doc.data())
-
-    if (activities.length === 0) return 0
-
-    const activityDates = [
-      ...new Set(
-        activities
-          .map((a) => {
-            const date = new Date(a.createdAt)
-            return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-          })
-          .filter((timestamp) => !isNaN(timestamp)),
-      ),
-    ].sort((a, b) => b - a)
-
-    if (activityDates.length === 0) return 0
-
-    const today = new Date()
-    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
-    const oneDayMs = 24 * 60 * 60 * 1000
-
-    let streak = 0
-    let expectedDate = todayMidnight
-
-    if (activityDates[0] < todayMidnight - oneDayMs) {
-      return 0
-    }
-
-    for (const activityDate of activityDates) {
-      if (activityDate === expectedDate || activityDate === expectedDate - oneDayMs) {
-        streak++
-        expectedDate = activityDate - oneDayMs
-      } else {
-        break
-      }
-    }
-
-    return streak
-  } catch (err) {
-    console.error('Failed to calculate streak:', err)
-    return 0
   }
 }
 
@@ -483,9 +438,17 @@ async function markAsDonated(item) {
     const foodItemSnap = await getDoc(foodItemRef)
 
     let isFullyDonated = false
+    let originalQty = 0
     if (foodItemSnap.exists()) {
       const remainingQty = Number(foodItemSnap.data().quantity || 0)
       isFullyDonated = remainingQty <= 0
+
+      // Calculate original quantity (current + donated)
+      originalQty = remainingQty + Number(item.quantity)
+    } else {
+      // If food item doesn't exist, the donated quantity was the original
+      originalQty = Number(item.quantity)
+      isFullyDonated = true
     }
 
     try {
@@ -508,22 +471,26 @@ async function markAsDonated(item) {
     const donationQty = Number(item.quantity) || 1
     const donationTotalPrice = Number(item.price) || 0  // This is total price from listing
 
-    // Get streak for multiplier
-    const streakDays = await getStreakDays(currentUser.value.uid)
-    const streakMultiplier = streakDays > 0 ? (1 + streakDays / 7) : 1
+    // Calculate percentage of food donated
+    const percentageDonated = originalQty > 0 ? (donationQty / originalQty) * 100 : 100
 
-    // Calculate score: (0.4 * qty) + (0.2 * totalPrice) + (0.5 * qty for donation bonus)
-    const baseScoreChange = (0.4 * donationQty) + (0.2 * donationTotalPrice) + (0.5 * donationQty)
-    const adjustedChange = baseScoreChange * streakMultiplier
-
+    // Get current score and streak from Firebase
     const userDocRef = doc(db, 'user', currentUser.value.uid)
     const userSnap = await getDoc(userDocRef)
     const currentScore = userSnap.exists() ? (userSnap.data().foodScore || 0) : 0
-    const newScore = Math.round(Math.max(0, currentScore + adjustedChange))
+    const streakDays = userSnap.exists() ? (userSnap.data().streak || 0) : 0
+
+    const streakMultiplier = streakDays > 0 ? (1 + streakDays / 7) : 1
+
+    // Calculate score using percentage: +40 points per 100%, +0.2*price, +50 bonus per 100%
+    const normalizedPercentage = percentageDonated / 100
+    const baseScoreChange = (40 * normalizedPercentage) + (0.2 * donationTotalPrice) + (50 * normalizedPercentage)
+    const adjustedChange = Math.round(baseScoreChange * streakMultiplier)
+
+    const newScore = Math.max(0, currentScore + adjustedChange)
 
     await updateDoc(userDocRef, {
-      foodScore: newScore,
-      streak: streakDays
+      foodScore: newScore
     })
 
     // Log donation activity with points earned
@@ -535,7 +502,7 @@ async function markAsDonated(item) {
       price: donationTotalPrice,  // Store total price
       quantity: donationQty,
       unit: item.unit,
-      pointsEarned: Math.round(adjustedChange)
+      pointsEarned: adjustedChange
     }
 
     // If fully donated, add note to mark it
@@ -632,11 +599,13 @@ const isEditQuantityValid = computed(() => {
 
 // Computed food items with status for modal
 const foodItemsWithStatus = computed(() => {
-  return foodItems.value.map(item => ({
-    ...item,
-    remainingQty: getRemainingQuantity(item.id),
-    isExpired: isExpiredItem(item)
-  }))
+  return foodItems.value
+    .map(item => ({
+      ...item,
+      remainingQty: getRemainingQuantity(item.id),
+      isExpired: isExpiredItem(item)
+    }))
+    .filter(item => item.remainingQty > 0 && !item.isExpired) // Exclude items with no remaining quantity or expired items
 })
 
 const isExpiredItem = (item) => {
@@ -904,11 +873,11 @@ async function submitEdit() {
           const currentFoodPrice = Number(foodItemSnap.data().price || 0)
 
           // Calculate per-unit price from current food item
-          const pricePerUnit = currentFoodQty > 0 ? currentFoodPrice / currentFoodQty : 0
+          const pricePerUnit = currentFoodQty > 0 ? Math.round((currentFoodPrice / currentFoodQty) * 100) / 100 : 0
 
           // Calculate new quantity and price
           const updatedFoodQty = currentFoodQty - qtyDifference
-          const updatedFoodPrice = pricePerUnit * updatedFoodQty
+          const updatedFoodPrice = Math.round(pricePerUnit * updatedFoodQty * 100) / 100
 
           await updateDoc(foodItemRef, {
             quantity: updatedFoodQty,
@@ -946,8 +915,8 @@ async function submitEdit() {
         const oldActivityQty = Number(activityDoc.data().quantity) || 1
 
         // Calculate price per unit from the activity (which stores the original proportional price)
-        const pricePerUnit = oldActivityQty > 0 ? oldActivityPrice / oldActivityQty : 0
-        const updatedPrice = pricePerUnit * newQty
+        const pricePerUnit = oldActivityQty > 0 ? Math.round((oldActivityPrice / oldActivityQty) * 100) / 100 : 0
+        const updatedPrice = Math.round(pricePerUnit * newQty * 100) / 100
 
         await updateDoc(activityDoc.ref, {
           quantity: newQty,
@@ -1055,17 +1024,17 @@ async function canDonated(item) {
         const firstActivity = activitiesSnap.docs[0]
         const activityQty = Number(firstActivity.data().quantity) || 1
         const activityPrice = Number(firstActivity.data().price) || 0
-        const pricePerUnit = activityQty > 0 ? activityPrice / activityQty : 0
-        priceToReturn = pricePerUnit * returnQty
+        const pricePerUnit = activityQty > 0 ? Math.round((activityPrice / activityQty) * 100) / 100 : 0
+        priceToReturn = Math.round(pricePerUnit * returnQty * 100) / 100
         activityToDelete = firstActivity
       }
     } else {
       // Fallback: calculate proportionally from current food price
-      const pricePerUnit = originalFoodQty > 0 ? currentFoodPrice / originalFoodQty : 0
-      priceToReturn = pricePerUnit * returnQty
+      const pricePerUnit = originalFoodQty > 0 ? Math.round((currentFoodPrice / originalFoodQty) * 100) / 100 : 0
+      priceToReturn = Math.round(pricePerUnit * returnQty * 100) / 100
     }
 
-    const newPrice = currentFoodPrice + priceToReturn
+    const newPrice = Math.round((currentFoodPrice + priceToReturn) * 100) / 100
 
     console.log('💰 Price calculation:', {
       currentFoodPrice,
@@ -1623,6 +1592,7 @@ const getGoogleMapsUrl = (location) => {
     @submit="submitShare"
     @select-food="(foodId) => { shareForm.foodItemId = foodId; onSelectFoodItem(); }"
     @location-selected="shareForm.location = $event"
+    @update:quantity="shareForm.quantity = $event"
   />
 
   <!-- Edit Donation Modal -->
@@ -1637,6 +1607,7 @@ const getGoogleMapsUrl = (location) => {
     @submit="submitEdit"
     @select-food="() => {}"
     @location-selected="editForm.location = $event"
+    @update:quantity="editForm.quantity = $event"
   />
 </template>
 
