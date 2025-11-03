@@ -22,6 +22,12 @@ const { user } = useUser()
 const { activeFoodItems, expiringSoon } = useFoodItems()
 
 const messages = ref([
+  {
+    id: 'welcome-1',
+    text: "👋 Hello! I'm BigBacks Brain, your AI assistant for smart food management. \nHow can I help you today?",
+    sender: 'ai',
+    timestamp: new Date()
+  }
 ])
 
 const messageInput = ref('')
@@ -35,6 +41,16 @@ const quickQuestions = [
   'Tips for meal planning'
 ]
 
+// helps to hide header/cards after first interaction
+const hasStarted = ref(false)
+const hideFeatureCards = ref(false)
+const startIfNeeded = () => {
+  if (!hasStarted.value) {
+    hasStarted.value = true
+    hideFeatureCards.value = true
+  }
+}
+
 // TODO: Replace with actual user context from stores
 const userContext = computed(() => ({
   inventoryCount: activeFoodItems.value.length,
@@ -45,6 +61,10 @@ const userContext = computed(() => ({
 
 const sendMessage = async () => {
   if (!messageInput.value.trim() || isLoading.value) return
+
+  // NEW: mark started + hide feature cards immediately
+  hasStarted.value = true
+  hideFeatureCards.value = true
 
   const userMessage = {
     id: Date.now().toString(),
@@ -137,136 +157,151 @@ onMounted(() => {
 <template>
   <div class="chatbot-page">
     <div class="content-wrapper">
-      <!-- Header -->
-      <div class="text-center mb-4">
-        <h1 class="display-6 fw-bold mb-2">Welcome to BigBacks Brain</h1>
-        <p class="lead text-secondary">Smart food storage, recipes, and waste reduction powered by AI</p>
-      </div>
-
-      <!-- Feature Cards -->
-      <div id="featureCards" class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3 mb-4">
-          <div class="col">
-            <div class="feature-card bg-gradient-blue">
-              <div class="icon-wrapper icon-gradient-blue">
-                <i class="bi bi-clock fs-5"></i>
-              </div>
-              <h5 class="text-dark">Storage Tips</h5>
-              <p class="text-secondary">Learn optimal storage methods for different foods.</p>
-              <div class="decoration"></div>
-            </div>
+      <!-- Two Column Layout -->
+      <div class="row g-4">
+        <!-- Left Column: Chatbot -->
+        <div class="col-12 col-lg-8">
+          <!-- Header (hide once chat starts) -->
+          <div v-if="!hasStarted" class="text-center mb-4">
+            <h1 class="display-6 fw-bold mb-2">Welcome to 
+              <span class="text-success">
+                BigBacks Brain
+              </span>
+            </h1>
+            <p class="lead text-secondary">Smart food storage, recipes, and waste reduction powered by AI</p>
           </div>
-          <div class="col">
-            <div class="feature-card bg-gradient-orange">
-              <div class="icon-wrapper icon-gradient-orange">
-                <i class="bi bi-egg-fried fs-5"></i>
-              </div>
-              <h5 class="text-dark">Recipe Ideas</h5>
-              <p class="text-secondary">Get creative recipes using leftover ingredients.</p>
-              <div class="decoration"></div>
-            </div>
-          </div>
-          <div class="col">
-            <div class="feature-card bg-gradient-purple">
-              <div class="icon-wrapper icon-gradient-purple">
-                <i class="bi bi-trash3 fs-5"></i>
-              </div>
-              <h5 class="text-dark">Waste Reduction</h5>
-              <p class="text-secondary">Tips to minimize food waste and save money.</p>
-              <div class="decoration"></div>
-            </div>
-          </div>
-          <div class="col">
-            <div class="feature-card bg-gradient-cyan">
-              <div class="icon-wrapper icon-gradient-cyan">
-                <i class="bi bi-lightbulb fs-5"></i>
-              </div>
-              <h5 class="text-dark">Smart Planning</h5>
-              <p class="text-secondary">Meal planning strategies for efficiency.</p>
-              <div class="decoration"></div>
-            </div>
-          </div>
-        </div>
 
-      <!-- Chat Shell: messages scroll; composer stays fixed at bottom -->
-      <div class="chat-shell">
-        <!-- Chat Messages -->
-        <div class="chat-messages" id="chatContainer" ref="chatContainer">
-          <div
-            v-for="msg in messages"
-            :key="msg.id"
-            class="message-row"
-            :class="msg.sender === 'user' ? 'is-user' : 'is-ai'"
-          >
-            <div class="avatar" :class="msg.sender === 'user' ? 'avatar-user' : 'avatar-ai'">
-              <i :class="msg.sender === 'user' ? 'bi bi-person-fill' : 'bi bi-robot'"></i>
-            </div>
-
-            <div class="bubble">
-              <div class="bubble-content">
-                <div class="message-text">{{ msg.text }}</div>
+          <!-- Feature Cards (hide once chat starts) -->
+          <transition name="fade-slide" appear>
+            <div v-show="!hideFeatureCards && !hasStarted" id="featureCards" class="row row-cols-1 row-cols-md-2 g-3 mb-4">
+              <div class="col">
+                <div class="feature-card bg-gradient-blue">
+                  <div class="icon-wrapper icon-gradient-blue">
+                    <i class="bi bi-clock fs-5"></i>
+                  </div>
+                  <h5 class="text-dark">Storage Tips</h5>
+                  <p class="text-secondary">Learn optimal storage methods for different foods.</p>
+                  <div class="decoration"></div>
+                </div>
               </div>
-              <div class="bubble-meta">
-                <small class="timestamp">{{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</small>
+              <div class="col">
+                <div class="feature-card bg-gradient-orange">
+                  <div class="icon-wrapper icon-gradient-orange">
+                    <i class="bi bi-egg-fried fs-5"></i>
+                  </div>
+                  <h5 class="text-dark">Recipe Ideas</h5>
+                  <p class="text-secondary">Get creative recipes using leftover ingredients.</p>
+                  <div class="decoration"></div>
+                </div>
+              </div>
+              <div class="col">
+                <div class="feature-card bg-gradient-purple">
+                  <div class="icon-wrapper icon-gradient-purple">
+                    <i class="bi bi-trash3 fs-5"></i>
+                  </div>
+                  <h5 class="text-dark">Waste Reduction</h5>
+                  <p class="text-secondary">Tips to minimize food waste and save money.</p>
+                  <div class="decoration"></div>
+                </div>
+              </div>
+              <div class="col">
+                <div class="feature-card bg-gradient-cyan">
+                  <div class="icon-wrapper icon-gradient-cyan">
+                    <i class="bi bi-lightbulb fs-5"></i>
+                  </div>
+                  <h5 class="text-dark">Smart Planning</h5>
+                  <p class="text-secondary">Meal planning strategies for efficiency.</p>
+                  <div class="decoration"></div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </transition>
 
-
-
-        <!-- Composer -->
-        <div class="chat-composer">
-          <div class="quick-questions-wrapper mb-3">
-            <div class="d-flex gap-2 flex-wrap justify-content-center">
-              <button
-                v-for="question in quickQuestions"
-                :key="question"
-                class="btn btn-sm btn-outline-secondary quick-btn"
-                @click="handleQuickQuestion(question)"
-                :disabled="isLoading"
+          <!-- Chat Shell -->
+          <div class="chat-shell">
+            <!-- Chat Messages -->
+            <div class="chat-messages" id="chatContainer" ref="chatContainer">
+              <div
+                v-for="msg in messages"
+                :key="msg.id"
+                class="message-row"
+                :class="msg.sender === 'user' ? 'is-user' : 'is-ai'"
               >
-                {{ question }}
-              </button>
+                <div class="avatar" :class="msg.sender === 'user' ? 'avatar-user' : 'avatar-ai'">
+                  <i :class="msg.sender === 'user' ? 'bi bi-person-fill' : 'bi bi-robot'"></i>
+                </div>
+
+                <div class="bubble">
+                  <div class="bubble-content">
+                    <div class="message-text">{{ msg.text }}</div>
+                  </div>
+                  <div class="bubble-meta">
+                    <small class="timestamp">{{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Composer -->
+            <div class="chat-composer">
+              <div class="quick-questions-wrapper mb-3">
+                <div class="d-flex gap-2 flex-wrap justify-content-center">
+                  <button
+                    v-for="question in quickQuestions"
+                    :key="question"
+                    class="btn btn-sm btn-outline-secondary quick-btn"
+                    @click="handleQuickQuestion(question)"
+                    :disabled="isLoading"
+                  >
+                    {{ question }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Input Area -->
+              <div class="input-area">
+                <!-- Error Display -->
+                <div v-if="error && error.length" class="alert alert-danger error-alert">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span>{{ error }}</span>
+                    <button type="button" class="btn-close" @click="clearError"></button>
+                  </div>
+                </div>
+
+                <div class="input-group-wrapper">
+                  <div class="input-wrapper">
+                    <input
+                      v-model="messageInput"
+                      @focus="startIfNeeded"
+                      @keydown.once="startIfNeeded"
+                      @keyup.enter="sendMessage"
+                      type="text"
+                      id="messageInput"
+                      class="form-control message-input"
+                      placeholder="Ask me anything..."
+                      maxlength="500"
+                    />
+                    <i class="bi bi-stars input-icon"></i>
+                  </div>
+                  <button class="btn btn-send" id="sendBtn" :disabled="isLoading" @click="sendMessage">
+                    <i class="bi bi-send"></i>
+                  </button>
+                </div>
+                <div class="char-count-wrapper">
+                  <small class="text-secondary" id="charCount">{{ charCount }}</small>
+                </div>
+              </div>
             </div>
           </div>
+        </div>
 
-          <!-- Input Area -->
-          <div class="input-area">
-            <!-- Error Display -->
-            <div v-if="error && error.length" class="alert alert-danger error-alert">
-              <div class="d-flex justify-content-between align-items-center">
-                <span>{{ error }}</span>
-                <button type="button" class="btn-close" @click="clearError"></button>
-              </div>
-            </div>
-
-            <div class="input-group-wrapper">
-              <div class="input-wrapper">
-                <input
-                  v-model="messageInput"
-                  @keyup.enter="sendMessage"
-                  type="text"
-                  id="messageInput"
-                  class="form-control message-input"
-                  placeholder="Ask me anything..."
-                  maxlength="500"
-                />
-                <i class="bi bi-stars input-icon"></i>
-              </div>
-              <button class="btn btn-send" id="sendBtn" :disabled="isLoading" @click="sendMessage">
-                <i class="bi bi-send"></i>
-              </button>
-            </div>
-            <div class="char-count-wrapper">
-              <small class="text-secondary" id="charCount">{{ charCount }}</small>
-            </div>
+        <!-- Right Column: News Vertical Carousel -->
+        <div class="col-12 col-lg-4">
+          <div class="news-sidebar">
+            <news />
           </div>
         </div>
       </div>
-                <!-- News Component -->
-        <div class="news-wrapper">
-          <news />
-        </div>
     </div>
   </div>
 
@@ -295,13 +330,32 @@ onMounted(() => {
 .content-wrapper {
   max-width: 1400px;
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
 }
 
-.news-wrapper {
-  width: 100%;
+.news-sidebar {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
+/* Vertical scrollbar for news sidebar */
+.news-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.news-sidebar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+.news-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.3);
+  border-radius: 10px;
+}
+
+.news-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.5);
 }
 
 /* Feature Cards */

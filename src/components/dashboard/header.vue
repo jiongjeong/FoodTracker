@@ -16,24 +16,16 @@
       </div>
     </div>
 
-    <!-- Floating Elements -->
-    <div class="floating-element position-absolute" 
-         style="top: 55%; left: 40%; font-size: 2rem; animation-delay: 0s;">📊</div>
-    
-    <div class="floating-element position-absolute" 
-         style="top: 15%; left: 48%; font-size: 1.8rem; animation-delay: 1s;">📈</div>
-    
-    <div class="floating-element position-absolute" 
-         style="top: 10%; left: 54%; font-size: 1.6rem; animation-delay: 2s;">💚</div>
-    
-    <div class="floating-element position-absolute" 
-         style="top: 57%; left: 50%; font-size: 1.5rem; animation-delay: 3s;">🌱</div>
-
     <div class="container-fluid px-4 h-100">
       <div class="row g-4 w-100">
         <!-- Title Section - Full Width -->
         <div class="col-12 text-center text-md-start position-relative" style="z-index: 10; padding-top: 2rem;">
-          <h1 class="hero-title mb-2">Your Dashboard</h1>
+          <h1 class="hero-title mb-2">Hello, 
+            <span class="text-success">
+              {{ username }}
+            </span>
+          
+          </h1>
           <p class="hero-subtitle mb-0">
             <i class="bi bi-leaf me-2"></i>
             Track your impact, stats, and food inventory 🌿
@@ -138,75 +130,24 @@
             </div>
           </div>
 
-          <!-- Right: Animated Graph (Desktop only) -->
+          <!-- Right: Animated Graph Image (Desktop only) -->
           <div class="col-12 col-lg-5 d-none d-lg-flex justify-content-center align-items-center position-relative" style="z-index: 5; min-height: 400px;">
-            <div class="position-relative" style="width: 320px; height: 320px;">
-              <!-- Main Graph Rounded Square with Pulse -->
-              <div class="position-relative rounded-4 shadow-lg overflow-hidden d-flex align-items-center justify-content-center graph-circle" style="width: 320px; height: 320px; background: linear-gradient(135deg, rgba(0, 184, 148, 0.15) 0%, rgba(0, 206, 201, 0.15) 100%); border: 3px solid rgba(0, 184, 148, 0.3);">
-                <!-- Animated SVG Graph -->
-                <svg width="280" height="280" viewBox="0 0 280 280" class="graph-svg">
-                  <!-- Grid lines -->
-                  <line x1="40" y1="40" x2="40" y2="240" stroke="rgba(0, 184, 148, 0.2)" stroke-width="2"/>
-                  <line x1="40" y1="240" x2="240" y2="240" stroke="rgba(0, 184, 148, 0.2)" stroke-width="2"/>
-                  
-                  <!-- Animated growing bars -->
-                  <rect x="60" y="240" width="30" height="60" fill="url(#barGradient1)" class="graph-bar" style="animation-delay: 0.2s;">
-                    <animate attributeName="height" from="0" to="60" dur="1.5s" fill="freeze" repeatCount="1"/>
-                    <animate attributeName="y" from="240" to="180" dur="1.5s" fill="freeze" repeatCount="1"/>
-                  </rect>
-                  
-                  <rect x="110" y="240" width="30" height="100" fill="url(#barGradient2)" class="graph-bar" style="animation-delay: 0.4s;">
-                    <animate attributeName="height" from="0" to="100" dur="1.5s" fill="freeze" repeatCount="1"/>
-                    <animate attributeName="y" from="240" to="140" dur="1.5s" fill="freeze" repeatCount="1"/>
-                  </rect>
-                  
-                  <rect x="160" y="240" width="30" height="140" fill="url(#barGradient3)" class="graph-bar" style="animation-delay: 0.6s;">
-                    <animate attributeName="height" from="0" to="140" dur="1.5s" fill="freeze" repeatCount="1"/>
-                    <animate attributeName="y" from="240" to="100" dur="1.5s" fill="freeze" repeatCount="1"/>
-                  </rect>
-                  
-                  <rect x="210" y="240" width="30" height="80" fill="url(#barGradient4)" class="graph-bar" style="animation-delay: 0.8s;">
-                    <animate attributeName="height" from="0" to="80" dur="1.5s" fill="freeze" repeatCount="1"/>
-                    <animate attributeName="y" from="240" to="160" dur="1.5s" fill="freeze" repeatCount="1"/>
-                  </rect>
-                  
-                  <!-- Animated line graph -->
-                  <polyline
-                    points="60,200 110,160 160,120 210,180"
-                    fill="none"
-                    stroke="rgba(0, 184, 148, 0.6)"
-                    stroke-width="3"
-                    stroke-linecap="round"
-                    class="graph-line"
-                  />
-                  
-                  <!-- Gradient definitions -->
-                  <defs>
-                    <linearGradient id="barGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" style="stop-color:rgba(0, 184, 148, 0.8);stop-opacity:1" />
-                      <stop offset="100%" style="stop-color:rgba(0, 206, 201, 0.6);stop-opacity:1" />
-                    </linearGradient>
-                    <linearGradient id="barGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" style="stop-color:rgba(0, 184, 148, 0.9);stop-opacity:1" />
-                      <stop offset="100%" style="stop-color:rgba(0, 206, 201, 0.7);stop-opacity:1" />
-                    </linearGradient>
-                    <linearGradient id="barGradient3" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" style="stop-color:rgba(0, 184, 148, 1);stop-opacity:1" />
-                      <stop offset="100%" style="stop-color:rgba(0, 206, 201, 0.8);stop-opacity:1" />
-                    </linearGradient>
-                    <linearGradient id="barGradient4" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" style="stop-color:rgba(0, 184, 148, 0.85);stop-opacity:1" />
-                      <stop offset="100%" style="stop-color:rgba(0, 206, 201, 0.65);stop-opacity:1" />
-                    </linearGradient>
-                  </defs>
-                </svg>
+            <div class="position-relative graph-container" style="width: 320px; height: 320px;">
+              <!-- Main Graph Image with Animation -->
+              <div class="graph-image-wrapper">
+                <img 
+                  src="/graph-img.png" 
+                  alt="Analytics Graph" 
+                  class="graph-image"
+                  style="width: 100%; height: 100%; object-fit: contain;"
+                />
               </div>
               
-              <!-- Floating data elements around the graph -->
-              <div class="floating-data position-absolute" style="top: -10%; left: 10%; font-size: 1.8rem; animation-delay: 0s;">💹</div>
-              <div class="floating-data position-absolute" style="top: 20%; right: -10%; font-size: 1.5rem; animation-delay: 1.5s;">📊</div>
-              <div class="floating-data position-absolute" style="bottom: 10%; left: -5%; font-size: 1.6rem; animation-delay: 2.5s;">📉</div>
-              <div class="floating-data position-absolute" style="bottom: -5%; right: 15%; font-size: 1.4rem; animation-delay: 3.5s;">💰</div>
+              <!-- Floating emojis emanating from the graph -->
+              <div class="floating-emoji emoji-1" style="top: 10%; left: 15%;">💹</div>
+              <div class="floating-emoji emoji-2" style="top: 25%; right: 10%;">📊</div>
+              <div class="floating-emoji emoji-3" style="bottom: 30%; left: 5%;">📈</div>
+              <div class="floating-emoji emoji-5" style="top: 40%; left: -5%;">📉</div>
             </div>
           </div>
         </div>
@@ -243,6 +184,10 @@ const props = defineProps({
   overviewCollapsed: {
     type: Boolean,
     default: false
+  },
+  username: {
+    type: String,
+    default: 'User'
   }
 })
 
@@ -286,46 +231,105 @@ defineEmits(['toggle-overview'])
   }
 }
 
-.floating-element {
-  animation: riseAndFloat 4s ease-in-out infinite;
+/* === GRAPH IMAGE ANIMATIONS === */
+.graph-container {
+  position: relative;
+}
+
+.graph-image-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: subtlePulse 3s ease-in-out infinite;
+}
+
+.graph-image {
+  filter: drop-shadow(0 8px 24px rgba(0, 184, 148, 0.2));
+  animation: floatGentle 4s ease-in-out infinite;
+}
+
+@keyframes subtlePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-8px) rotate(0.5deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(-0.5deg);
+  }
+  75% {
+    transform: translateY(-8px) rotate(0.5deg);
+  }
+}
+
+/* Floating emojis from graph */
+.floating-emoji {
+  position: absolute;
+  font-size: 1.6rem;
   pointer-events: none;
-  transform-origin: center;
-  z-index: 1;
+  animation: emojiPop 4s ease-in-out infinite;
+  opacity: 0;
 }
 
-.floating-data {
-  animation: riseAndFloat 5s ease-in-out infinite;
-  pointer-events: none;
-  transform-origin: center;
-  z-index: 2;
+.emoji-1 {
+  animation-delay: 0s;
 }
 
-/* === GRAPH ANIMATIONS === */
-.graph-circle {
-  /* No animation - static container */
-  box-shadow: 0 8px 24px rgba(0, 184, 148, 0.15);
+.emoji-2 {
+  animation-delay: 0.7s;
 }
 
-.graph-line {
-  stroke-dasharray: 400;
-  stroke-dashoffset: 400;
-  animation: drawLine 2s ease-in-out forwards;
-  animation-delay: 1s;
+.emoji-3 {
+  animation-delay: 1.4s;
 }
 
-@keyframes drawLine {
+.emoji-4 {
+  animation-delay: 2.1s;
+}
+
+.emoji-5 {
+  animation-delay: 2.8s;
+}
+
+.emoji-6 {
+  animation-delay: 3.5s;
+}
+
+@keyframes emojiPop {
   0% {
-    stroke-dashoffset: 400;
+    opacity: 0;
+    transform: translate(0, 0) scale(0.3);
+  }
+  10% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  30% {
+    opacity: 0.8;
+    transform: translate(calc(var(--x, 0) * 10px), calc(var(--y, 0) * -15px)) scale(1.1);
+  }
+  60% {
+    opacity: 0.5;
+    transform: translate(calc(var(--x, 0) * 20px), calc(var(--y, 0) * -30px)) scale(0.9) rotate(10deg);
   }
   100% {
-    stroke-dashoffset: 0;
+    opacity: 0;
+    transform: translate(calc(var(--x, 0) * 30px), calc(var(--y, 0) * -50px)) scale(0.5) rotate(20deg);
   }
 }
 
-.graph-bar {
-  transform-origin: bottom;
-  /* No fluctuate animation - bars stay solid after growing */
-}
 
 /* === CONTENT === */
 .hero-content {
@@ -333,7 +337,6 @@ defineEmits(['toggle-overview'])
   z-index: 2;
 }
 
-/* Header Wrapper - Desktop: flex row, Mobile: flex column */
 .header-wrapper {
   display: flex;
   align-items: center;

@@ -7,7 +7,6 @@ import { getAuth } from 'firebase/auth';
 import { useAlert } from '@/composables/useAlert.js';
 import DashboardHeader from '@/components/dashboard/header.vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
-// import FlippedStatCard from '@/components/dashboard/flippedCard.vue'
 import WasteVsSavingsChart from '@/components/dashboard/WasteVsSavingsChart.vue'
 import WasteByCategoryChart from '@/components/dashboard/WasteByCategoryChart.vue'
 import FoodCard from '@/components/dashboard/FoodCard.vue'
@@ -19,6 +18,7 @@ const router = useRouter()
 const auth = getAuth()
 const user = ref(auth.currentUser)
 const userId = computed(() => user.value?.uid || null)
+const username = ref('User')
 
 // State variables
 const userFoodScore = ref(0);
@@ -240,7 +240,9 @@ watch(userId, async (val) => {
       const userDocRef = doc(db, 'user', val);
       const userDoc = await getDoc(userDocRef);
       if (userDoc.exists()) {
-        userFoodScore.value = userDoc.data().foodScore || 0;
+        const userData = userDoc.data();
+        userFoodScore.value = userData.foodScore || 0;
+        username.value = userData.username || userData.displayName || user.value?.displayName || 'User';
       }
     } catch (err) {
       console.error('Failed to load food score:', err);
@@ -1079,6 +1081,7 @@ const confirmDelete = async () => {
       :expired="expired"
       :analytics="analytics"
       :overviewCollapsed="overviewCollapsed"
+      :username="username"
       @toggle-overview="overviewCollapsed = !overviewCollapsed"
     />
 
