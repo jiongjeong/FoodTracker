@@ -238,7 +238,7 @@ defineEmits(['toggle-overview'])
   color: #2d3436;
   overflow: hidden;
   margin: -1rem 0 2rem 0;
-  min-height: 600px;
+  min-height: 300px;
   display: flex;
   align-items: center;
   padding: 30px 0 40px 0;
