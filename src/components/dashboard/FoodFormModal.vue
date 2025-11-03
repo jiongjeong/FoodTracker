@@ -51,13 +51,20 @@ const formatDate = (date) => {
   return `${y}-${m}-${d}`
 }
 
+// Helper to sanitize user input for prompt injection prevention
+function sanitizeForPrompt(str) {
+  if (typeof str !== 'string') return '';
+  // Remove newlines, carriage returns, and limit length
+  return str.replace(/[\r\n]+/g, ' ').replace(/[^\x20-\x7E]+/g, '').slice(0, 100);
+}
+
 const suggestWithGemini = async () => {
   try {
     // clear previous suggestion immediately and show spinner
     lastSuggestion.value = ''
-    const name = localForm.value.name || ''
-    const category = localForm.value.category || ''
-    const unit = localForm.value.unit || ''
+    const name = sanitizeForPrompt(localForm.value.name || '')
+    const category = sanitizeForPrompt(localForm.value.category || '')
+    const unit = sanitizeForPrompt(localForm.value.unit || '')
     const prompt = `Suggest a reasonable expiration period in days for this food item. Respond with a single integer number of days only.\n\nFood name: ${name}\nCategory: ${category}\nUnit: ${unit}`
     const resp = await generateResponse(prompt, {})
     const m = resp && resp.match(/(\d{1,3})/)
