@@ -1,6 +1,6 @@
 <template>
   <div class="news-section">
-    <h2 class="section-title">�️ Food & Sustainability News</h2>
+    <h2 class="section-title">Food & Sustainability News</h2>
 
     <div class="carousel-container" ref="carousel">
       <div
@@ -145,19 +145,19 @@ const handleImageError = (event) => {
   }
 }
 
-// Auto scroll effect
+// Auto scroll effect - Vertical
 const startAutoScroll = () => {
   scrollInterval = setInterval(() => {
     if (carousel.value) {
       carousel.value.scrollBy({
-        left: 300,
+        top: 300,
         behavior: 'smooth'
       })
       if (
-        carousel.value.scrollLeft + carousel.value.clientWidth >=
-        carousel.value.scrollWidth
+        carousel.value.scrollTop + carousel.value.clientHeight >=
+        carousel.value.scrollHeight
       ) {
-        carousel.value.scrollTo({ left: 0, behavior: 'smooth' })
+        carousel.value.scrollTo({ top: 0, behavior: 'smooth' })
       }
     }
   }, 4000)
@@ -177,17 +177,17 @@ onUnmounted(() => clearInterval(scrollInterval))
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-radius: 20px;
-  padding: 28px;
+  padding: 24px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.5);
   overflow: hidden;
-  margin-bottom: 2rem;
+  height: 100%;
 }
 
 .section-title {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   font-weight: 700;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   color: #065f46;
   text-align: center;
   letter-spacing: -0.02em;
@@ -195,18 +195,37 @@ onUnmounted(() => clearInterval(scrollInterval))
 
 .carousel-container {
   display: flex;
-  gap: 20px;
-  overflow-x: auto;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
   scroll-behavior: smooth;
-  scrollbar-width: none;
-  padding: 8px 4px;
+  scrollbar-width: thin;
+  padding: 4px;
+  max-height: calc(100vh - 200px);
 }
+
 .carousel-container::-webkit-scrollbar {
-  display: none;
+  width: 6px;
+}
+
+.carousel-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+.carousel-container::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.3);
+  border-radius: 10px;
+}
+
+.carousel-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.5);
 }
 
 .news-card {
-  flex: 0 0 280px;
+  flex: 0 0 auto;
+  width: 100%;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
@@ -217,15 +236,16 @@ onUnmounted(() => clearInterval(scrollInterval))
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid rgba(255, 255, 255, 0.7);
 }
+
 .news-card:hover {
-  transform: translateY(-6px) scale(1.02);
-  box-shadow: 0 12px 24px rgba(16, 185, 129, 0.15);
+  transform: translateX(4px);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15);
   border-color: rgba(16, 185, 129, 0.3);
 }
 
 .news-img-container {
   width: 100%;
-  height: 160px;
+  height: 140px;
   position: relative;
   overflow: hidden;
   background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
@@ -252,7 +272,7 @@ onUnmounted(() => clearInterval(scrollInterval))
 }
 
 .placeholder-icon {
-  font-size: 3.5rem;
+  font-size: 3rem;
   opacity: 0.5;
   filter: grayscale(20%);
 }

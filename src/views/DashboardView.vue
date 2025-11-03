@@ -6,7 +6,6 @@ import { ref, computed, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
 import { useAlert } from '@/composables/useAlert.js';
 import DashboardHeader from '@/components/dashboard/header.vue'
-// import FlippedStatCard from '@/components/dashboard/flippedCard.vue'
 import WasteVsSavingsChart from '@/components/dashboard/WasteVsSavingsChart.vue'
 import WasteByCategoryChart from '@/components/dashboard/WasteByCategoryChart.vue'
 import FoodCard from '@/components/dashboard/FoodCard.vue'
@@ -19,9 +18,11 @@ const router = useRouter()
 const auth = getAuth()
 const user = ref(auth.currentUser)
 const userId = computed(() => user.value?.uid || null)
+const username = ref('User')
 
 // State variables
 const userFoodScore = ref(0);
+const userStreak = ref(0);
 const foodItems = ref([])
 const recipes = ref([])
 const activities = ref([])
@@ -169,46 +170,50 @@ async function loadActivities() {
 }
 
 // Helper function to calculate score change for an activity
-const calculateScoreChange = (activityType, price, quantity = 1) => {
+// percentageUsed: the percentage (0-100) of the food item being used
+const calculateScoreChange = (activityType, price, percentageUsed = 100) => {
   price = Number(price) || 0;
-  quantity = Number(quantity) || 1;
+  percentageUsed = Number(percentageUsed) || 0;
+
+  // Normalize percentage to 0-1 range
+  const normalizedPercentage = percentageUsed / 100;
 
   switch (activityType) {
     case 'conFood': // Consumed/Saved
-      return (0.4 * quantity) + (0.2 * price); // +0.4 per item, +0.2*total_value for money
+      return (40 * normalizedPercentage) + (0.2 * price); // +40 points per 100%, +0.2*total_value for money
     case 'expFood': // Expired/Wasted
-      return -((0.6 * quantity) + (0.2 * price)); // -0.6 per item, -0.2*total_value for money, wasting food should bear heaviest weightage
+      return -((60 * normalizedPercentage) + (0.2 * price)); // -60 points per 100%, -0.2*total_value for money, wasting food should bear heaviest weightage
     case 'donFood': // Donated
-      return (0.4 * quantity) + (0.2 * price) + (0.5 * quantity); // +0.4 per item, +0.2*total_value, +0.5 per item donated. Bears higher weightage to encourage donation
+      return (40 * normalizedPercentage) + (0.2 * price) + (50 * normalizedPercentage); // +40 per 100%, +0.2*total_value, +50 per 100% donated. Bears higher weightage to encourage donation
     default:
       return 0;
   }
 };
 
 // Helper function to update food score in Firebase
-const updateFoodScore = async (activityType, price, uid, quantity = 1) => {
+const updateFoodScore = async (activityType, price, uid, percentageUsed = 100) => {
   if (!uid) return { newScore: null, pointsEarned: 0 };
 
   try {
     const userDocRef = doc(db, 'user', uid);
-    const streakDays = calculateActivityStreak();
+
+    // Get current score and streak from Firebase
+    const currentDoc = await getDoc(userDocRef);
+    const currentScore = currentDoc.exists() ? (currentDoc.data().foodScore || 0) : 0;
+    const streakDays = currentDoc.exists() ? (currentDoc.data().streak || 0) : 0;
+
     const streakMultiplier = streakDays > 0 ? (1 + streakDays / 7) : 1;
 
     // Calculate base score change
-    const baseScoreChange = calculateScoreChange(activityType, price, quantity);
+    const baseScoreChange = calculateScoreChange(activityType, price, percentageUsed);
 
-    // Apply streak multiplier
-    const adjustedChange = (baseScoreChange * streakMultiplier);
+    // Apply streak multiplier and round to whole number
+    const adjustedChange = Math.round(baseScoreChange * streakMultiplier);
 
-    // Get current score from Firebase (or initialize to 0)
-    const currentDoc = await getDoc(userDocRef);
-    const currentScore = currentDoc.exists() ? (currentDoc.data().foodScore || 0) : 0;
-
-    const newScore = Math.round(Math.max(0, currentScore + adjustedChange));
+    const newScore = Math.max(0, currentScore + adjustedChange);
 
     await updateDoc(userDocRef, {
-      foodScore: newScore,
-      streak: streakDays
+      foodScore: newScore
     });
 
     return { newScore, pointsEarned: adjustedChange };
@@ -240,7 +245,10 @@ watch(userId, async (val) => {
       const userDocRef = doc(db, 'user', val);
       const userDoc = await getDoc(userDocRef);
       if (userDoc.exists()) {
-        userFoodScore.value = userDoc.data().foodScore || 0;
+        const userData = userDoc.data();
+        userFoodScore.value = userData.foodScore || 0;
+        userStreak.value = userData.streak || 0;
+        username.value = userData.username || userData.displayName || user.value?.displayName || 'User';
       }
     } catch (err) {
       console.error('Failed to load food score:', err);
@@ -250,6 +258,7 @@ watch(userId, async (val) => {
     recipes.value = []
     activities.value = []
     userFoodScore.value = 0
+    userStreak.value = 0
   }
 }, { immediate: true })
 
@@ -275,8 +284,13 @@ watchEffect(async () => {
       )
       const snapshot = await getDocs(q)
       if (snapshot.empty) {
-        // Calculate points BEFORE creating activity
-        const { newScore, pointsEarned } = await updateFoodScore('expFood', food.price, uid, food.quantity);
+        // Reset streak to 0 when food expires
+        const userDocRef = doc(db, 'user', uid)
+        await updateDoc(userDocRef, { streak: 0 })
+        userStreak.value = 0
+
+        // Calculate points BEFORE creating activity - use 100% since entire item expired
+        const { newScore, pointsEarned } = await updateFoodScore('expFood', food.price, uid, 100);
         if (newScore !== null) {
           userFoodScore.value = newScore;
         }
@@ -298,6 +312,29 @@ watchEffect(async () => {
           ...payload,
         })
       }
+    }
+  }
+
+  // Check for activity gap (no activity in last 24 hours)
+  if (activities.value.length > 0) {
+    const now = new Date()
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+
+    // Get most recent activity
+    const sortedActivities = [...activities.value].sort((a, b) => {
+      const dateA = new Date(a.createdAt)
+      const dateB = new Date(b.createdAt)
+      return dateB - dateA
+    })
+
+    const mostRecentActivity = sortedActivities[0]
+    const mostRecentDate = new Date(mostRecentActivity.createdAt)
+
+    // If most recent activity is more than 24 hours ago and streak > 0, reset streak
+    if (mostRecentDate < oneDayAgo && userStreak.value > 0) {
+      const userDocRef = doc(db, 'user', uid)
+      await updateDoc(userDocRef, { streak: 0 })
+      userStreak.value = 0
     }
   }
 })
@@ -329,45 +366,6 @@ const getDaysLeft = (food) => {
   const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate())
   return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
-}
-
-const calculateActivityStreak = () => {
-  if (!activitiesLoaded.value || activities.value.length === 0) return 0
-
-  const activityDates = [
-    ...new Set(
-      activities.value
-        .map((a) => {
-          const date = new Date(a.createdAt)
-          return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-        })
-        .filter((timestamp) => !isNaN(timestamp)),
-    ),
-  ].sort((a, b) => b - a)
-
-  if (activityDates.length === 0) return 0
-
-  const today = new Date()
-  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
-  const oneDayMs = 24 * 60 * 60 * 1000
-
-  let streak = 0
-  let expectedDate = todayMidnight
-
-  if (activityDates[0] < todayMidnight - oneDayMs) {
-    return 0
-  }
-
-  for (const activityDate of activityDates) {
-    if (activityDate === expectedDate || activityDate === expectedDate - oneDayMs) {
-      streak++
-      expectedDate = activityDate - oneDayMs
-    } else {
-      break
-    }
-  }
-
-  return streak
 }
 
 // Computed properties
@@ -571,7 +569,6 @@ const analytics = computed(() => {
   const adjustedInventoryValue = Math.max(0, inventoryValue)
   const inventoryItems = inventoryActivities.length
 
-  const streakDays = calculateActivityStreak()
   const foodDonated = donatedActivities.length
 
   return {
@@ -579,7 +576,7 @@ const analytics = computed(() => {
     totalSaved: { money: totalSavedMoney, items: totalSavedItems },
     reduction: reductionPercentage,
     inventory: { value: adjustedInventoryValue, items: inventoryItems },
-    streakDays: streakDays,
+    streakDays: userStreak.value,
     foodDonated: foodDonated,
     pendingDonations: pendingDonations.length,
   }
@@ -640,15 +637,18 @@ const saveUse = async () => {
     const newQty = food.quantity - usedQty
 
     const totalPrice = food.price || 0
-    const pricePerUnit = totalPrice / (food.quantity || 1)
-    const usedValue = pricePerUnit * usedQty
-    const remainingValue = pricePerUnit * newQty
+    const pricePerUnit = Math.round((totalPrice / (food.quantity || 1)) * 100) / 100
+    const usedValue = Math.round(pricePerUnit * usedQty * 100) / 100
+    const remainingValue = Math.round(pricePerUnit * newQty * 100) / 100
+
+    // Calculate percentage of food used
+    const percentageUsed = (usedQty / food.quantity) * 100
 
     const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id)
     const actRef = collection(db, 'user', uid, 'activities')
 
-    // Calculate points BEFORE creating activity
-    const { newScore, pointsEarned } = await updateFoodScore('conFood', usedValue, uid, usedQty);
+    // Calculate points BEFORE creating activity using percentage
+    const { newScore, pointsEarned } = await updateFoodScore('conFood', usedValue, uid, percentageUsed);
     if (newScore !== null) {
       userFoodScore.value = newScore;
     }
@@ -674,9 +674,7 @@ const saveUse = async () => {
       await deleteDoc(refDoc)
       foodItems.value.splice(foodIndex, 1)
 
-      // Calculate points for fully consumed
-      const { pointsEarned: fullPoints } = await updateFoodScore('conFood', 0, uid, 0);
-
+      // No additional points for fully consumed marker (already counted above)
       const fullConsumedPayload = {
         activityType: 'conFood',
         createdAt: new Date().toISOString(),
@@ -686,7 +684,7 @@ const saveUse = async () => {
         quantity: String(usedQty),
         unit: food.unit || '',
         note: 'fully consumed',
-        pointsEarned: fullPoints // ← ADD THIS LINE
+        pointsEarned: 0 // No additional points
       }
       const docRef2 = await addDoc(actRef, fullConsumedPayload)
       activities.value.unshift({
@@ -933,6 +931,7 @@ const confirmDelete = async () => {
       :expired="expired"
       :analytics="analytics"
       :overviewCollapsed="overviewCollapsed"
+      :username="username"
       @toggle-overview="overviewCollapsed = !overviewCollapsed"
     />
 
@@ -1116,7 +1115,7 @@ const confirmDelete = async () => {
     </div>
 
     <!-- Floating Add Button -->
-    <button class="fab-add d-flex align-items-center justify-content-center" @click="openAdd" title="Add Food">
+    <button v-if="!showAddModal" class="fab-add d-flex align-items-center justify-content-center" @click="openAdd" title="Add Food">
       <i class="bi bi-plus-lg d-flex align-items-center justify-content-center fs-3"></i>
       <span class="fab-text">Add Food</span>
     </button>

@@ -10,6 +10,10 @@ const panContainer = ref(null)
 const villageImg = ref(null)
 const allMonkeys = ref([])
 const hoveredMonkey = ref(null)
+const jumpingMonkeys = ref(new Set())
+const celebratingMonkeys = ref(new Set())
+const bananas = ref([])
+const collectedBananas = ref(0)
 
 /* ---------- PAN ---------- */
 const isPanning = ref(false)
@@ -17,6 +21,10 @@ const startX = ref(0)
 const startY = ref(0)
 const translateX = ref(0)
 const translateY = ref(0)
+
+/* ---------- KEYBOARD CONTROL ---------- */
+const keyboardControl = ref(false)
+const moveSpeed = 1 // percentage points per frame
 
 /* ---------- WALKING ---------- */
 const LAND_BOUNDS = { minX: 30, maxX: 70, minY: 20, maxY: 75 }
@@ -47,10 +55,15 @@ onMounted(() => {
 
     if (!animationFrame) startWalking()
   })
+  
+  // Start spawning bananas
+  bananaInterval = setInterval(spawnBanana, 10000)
+  spawnBanana() // Spawn first banana immediately
 })
 
 onUnmounted(() => {
   if (animationFrame) cancelAnimationFrame(animationFrame)
+  if (bananaInterval) clearInterval(bananaInterval)
 })
 
 /* ---------- LAND CLAMPING (natural size) ---------- */
@@ -94,6 +107,11 @@ const getRandomLandPosition = () => {
 const startWalking = () => {
   const walk = () => {
     allMonkeys.value.forEach(m => {
+      // Skip keyboard control for the player's monkey
+      if (m.isYou && keyboardControl.value) {
+        return
+      }
+
       if (
         Math.abs(m.pos.x - m.target.x) < 0.5 &&
         Math.abs(m.pos.y - m.target.y) < 0.5
@@ -112,12 +130,184 @@ const startWalking = () => {
       const clamped = clampToLand(m.pos.x, m.pos.y)
       m.pos.x = clamped.x
       m.pos.y = clamped.y
+
+      // Check for banana collection (player only)
+      if (m.isYou) {
+        checkBananaCollection(m)
+      }
     })
 
     animationFrame = requestAnimationFrame(walk)
   }
   walk()
 }
+
+/* ---------- BANANA COLLECTION CHECK ---------- */
+const checkBananaCollection = (monkey) => {
+  const collectionRadius = 3 // percentage points
+  
+  bananas.value.forEach(banana => {
+    if (!banana.collectible) return
+    
+    const dx = monkey.pos.x - banana.x
+    const dy = monkey.pos.y - banana.y
+    const distance = Math.sqrt(dx * dx + dy * dy)
+    
+    if (distance < collectionRadius) {
+      collectBanana(banana)
+    }
+  })
+}
+
+/* ---------- INTERACTIVE FEATURES ---------- */
+const onMonkeyClick = (monkey) => {
+  // Make monkey jump
+  jumpingMonkeys.value.add(monkey.uid)
+  setTimeout(() => {
+    jumpingMonkeys.value.delete(monkey.uid)
+  }, 600)
+}
+
+const onMonkeyDoubleClick = (monkey) => {
+  // Make monkey celebrate
+  celebratingMonkeys.value.add(monkey.uid)
+  setTimeout(() => {
+    celebratingMonkeys.value.delete(monkey.uid)
+  }, 1000)
+  
+  // Spawn confetti emojis
+  spawnConfetti(monkey.pos.x, monkey.pos.y)
+}
+
+const spawnConfetti = (x, y) => {
+  const emojis = ['🎉', '⭐', '🍌', '💫', '✨']
+  for (let i = 0; i < 5; i++) {
+    const angle = (Math.PI * 2 * i) / 5
+    const id = Date.now() + i
+    bananas.value.push({
+      id,
+      emoji: emojis[i % emojis.length],
+      x: x,
+      y: y,
+      targetX: x + Math.cos(angle) * 8,
+      targetY: y + Math.sin(angle) * 8,
+      opacity: 1
+    })
+    
+    setTimeout(() => {
+      bananas.value = bananas.value.filter(b => b.id !== id)
+    }, 1000)
+  }
+}
+
+// Spawn collectible bananas periodically
+const spawnBanana = () => {
+  const pos = getRandomLandPosition()
+  bananas.value.push({
+    id: Date.now(),
+    emoji: '🍌',
+    x: pos.x,
+    y: pos.y,
+    collectible: true,
+    opacity: 1
+  })
+}
+
+const collectBanana = (banana) => {
+  if (!banana.collectible) return
+  
+  collectedBananas.value++
+  banana.opacity = 0
+  
+  setTimeout(() => {
+    bananas.value = bananas.value.filter(b => b.id !== banana.id)
+  }, 300)
+}
+
+/* ---------- KEYBOARD CONTROL ---------- */
+const handleKeyDown = (e) => {
+  const yourMonkey = allMonkeys.value.find(m => m.isYou)
+  if (!yourMonkey) return
+
+  const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd']
+  if (!keys.includes(e.key)) return
+
+  e.preventDefault()
+  keyboardControl.value = true
+
+  let newX = yourMonkey.pos.x
+  let newY = yourMonkey.pos.y
+
+  switch(e.key) {
+    case 'ArrowUp':
+    case 'w':
+      newY -= moveSpeed
+      break
+    case 'ArrowDown':
+    case 's':
+      newY += moveSpeed
+      break
+    case 'ArrowLeft':
+    case 'a':
+      newX -= moveSpeed
+      break
+    case 'ArrowRight':
+    case 'd':
+      newX += moveSpeed
+      break
+  }
+
+  const clamped = clampToLand(newX, newY)
+  yourMonkey.pos.x = clamped.x
+  yourMonkey.pos.y = clamped.y
+  yourMonkey.target.x = clamped.x
+  yourMonkey.target.y = clamped.y
+
+  // Check for banana collection on keyboard movement
+  checkBananaCollection(yourMonkey)
+}
+
+// Spawn bananas every 10 seconds
+let bananaInterval = null
+onMounted(() => {
+  // ... existing onMounted code ...
+  const uid = auth.currentUser.uid
+  const q = query(collection(db, 'user'), orderBy('foodScore', 'desc'), limit(5))
+
+  onSnapshot(q, snap => {
+    allMonkeys.value = snap.docs.map(d => {
+      const data = d.data()
+      const fallback = getRandomLandPosition()
+      const pos = data.village || fallback
+
+      return {
+        uid: d.id,
+        name: data.name || 'Anon',
+        monkeyId: data.monkey?.selected || 'monkey1',
+        score: data.foodScore || 0,
+        pos: { x: pos.x, y: pos.y },
+        target: { ...pos },
+        speed: 0.02 + Math.random() * 0.03,
+        isYou: d.id === uid
+      }
+    })
+
+    if (!animationFrame) startWalking()
+  })
+  
+  // Start spawning bananas
+  bananaInterval = setInterval(spawnBanana, 10000)
+  spawnBanana() // Spawn first banana immediately
+
+  // Add keyboard event listener
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  if (animationFrame) cancelAnimationFrame(animationFrame)
+  if (bananaInterval) clearInterval(bananaInterval)
+  window.removeEventListener('keydown', handleKeyDown)
+})
 
 /* ---------- PANNING ---------- */
 const startPan = e => {
@@ -194,14 +384,28 @@ const monkeyStyle = m => ({
   height: '64px',
   zIndex: m.isYou ? 100 : 50,
   pointerEvents: 'auto',
-  transition: m.isYou ? 'none' : 'left 0.1s linear, top 0.1s linear'
+  transition: (m.isYou && keyboardControl.value) ? 'none' : (m.isYou ? 'none' : 'left 0.1s linear, top 0.1s linear'),
+  cursor: 'pointer'
+})
+
+const bananaStyle = b => ({
+  position: 'absolute',
+  left: `${b.targetX || b.x}%`,
+  top: `${b.targetY || b.y}%`,
+  transform: 'translate(-50%, -50%)',
+  fontSize: '24px',
+  opacity: b.opacity,
+  transition: 'all 0.8s ease-out',
+  pointerEvents: b.collectible ? 'auto' : 'none',
+  cursor: b.collectible ? 'pointer' : 'default',
+  zIndex: 40
 })
 
 // on hover, change to banana monkey
 const monkeySrc = (monkey) => {
   const isHovered = hoveredMonkey.value === monkey.uid
   const normal = `/monkey/${monkey.monkeyId}.png`
-  const banana = `/bananagif.gif`  // ← SAME IMAGE FOR ALL
+  const banana = `/bananagif-unscreen.gif`  // ← SAME IMAGE FOR ALL
   return isHovered ? banana : normal
 }
 
@@ -238,15 +442,21 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
           v-for="monkey in allMonkeys"
           :key="monkey.uid"
           class="monkey"
-          :class="{ you: monkey.isYou, hover: hoveredMonkey === monkey.uid }"
+          :class="{ 
+            you: monkey.isYou, 
+            hover: hoveredMonkey === monkey.uid,
+            jumping: jumpingMonkeys.has(monkey.uid),
+            celebrating: celebratingMonkeys.has(monkey.uid)
+          }"
           :style="monkeyStyle(monkey)"
+          @click="onMonkeyClick(monkey)"
+          @dblclick="onMonkeyDoubleClick(monkey)"
         >
         <img
           :src="monkeySrc(monkey)"
           class="monkey-img"
           @mouseenter="onHover(monkey.uid)"
           @mouseleave="onHoverLeave"
-          @click.stop="onMonkeyClick(monkey)"
           alt=""
         />
 
@@ -254,11 +464,31 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
           <div v-if="hoveredMonkey === monkey.uid" class="popup">
             <div class="popup-name">{{ monkey.name }}</div>
             <div class="popup-score">Score: {{ monkey.score }}</div>
+            <div v-if="monkey.isYou" class="popup-hint">🎮 Use arrow keys or WASD to move!</div>
+            <div v-else class="popup-hint">Click to jump • Double-click for fun!</div>
           </div>
 
           <!-- Labels -->
           <div v-if="monkey.isYou" class="you-label">You</div>
           <div v-else class="name-label">{{ monkey.name }}</div>
+        </div>
+
+        <!-- Collectible Bananas & Confetti -->
+        <div
+          v-for="banana in bananas"
+          :key="banana.id"
+          class="banana"
+          :class="{ collectible: banana.collectible }"
+          :style="bananaStyle(banana)"
+          @click="collectBanana(banana)"
+        >
+          {{ banana.emoji }}
+        </div>
+
+        <!-- Banana Counter -->
+        <div class="banana-counter">
+          <span class="banana-icon">🍌</span>
+          <span class="banana-count">{{ collectedBananas }}</span>
         </div>
       </div>
 
@@ -304,27 +534,43 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
   width: 64px;
   height: 64px;
   text-align: center;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.monkey.jumping {
+  animation: jumpAnimation 0.6s ease;
+}
+
+.monkey.celebrating {
+  animation: celebrateAnimation 1s ease;
+}
+
+@keyframes jumpAnimation {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0) scale(1); }
+  50% { transform: translate(-50%, -50%) translateY(-30px) scale(1.1); }
+}
+
+@keyframes celebrateAnimation {
+  0%, 100% { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+  25% { transform: translate(-50%, -50%) rotate(-15deg) scale(1.15); }
+  75% { transform: translate(-50%, -50%) rotate(15deg) scale(1.15); }
 }
 
 .monkey-img {
   width: 100%;
   height: 100%;
   image-rendering: auto;
-  border: 3px solid #000;
-  border-radius: 50%;
-  box-shadow: 0 4px 8px rgba(0,0,0,.4);
   transition: all 0.2s ease;
 }
 
 .monkey-img:hover {
-  filter: brightness(1.4) hue-rotate(60deg) drop-shadow(0 0 12px #FFD700);
-  border-color: #FFD700;
+  filter: brightness(1.2) drop-shadow(0 0 12px #FFD700);
   transform: scale(1.15);
 }
 
 .monkey.you .monkey-img {
-  border-color: #FFD700;
-  box-shadow: 0 0 16px #FFD700;
+  filter: drop-shadow(0 0 8px #FFD700);
 }
 
 .monkey, .monkey-img {
@@ -391,6 +637,13 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
   margin-top: 1px;
 }
 
+.popup-hint {
+  color: #6ee7b7;
+  font-size: 10px;
+  margin-top: 3px;
+  font-style: italic;
+}
+
 @keyframes popupFade {
   from {
     opacity: 0;
@@ -400,6 +653,67 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+}
+
+/* ---------- BANANAS ---------- */
+.banana {
+  position: absolute;
+  font-size: 24px;
+  transition: all 0.8s ease-out;
+  user-select: none;
+  z-index: 40;
+}
+
+.banana.collectible {
+  cursor: pointer;
+  animation: bananaFloat 2s ease-in-out infinite;
+}
+
+.banana.collectible:hover {
+  transform: translate(-50%, -50%) scale(1.3);
+  filter: drop-shadow(0 0 8px #FFD700);
+}
+
+@keyframes bananaFloat {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0) rotate(0deg); }
+  50% { transform: translate(-50%, -50%) translateY(-10px) rotate(10deg); }
+}
+
+/* ---------- BANANA COUNTER ---------- */
+.banana-counter {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  border: 3px solid #000;
+  border-radius: 20px;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  z-index: 1000;
+  font-family: monospace;
+  pointer-events: none;
+}
+
+.banana-icon {
+  font-size: 24px;
+  animation: bananaWiggle 1s ease-in-out infinite;
+}
+
+.banana-count {
+  font-size: 20px;
+  font-weight: bold;
+  color: #000;
+  min-width: 30px;
+  text-align: center;
+}
+
+@keyframes bananaWiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
 }
 
 /* ---------- RESPONSIVE ---------- */
@@ -431,6 +745,24 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
 
   .popup-score {
     font-size: 10px;
+  }
+
+  .popup-hint {
+    font-size: 9px;
+  }
+
+  .banana-counter {
+    top: 15px;
+    right: 15px;
+    padding: 8px 16px;
+  }
+
+  .banana-icon {
+    font-size: 20px;
+  }
+
+  .banana-count {
+    font-size: 18px;
   }
 }
 
@@ -466,6 +798,30 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
 
   .popup-score {
     font-size: 9px;
+  }
+
+  .popup-hint {
+    font-size: 8px;
+  }
+
+  .banana {
+    font-size: 20px;
+  }
+
+  .banana-counter {
+    top: 10px;
+    right: 10px;
+    padding: 6px 12px;
+    border-radius: 15px;
+  }
+
+  .banana-icon {
+    font-size: 18px;
+  }
+
+  .banana-count {
+    font-size: 16px;
+    min-width: 25px;
   }
 }
 
