@@ -22,6 +22,7 @@ const MAX_INGREDIENTS = 40
 const REQUEST_TIMEOUT = 10000
 const MAX_SUGGESTED_RECIPES = 10
 const EXPIRING_SOON_DAYS = 7
+const MIN_WORD_LENGTH_FOR_MATCHING = 3
 
 // Reactive state
 const activeTab = ref('suggested')
@@ -52,18 +53,30 @@ const getDaysLeft = (food) => {
   let expDate
 
   if (food.expirationDate) {
-    if (food.expirationDate.toDate) {
+    if (typeof food.expirationDate.toDate === 'function') {
+      // Firestore Timestamp
       expDate = food.expirationDate.toDate()
+    } else if (food.expirationDate.seconds) {
+      // Firestore Timestamp object with seconds property
+      expDate = new Date(food.expirationDate.seconds * 1000)
     } else {
+      // String or Date object
       expDate = new Date(food.expirationDate)
     }
   } else {
     return Infinity // no expiration date
   }
 
+  // Validate the date
+  if (isNaN(expDate.getTime())) {
+    return Infinity
+  }
+
   const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate())
-  return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
+  const daysLeft = Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
+  
+  return daysLeft
 }
 
 // Fetch full recipe objects for bookmarked IDs
@@ -189,18 +202,33 @@ const getSuggestedRecipes = async () => {
       return
     }
 
-    const ingredients = [...new Set(expiringFoods.map(food => {
-      const words = food.name.toLowerCase().split(' ')
-      return words[words.length - 1]
-    }))]
+    // Extract ingredient keywords - use the full name for better matching
+    const ingredients = [...new Set(expiringFoods.map(food => food.name.toLowerCase().trim()))]
 
+    // Cache for failed filter.php requests to avoid redundant search.php calls
+    const filterFailedCache = new Set()
+
+    // Try searching by ingredient filter first, then fallback to general search
     const recipePromises = ingredients.map(async (ingredient) => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/filter.php`, {
+        // First try: ingredient filter
+        let response = await axios.get(`${API_BASE_URL}/filter.php`, {
           params: { i: ingredient },
           timeout: REQUEST_TIMEOUT
         })
-        return response.data.meals || []
+        let meals = response.data.meals || []
+        
+        // If no results, try general search as fallback (only once per ingredient)
+        if (meals.length === 0 && !filterFailedCache.has(ingredient)) {
+          filterFailedCache.add(ingredient)
+          response = await axios.get(`${API_BASE_URL}/search.php`, {
+            params: { s: ingredient },
+            timeout: REQUEST_TIMEOUT
+          })
+          meals = response.data.meals || []
+        }
+        
+        return meals
       } catch (error) {
         console.error(`Error searching recipes for ${ingredient}:`, error)
         return []
@@ -214,6 +242,17 @@ const getSuggestedRecipes = async () => {
       index === self.findIndex(m => m.idMeal === meal.idMeal)
     ).slice(0, MAX_SUGGESTED_RECIPES)
 
+    // Pre-compute normalized food tokens for faster matching
+    const normalizedFoods = expiringFoods.map(food => {
+      const foodName = food.name.toLowerCase()
+      const foodWords = foodName.split(/\s+/).filter(w => w.length >= MIN_WORD_LENGTH_FOR_MATCHING)
+      return {
+        name: food.name,
+        normalized: foodName,
+        words: new Set(foodWords)
+      }
+    })
+
     const fullRecipePromises = uniqueMeals.map(async (meal) => {
       try {
         const response = await axios.get(`${API_BASE_URL}/lookup.php`, {
@@ -223,10 +262,24 @@ const getSuggestedRecipes = async () => {
         if (response.data.meals?.[0]) {
           const fullMeal = response.data.meals[0]
           const mealIngredients = getIngredientsList(fullMeal).map(ing => ing.toLowerCase())
-          const suggestingFoods = expiringFoods.filter(food => {
-            const words = food.name.toLowerCase().split(' ')
-            const ingredient = words[words.length - 1]
-            return mealIngredients.some(ing => ing.includes(ingredient))
+          const recipeName = fullMeal.strMeal.toLowerCase()
+          
+          // Match expiring foods to recipe ingredients OR recipe name
+          const suggestingFoods = normalizedFoods.filter(food => {
+            // Check recipe name first
+            if (recipeName.includes(food.normalized)) return true
+            if ([...food.words].some(word => recipeName.includes(word))) return true
+            
+            // Check if any recipe ingredient contains the food name or any significant word
+            return mealIngredients.some(ing => {
+              // Direct match
+              if (ing.includes(food.normalized) || food.normalized.includes(ing)) return true
+              
+              // Check individual words from pre-computed set
+              return [...food.words].some(word => {
+                return ing.includes(word) || word.includes(ing)
+              })
+            })
           }).map(food => food.name)
 
           return {
