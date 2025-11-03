@@ -43,7 +43,7 @@
       </div>
 
       <!-- Collapsible navbar content -->
-      <div class="navbar-collapse" :class="{ show: navbarOpen, collapse: !navbarOpen }" id="navbarNav">
+      <div class="navbar-collapse collapse" :class="{ show: navbarOpen }" id="navbarNav">
         <div class="d-flex align-items-center w-100">
           <ul class="navbar-nav d-flex flex-column flex-md-row justify-content-center align-items-center flex-grow-1">
             <li class="nav-item">
