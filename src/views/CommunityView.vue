@@ -4,6 +4,7 @@ import { db, auth } from '../firebase.js'
 import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth"
 import LocationPicker from '@/components/LocationPicker.vue'
+import ShareFoodModal from '@/components/community/ShareFoodModal.vue'
 import { loadGoogleMaps } from '@/composables/loadGoogleMap.js'
 import { useAlert } from '@/composables/useAlert'
 
@@ -62,6 +63,7 @@ const shareForm = ref({
 // Edit form ref
 const editForm = ref({
   id: '',
+  foodItemId: '',
   foodName: '',
   category: '',
   quantity: '',
@@ -69,8 +71,7 @@ const editForm = ref({
   expirationDate: '',
   pickupTime: '',
   notes: '',
-  location: null,
-  foodItemId: ''
+  location: null
 })
 
 const handleShareFood = async () => {
@@ -136,7 +137,9 @@ async function loadFoodItems() {
 }
 
 function onSelectFoodItem() {
+  console.log('onSelectFoodItem called, foodId:', shareForm.value.foodItemId)
   const selected = foodItems.value.find(fi => fi.id === shareForm.value.foodItemId)
+  console.log('Selected food item:', selected)
   if (selected) {
     shareForm.value.category = selected.category || ''
     shareForm.value.foodName = selected.name || ''
@@ -156,6 +159,7 @@ function onSelectFoodItem() {
     shareForm.value.quantity = selected.quantity || ''
     shareForm.value.unit = selected.unit || ''
 
+    console.log('Updated shareForm:', shareForm.value)
   }
 }
 
@@ -299,22 +303,25 @@ async function loadAvailableListings() {
 
 
 // Share Food
-async function submitShare() {
+async function submitShare(formData) {
+  // Use formData from modal if provided, otherwise fall back to shareForm
+  const data = formData || shareForm.value
+
   if (!currentUser.value) {
     await error('Please log in first')
     return
   }
-  if (!shareForm.value.location?.lat || !shareForm.value.location?.lng) {
+  if (!data.location?.lat || !data.location?.lng) {
     await warning('Please select a pickup location')
     return
   }
 
 
-  if (!shareForm.value.foodItemId) {
+  if (!data.foodItemId) {
     await warning('Please select a valid food item')
     return
   }
-  const qtyToShare = Number(shareForm.value.quantity || 0)
+  const qtyToShare = Number(data.quantity || 0)
   if (!qtyToShare || qtyToShare <= 0) {
     await warning('Please enter a valid quantity')
     return
@@ -322,43 +329,43 @@ async function submitShare() {
 
   try {
 
-    const remaining = getRemainingQuantity(shareForm.value.foodItemId)
+    const remaining = getRemainingQuantity(data.foodItemId)
     if (qtyToShare > remaining) {
-      await warning(`You only have ${remaining} ${shareForm.value.unit} left to share.`)
+      await warning(`You only have ${remaining} ${data.unit} left to share.`)
       return
     }
 
     // Prevent sharing expired items
-    if (shareForm.value.expirationDate && getDaysLeft(shareForm.value.expirationDate) === 0) {
+    if (data.expirationDate && getDaysLeft(data.expirationDate) === 0) {
       await error('This item is expired and cannot be shared.')
       return
     }
 
-    const expDate = new Date(shareForm.value.expirationDate)
+    const expDate = new Date(data.expirationDate)
 
 
-    const data = {
+    const payload = {
       ownerId: currentUser.value.uid,
-      foodId: shareForm.value.foodItemId,
-      category: shareForm.value.category,
+      foodId: data.foodItemId,
+      category: data.category,
       quantity: qtyToShare,
-      unit: shareForm.value.unit,
+      unit: data.unit,
       expirationDate: expDate,
-      pickupTime: shareForm.value.pickupTime || 'Anytime',
-      notes: shareForm.value.notes || '',
+      pickupTime: data.pickupTime || 'Anytime',
+      notes: data.notes || '',
       createdAt: serverTimestamp(),
       location: {
-        lat: shareForm.value.location.lat,
-        lng: shareForm.value.location.lng,
-        address: shareForm.value.location.address || ''
+        lat: data.location.lat,
+        lng: data.location.lng,
+        address: data.location.address || ''
       }
     }
 
-    const docRef = await addDoc(collection(db, "communityListings"), data)
+    const docRef = await addDoc(collection(db, "communityListings"), payload)
 
 
-    const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', shareForm.value.foodItemId)
-    const currentItem = foodItems.value.find(f => f.id === shareForm.value.foodItemId)
+    const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', data.foodItemId)
+    const currentItem = foodItems.value.find(f => f.id === data.foodItemId)
     const currentQty = Number(currentItem?.quantity || 0)
     const totalPrice = Number(currentItem?.price || 0)
 
@@ -388,12 +395,12 @@ async function submitShare() {
     await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
       activityType: 'pendingDonFood',
       createdAt: new Date().toISOString(),
-      category: data.category,
+      category: payload.category,
       price: sharedPrice,
-      foodName: currentItem?.name || shareForm.value.foodName || '',
-      foodId: data.foodId,
-      quantity: data.quantity,
-      unit: data.unit,
+      foodName: currentItem?.name || data.foodName || '',
+      foodId: payload.foodId,
+      quantity: payload.quantity,
+      unit: payload.unit,
     })
 
     await success("Food shared successfully!")
@@ -409,12 +416,12 @@ async function submitShare() {
 // Helper function to get streak days
 const getStreakDays = async (uid) => {
   if (!uid) return 0
-  
+
   try {
     const activityRef = collection(db, 'user', uid, 'activities')
     const activitySnapshot = await getDocs(activityRef)
     const activities = activitySnapshot.docs.map((doc) => doc.data())
-    
+
     if (activities.length === 0) return 0
 
     const activityDates = [
@@ -597,6 +604,41 @@ const isShareQuantityValid = computed(() => {
   return qty > 0 && qty <= max
 })
 
+// Computed property for max editable quantity (for edit mode)
+const maxEditQuantity = computed(() => {
+  if (!editForm.value.foodItemId) return 0
+
+  // Get the current food item quantity from inventory
+  const foodItem = foodItems.value.find(f => f.id === editForm.value.foodItemId)
+  if (!foodItem) return 0
+
+  const currentFoodQty = Number(foodItem.quantity || 0)
+
+  // Get the original listing quantity (what was already shared)
+  // We need to find this from mySharedItems
+  const originalListing = mySharedItems.value.find(item => item.id === editForm.value.id)
+  const originalSharedQty = originalListing ? Number(originalListing.quantity || 0) : 0
+
+  // Max = current inventory + what was already shared
+  return currentFoodQty + originalSharedQty
+})
+
+// Check if edit quantity is valid
+const isEditQuantityValid = computed(() => {
+  const qty = Number(editForm.value.quantity) || 0
+  const max = maxEditQuantity.value
+  return qty > 0 && qty <= max
+})
+
+// Computed food items with status for modal
+const foodItemsWithStatus = computed(() => {
+  return foodItems.value.map(item => ({
+    ...item,
+    remainingQty: getRemainingQuantity(item.id),
+    isExpired: isExpiredItem(item)
+  }))
+})
+
 const isExpiredItem = (item) => {
   if (!item || !item.expirationDate) return false
 
@@ -769,6 +811,7 @@ async function editDonated(item) {
 
   editForm.value = {
     id: item.id,
+    foodItemId: item.foodId,
     foodName: item.foodName,
     category: item.category,
     quantity: item.quantity,
@@ -780,8 +823,7 @@ async function editDonated(item) {
         : item.expirationDate?.slice(0, 10) || '',
     pickupTime: item.pickupTime || '',
     notes: item.notes || '',
-    location: item.location || null,
-    foodItemId: item.foodId
+    location: item.location || null
   }
 
   showEditModal.value = true
@@ -888,7 +930,7 @@ async function submitEdit() {
       const activitiesQuery = query(
         collection(db, 'user', currentUser.value.uid, 'activities'),
         where('activityType', '==', 'pendingDonFood'),
-        where('foodId', '==', editForm.value.foodItemId)
+        where('foodId', '==', editForm.value.foodId)
       )
 
       const activitiesSnap = await getDocs(activitiesQuery)
@@ -1560,188 +1602,32 @@ const getGoogleMapsUrl = (location) => {
   </div>
 
   <!-- Share Food Modal -->
-  <div v-if="showShareModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
-    <div class="modal-backdrop fade show" @click="showShareModal = false" style="z-index: 1050;"></div>
-    <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">
-            <i class="bi bi-share me-2"></i>
-            Share Food Item
-          </h5>
-          <button type="button" class="btn-close" @click="showShareModal = false"></button>
-        </div>
-
-        <div class="modal-body" style="max-height:70vh; overflow-y:auto">
-          <form @submit.prevent="submitShare">
-            <div class="mb-3">
-              <label class="form-label">Food Name *</label>
-              <select v-model="shareForm.foodItemId" class="form-select" @change="onSelectFoodItem" required
-                :key="foodItems.map(i => i.id + ':' + i.quantity).join('|') + '|' + donationActivities.length">
-                <option value="" disabled>Select a food item...</option>
-                <option v-for="item in foodItems" :key="item.id" :value="item.id"
-                  :disabled="getRemainingQuantity(item.id) <= 0 || isExpiredItem(item)">
-                  {{ item.name }} - {{ getRemainingQuantity(item.id) }} {{ item.unit }} left
-                  <template v-if="isExpiredItem(item)"> (expired)</template>
-                </option>
-              </select>
-            </div>
-
-            <div class="row g-3 mb-3">
-              <div class="col-md-6">
-                <label class="form-label">Category</label>
-                <input v-model="shareForm.category" type="text" class="form-control" readonly
-                  style="background-color: #e9ecef; cursor: not-allowed;" />
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Expiration Date</label>
-                <input v-model="shareForm.expirationDate" type="date" class="form-control" readonly
-                  style="background-color: #e9ecef; cursor: not-allowed;" />
-              </div>
-            </div>
-
-            <div class="row g-3 mb-3">
-              <div class="col-md-6">
-                <label class="form-label">Quantity *</label>
-                <input v-model.number="shareForm.quantity" type="number" class="form-control"
-                  :class="{ 'is-invalid': shareForm.quantity > maxShareQuantity }" min="1" step="1"
-                  :max="maxShareQuantity" required />
-                <small class="text-muted d-block">
-                  Available: {{ maxShareQuantity }} {{ shareForm.unit }}
-                </small>
-                <div v-if="shareForm.quantity > maxShareQuantity" class="invalid-feedback d-block">
-                  Cannot exceed {{ maxShareQuantity }} {{ shareForm.unit }}
-                </div>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Unit</label>
-                <input v-model="shareForm.unit" type="text" class="form-control" readonly
-                  style="background-color: #e9ecef; cursor: not-allowed;" />
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Preferred Pickup Time</label>
-              <input v-model="shareForm.pickupTime" type="text" class="form-control"
-                placeholder="e.g., Weekdays after 6pm, Weekends anytime" />
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Preferred Pickup Location *</label>
-              <LocationPicker @place-selected="shareForm.location = $event" />
-              <small v-if="shareForm.location" class="text-success d-block mt-1">
-                Selected: {{ shareForm.location.address }}
-              </small>
-
-              <small v-else class="text-danger d-block mt-1">Please select location</small>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Additional Notes</label>
-              <textarea v-model="shareForm.notes" class="form-control" rows="3"
-                placeholder="Any special instructions or notes about the food item..."></textarea>
-            </div>
-          </form>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showShareModal = false">
-            Cancel
-          </button>
-          <button type="button" class="btn btn-primary" @click="submitShare" :disabled="!isShareQuantityValid">
-            <i class="bi bi-share me-2"></i>
-            Share Food
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <ShareFoodModal
+    :show="showShareModal"
+    :formData="shareForm"
+    :foodItems="foodItemsWithStatus"
+    :maxShareQuantity="maxShareQuantity"
+    :isShareQuantityValid="isShareQuantityValid"
+    :isEditMode="false"
+    @close="showShareModal = false"
+    @submit="submitShare"
+    @select-food="(foodId) => { shareForm.foodItemId = foodId; onSelectFoodItem(); }"
+    @location-selected="shareForm.location = $event"
+  />
 
   <!-- Edit Donation Modal -->
-  <div v-if="showEditModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
-    <div class="modal-backdrop fade show" @click="showEditModal = false" style="z-index: 1050;"></div>
-    <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">
-            <i class="bi bi-pencil-square me-2"></i>
-            Edit Donation
-          </h5>
-          <button type="button" class="btn-close" @click="showEditModal = false"></button>
-        </div>
-
-        <div class="modal-body" style="max-height:70vh; overflow-y:auto">
-          <form @submit.prevent="submitEdit">
-            <div class="mb-3">
-              <label class="form-label">Food Name</label>
-              <input v-model="editForm.foodName" type="text" class="form-control" readonly
-                style="background-color: #e9ecef; cursor: not-allowed;" />
-            </div>
-
-            <div class="row g-3 mb-3">
-              <div class="col-md-6">
-                <label class="form-label">Category</label>
-                <input v-model="editForm.category" type="text" class="form-control" readonly
-                  style="background-color: #e9ecef; cursor: not-allowed;" />
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Expiration Date *</label>
-                <input v-model="editForm.expirationDate" type="date" class="form-control" readonly
-                  style="background-color: #e9ecef; cursor: not-allowed;" />
-              </div>
-            </div>
-
-            <div class="row g-3 mb-3">
-              <div class="col-md-6">
-                <label class="form-label">Quantity *</label>
-                <input v-model.number="editForm.quantity" type="number" class="form-control" min="1" step="1"
-                  required />
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Unit</label>
-                <input v-model="editForm.unit" type="text" class="form-control" readonly
-                  style="background-color: #e9ecef; cursor: not-allowed;" />
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Preferred Pickup Time</label>
-              <input v-model="editForm.pickupTime" type="text" class="form-control"
-                placeholder="e.g., Weekdays after 6pm, Weekends anytime" />
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Preferred Pickup Location *</label>
-              <LocationPicker @place-selected="editForm.location = $event"
-                :initial-address="editForm.location?.address" />
-              <small v-if="editForm.location" class="text-success d-block mt-1">
-                Selected: {{ editForm.location.address }}
-              </small>
-              <small v-else class="text-danger d-block mt-1">Please select location</small>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Additional Notes</label>
-              <textarea v-model="editForm.notes" class="form-control" rows="3"
-                placeholder="Any special instructions or notes about the food item..."></textarea>
-            </div>
-          </form>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showEditModal = false">
-            Cancel
-          </button>
-          <button type="button" class="btn btn-primary" @click="submitEdit">
-            <i class="bi bi-check-circle me-2"></i>
-            Update Listing
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <ShareFoodModal
+    :show="showEditModal"
+    :formData="editForm"
+    :foodItems="[]"
+    :maxShareQuantity="maxEditQuantity"
+    :isShareQuantityValid="isEditQuantityValid"
+    :isEditMode="true"
+    @close="showEditModal = false"
+    @submit="submitEdit"
+    @select-food="() => {}"
+    @location-selected="editForm.location = $event"
+  />
 </template>
 
 <style scoped>

@@ -6,14 +6,14 @@ import { ref, computed, reactive, watch, watchEffect } from 'vue';
 import { getAuth } from 'firebase/auth';
 import { useAlert } from '@/composables/useAlert.js';
 import DashboardHeader from '@/components/dashboard/header.vue'
-import StatCard from '@/components/dashboard/StatCard.vue'
 // import FlippedStatCard from '@/components/dashboard/flippedCard.vue'
 import WasteVsSavingsChart from '@/components/dashboard/WasteVsSavingsChart.vue'
 import WasteByCategoryChart from '@/components/dashboard/WasteByCategoryChart.vue'
 import FoodCard from '@/components/dashboard/FoodCard.vue'
 import ActivityItem from '@/components/dashboard/ActivityItem.vue'
+import FoodFormModal from '@/components/dashboard/FoodFormModal.vue'
 
-const { success, error, confirm } = useAlert();
+const { success, error } = useAlert();
 
 const router = useRouter()
 const auth = getAuth()
@@ -169,7 +169,7 @@ async function loadActivities() {
 }
 
 // Helper function to calculate score change for an activity
-const calculateScoreChange = (activityType, price, quantity = 1, isDonation = false) => {
+const calculateScoreChange = (activityType, price, quantity = 1) => {
   price = Number(price) || 0;
   quantity = Number(quantity) || 1;
 
@@ -186,7 +186,7 @@ const calculateScoreChange = (activityType, price, quantity = 1, isDonation = fa
 };
 
 // Helper function to update food score in Firebase
-const updateFoodScore = async (activityType, price, uid, quantity = 1, isDonation = false) => {
+const updateFoodScore = async (activityType, price, uid, quantity = 1) => {
   if (!uid) return { newScore: null, pointsEarned: 0 };
 
   try {
@@ -195,7 +195,7 @@ const updateFoodScore = async (activityType, price, uid, quantity = 1, isDonatio
     const streakMultiplier = streakDays > 0 ? (1 + streakDays / 7) : 1;
 
     // Calculate base score change
-    const baseScoreChange = calculateScoreChange(activityType, price, quantity, isDonation);
+    const baseScoreChange = calculateScoreChange(activityType, price, quantity);
 
     // Apply streak multiplier
     const adjustedChange = (baseScoreChange * streakMultiplier);
@@ -276,8 +276,6 @@ watchEffect(async () => {
       const snapshot = await getDocs(q)
       if (snapshot.empty) {
         // Calculate points BEFORE creating activity
-        const foodPrice = food.price || 0
-        const foodQty = food.quantity || 1
         const { newScore, pointsEarned } = await updateFoodScore('expFood', food.price, uid, food.quantity);
         if (newScore !== null) {
           userFoodScore.value = newScore;
@@ -312,38 +310,6 @@ const toInputDateString = (d) => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-const formatDate = (dateObj) => {
-  let date
-  if (dateObj) {
-    if (typeof dateObj.toDate === 'function') {
-      date = dateObj.toDate()
-    } else if (dateObj instanceof Date) {
-      date = dateObj
-    } else {
-      date = new Date(dateObj)
-    }
-  } else {
-    return ''
-  }
-
-  if (isNaN(date)) return ''
-
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = date.toLocaleString('en-US', { month: 'short' })
-  const year = date.getFullYear()
-  return `${day} ${month} ${year}`
-}
-
-const getRelativeTime = (dateString) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-  if (diffInSeconds < 60) return 'Just now'
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
-  return `${Math.floor(diffInSeconds / 86400)}d ago`
-}
-
 const getDaysLeft = (food) => {
   const now = new Date()
   let expDate
@@ -365,45 +331,6 @@ const getDaysLeft = (food) => {
   return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
 }
 
-const getFoodCardClass = (food) => {
-  const now = new Date()
-  let expDate
-
-  if (food.expirationDate) {
-    if (typeof food.expirationDate.toDate === 'function') {
-      expDate = food.expirationDate.toDate()
-    } else if (food.expirationDate instanceof Date) {
-      expDate = food.expirationDate
-    } else {
-      expDate = new Date(food.expirationDate)
-    }
-  } else {
-    return 'normal-card'
-  }
-
-  if (isNaN(expDate)) return 'normal-card'
-
-  const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24))
-
-  if (expDate < now) {
-    return 'expired-card'
-  } else if (daysLeft >= 1 && daysLeft <= 7) {
-    return 'warning-card'
-  } else {
-    return 'normal-card'
-  }
-}
-
-const getBadgeClass = (food) => {
-  const daysLeft = getDaysLeft(food)
-  if (daysLeft <= 1) {
-    return 'badge-expired'
-  } else if (daysLeft <= 7) {
-    return 'badge-warning'
-  } else {
-    return 'badge-transparent'
-  }
-}
 const calculateActivityStreak = () => {
   if (!activitiesLoaded.value || activities.value.length === 0) return 0
 
@@ -665,81 +592,6 @@ const toggleSortDirection = () => {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
 }
 
-// Convert string to Title Case (e.g., "baby spinach" -> "Baby Spinach")
-const titleCase = (str) => {
-  if (!str || typeof str !== 'string') return ''
-  return str
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
-}
-
-const applyTitleCase = () => {
-  addForm.name = titleCase(addForm.name || '')
-}
-
-// Live input handler for addForm.name that title-cases as user types.
-const onAddNameInput = (event) => {
-  // Preserve cursor position (best-effort)
-  const el = event.target
-  const start = el.selectionStart
-  const end = el.selectionEnd
-  const raw = el.value || ''
-  // Live title-casing that preserves all original spaces (including trailing)
-  // Use regex to transform only non-space runs so user can type spaces freely.
-  const transformed = raw.replace(/\S+/g, (w) => {
-    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
-  })
-
-  // Update model when needed. If nothing changed, still keep model in sync.
-  if (transformed !== raw) {
-    addForm.name = transformed
-    // restore cursor (best-effort)
-    setTimeout(() => {
-      try {
-        el.selectionStart = start
-        el.selectionEnd = end
-      } catch (e) {
-        // ignore
-      }
-    }, 0)
-  } else {
-    addForm.name = raw
-  }
-}
-
-const applyTitleCaseEdit = () => {
-  editForm.name = titleCase(editForm.name || '')
-}
-
-// Live input handler for editForm.name that mirrors the addForm behavior
-const onEditNameInput = (event) => {
-  const el = event.target
-  const start = el.selectionStart
-  const end = el.selectionEnd
-  const raw = el.value || ''
-
-  const transformed = raw.replace(/\S+/g, (w) => {
-    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
-  })
-
-  if (transformed !== raw) {
-    editForm.name = transformed
-    setTimeout(() => {
-      try {
-        el.selectionStart = start
-        el.selectionEnd = end
-      } catch (e) {
-        // ignore
-      }
-    }, 0)
-  } else {
-    editForm.name = raw
-  }
-}
-
 const getSortButtonIcon = computed(() => {
   return sortDirection.value === 'asc' ? 'bi bi-sort-up' : 'bi bi-sort-down'
 })
@@ -880,32 +732,32 @@ const closeAdd = () => {
   addForm.unit = ''
 }
 
-const saveAdd = async () => {
+const saveAdd = async (formData) => {
   if (!userId.value) {
     console.warn('No userId available; cannot add food item')
     return
   }
 
-  // Ensure the name is title-cased before saving
-  applyTitleCase()
-  const nameValue = addForm.name || ''
+  // Use formData from modal if provided, otherwise fall back to addForm
+  const data = formData || addForm
+  const nameValue = data.name || ''
 
   const colRef = collection(db, 'user', userId.value, 'foodItems')
   const actRef = collection(db, 'user', userId.value, 'activities')
 
   const foodPayload = {
     name: nameValue,
-    category: addForm.category || '',
-    price: Number(addForm.price) || 0,
-    quantity: Number(addForm.quantity) || 0,
-    unit: addForm.unit || '',
-    createdAt: addForm.createdAt
-      ? Timestamp.fromDate(new Date(addForm.createdAt))
+    category: data.category || '',
+    price: Number(data.price) || 0,
+    quantity: Number(data.quantity) || 0,
+    unit: data.unit || '',
+    createdAt: data.createdAt
+      ? Timestamp.fromDate(new Date(data.createdAt))
       : Timestamp.fromDate(new Date()),
   }
 
-  if (addForm.expirationDate) {
-    foodPayload.expirationDate = Timestamp.fromDate(new Date(addForm.expirationDate))
+  if (data.expirationDate) {
+    foodPayload.expirationDate = Timestamp.fromDate(new Date(data.expirationDate))
   }
 
   try {
@@ -915,10 +767,10 @@ const saveAdd = async () => {
       activityType: 'addFood',
       createdAt: new Date().toISOString(),
       foodName: nameValue,
-      category: addForm.category || '',
-      price: String(addForm.price || ''),
-      quantity: String(addForm.quantity || ''),
-      unit: String(addForm.unit || ''),
+      category: data.category || '',
+      price: String(data.price || ''),
+      quantity: String(data.quantity || ''),
+      unit: String(data.unit || ''),
     }
 
     const activityDocRef = await addDoc(actRef, activityPayload)
@@ -986,24 +838,26 @@ const closeEdit = () => {
   editFormOriginal.value = null
 }
 
-const saveEdit = async () => {
-  if (!editForm.id) return
-  const refDoc = doc(db, 'user', userId.value, 'foodItems', editForm.id)
+const saveEdit = async (formData) => {
+  // Use formData from modal if provided, otherwise fall back to editForm
+  const data = formData || editForm
+  if (!data.id) return
+  const refDoc = doc(db, 'user', userId.value, 'foodItems', data.id)
   const payload = {
-    name: editForm.name,
-    category: editForm.category,
-    price: (Number(editForm.price) || 0),
-    quantity: Number(editForm.quantity) || 0,
-    unit: editForm.unit || '',
+    name: data.name,
+    category: data.category,
+    price: (Number(data.price) || 0),
+    quantity: Number(data.quantity) || 0,
+    unit: data.unit || '',
   }
-  if (editForm.expirationDate) {
-    payload.expirationDate = Timestamp.fromDate(new Date(editForm.expirationDate))
+  if (data.expirationDate) {
+    payload.expirationDate = Timestamp.fromDate(new Date(data.expirationDate))
   }
-  if (editForm.createdAt) {
-    payload.createdAt = Timestamp.fromDate(new Date(editForm.createdAt))
+  if (data.createdAt) {
+    payload.createdAt = Timestamp.fromDate(new Date(data.createdAt))
   }
   await updateDoc(refDoc, payload)
-  const idx = foodItems.value.findIndex((f) => f.id === editForm.id)
+  const idx = foodItems.value.findIndex((f) => f.id === data.id)
   if (idx !== -1) {
     foodItems.value[idx] = { ...foodItems.value[idx], ...payload }
   }
@@ -1072,7 +926,7 @@ const confirmDelete = async () => {
 <template>
   <div class="container-fluid p-0">
     <!-- Dashboard Header with Stats Cards -->
-    <DashboardHeader 
+    <DashboardHeader
       :userFoodScore="userFoodScore"
       :expiringSoon="expiringSoon"
       :potentialLoss="potentialLoss"
@@ -1209,55 +1063,15 @@ const confirmDelete = async () => {
   </div>
 
   <!-- Edit Food Modal -->
-  <div v-if="showEditModal" class="modal-backdrop">
-      <div class="modal-card">
-        <h3 class="h5 mb-3">Edit Food Item</h3>
-        <div class="mb-2">
-          <label class="form-label">Name</label>
-          <input v-model="editForm.name" @input="onEditNameInput" @blur="applyTitleCaseEdit" class="form-control" />
-        </div>
-        <div class="mb-2">
-          <label class="form-label">Category</label>
-          <select v-model="editForm.category" class="form-select">
-            <option disabled value="">{{ editForm.category || 'Select a category' }}</option>
-            <option v-for="cat in categories.filter((c) => c !== 'All Categories')" :key="cat" :value="cat">
-              {{ cat }}
-            </option>
-          </select>
-        </div>
-        <div class="row g-2">
-          <div class="col-6">
-            <label class="form-label">Expiration Date</label>
-            <input v-model="editForm.expirationDate" type="date" class="form-control" />
-          </div>
-          <div class="col-6">
-            <label class="form-label">Created At</label>
-            <input v-model="editForm.createdAt" type="date" class="form-control" disabled />
-          </div>
-        </div>
-        <div class="row g-2 mt-2">
-          <div class="col-4">
-            <label class="form-label">Total Price</label>
-            <input v-model="editForm.price" type="number" step="0.01" class="form-control" />
-          </div>
-          <div class="col-4">
-            <label class="form-label">Quantity</label>
-            <input v-model="editForm.quantity" type="number" class="form-control" />
-          </div>
-          <div class="col-4">
-            <label class="form-label">Unit</label>
-            <select v-model="editForm.unit" class="form-select">
-              <option disabled value="">{{ editForm.unit || 'Select a unit' }}</option>
-              <option v-for="unit in availableUnits" :key="unit" :value="unit">{{ unit }}</option>
-            </select>
-          </div>
-        </div>
-        <div class="d-flex justify-content-end gap-2 mt-3">
-          <button class="btn btn-secondary" @click="closeEdit">Cancel</button>
-          <button class="btn btn-primary" @click="saveEdit">Save</button>
-        </div>
-      </div>
-    </div>
+  <FoodFormModal
+    :show="showEditModal"
+    mode="edit"
+    :formData="editForm"
+    :categories="categories"
+    :availableUnits="availableUnits"
+    @close="closeEdit"
+    @save="saveEdit"
+  />
 
     <!-- Use Food Modal -->
     <div v-if="showUseModal" class="modal-backdrop">
@@ -1308,55 +1122,15 @@ const confirmDelete = async () => {
     </button>
 
     <!-- Add Modal -->
-    <div v-if="showAddModal" class="modal-backdrop">
-      <div class="modal-card">
-        <h3 class="h5 mb-3">Add Food Item</h3>
-        <div class="mb-2">
-          <label class="form-label">Name</label>
-          <input v-model="addForm.name" @input="onAddNameInput" @blur="applyTitleCase" class="form-control" />
-        </div>
-        <div class="mb-2">
-          <label class="form-label">Category</label>
-          <select v-model="addForm.category" class="form-select">
-            <option disabled value="">Select a category</option>
-            <option v-for="cat in categories.filter((c) => c !== 'All Categories')" :key="cat" :value="cat">
-              {{ cat }}
-            </option>
-          </select>
-        </div>
-        <div class="row g-2">
-          <div class="col-6">
-            <label class="form-label">Expiration Date</label>
-            <input v-model="addForm.expirationDate" type="date" class="form-control" />
-          </div>
-          <div class="col-6">
-            <label class="form-label">Created At</label>
-            <input v-model="addForm.createdAt" type="date" class="form-control" disabled />
-          </div>
-        </div>
-        <div class="row g-2 mt-2">
-          <div class="col-4">
-            <label class="form-label">Total Price</label>
-            <input v-model="addForm.price" type="number" step="0.01" class="form-control" />
-          </div>
-          <div class="col-4">
-            <label class="form-label">Quantity</label>
-            <input v-model="addForm.quantity" type="number" class="form-control" />
-          </div>
-          <div class="col-4">
-            <label class="form-label">Unit</label>
-            <select v-model="addForm.unit" class="form-select">
-              <option disabled value="">Select a unit</option>
-              <option v-for="unit in availableUnits" :key="unit" :value="unit">{{ unit }}</option>
-            </select>
-          </div>
-        </div>
-        <div class="d-flex justify-content-end gap-2 mt-3">
-          <button class="btn btn-secondary" @click="closeAdd">Cancel</button>
-          <button class="btn btn-primary" @click="saveAdd">Add</button>
-        </div>
-      </div>
-    </div>
+    <FoodFormModal
+      :show="showAddModal"
+      mode="add"
+      :formData="addForm"
+      :categories="categories"
+      :availableUnits="availableUnits"
+      @close="closeAdd"
+      @save="saveAdd"
+    />
   </div>
 
   <!-- Delete Confirmation Modal -->
