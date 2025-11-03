@@ -177,7 +177,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 4rem;
   align-items: center;
-  padding: 4rem 8%;
+  padding: 1rem 8%;
   background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 50%, #fef3c7 100%);
   position: relative;
   overflow: hidden;

@@ -1100,7 +1100,7 @@ const getGoogleMapsUrl = (location) => {
         <div class="blob blob-green position-absolute top-0 end-0 rounded-circle opacity-75 shadow"></div>
         <div class="blob blob-blue position-absolute bottom-0 end-0 rounded-circle opacity-75 shadow"></div>
       </div>
-      
+
       <!-- Connection Network Animation -->
       <svg class="connection-network position-absolute w-100 h-100" viewBox="0 0 800 400" preserveAspectRatio="none">
         <defs>
@@ -1109,7 +1109,7 @@ const getGoogleMapsUrl = (location) => {
             <stop offset="100%" style="stop-color:#10b981;stop-opacity:0.2" />
           </radialGradient>
         </defs>
-        
+
         <!-- Connection nodes -->
         <circle class="connection-node node-1" cx="120" cy="150" r="6" fill="url(#nodeGradient)"/>
         <circle class="connection-node node-2" cx="280" cy="120" r="5" fill="url(#nodeGradient)"/>
@@ -1120,7 +1120,7 @@ const getGoogleMapsUrl = (location) => {
         <circle class="connection-node node-7" cx="520" cy="260" r="6" fill="url(#nodeGradient)"/>
         <circle class="connection-node node-8" cx="350" cy="100" r="4" fill="url(#nodeGradient)"/>
         <circle class="connection-node node-9" cx="90" cy="220" r="5" fill="url(#nodeGradient)"/>
-        
+
         <!-- Main connection lines between nodes -->
         <line class="connection-link link-1" x1="120" y1="150" x2="280" y2="120" stroke="#10b981" stroke-width="1.5" opacity="0.4"/>
         <line class="connection-link link-2" x1="280" y1="120" x2="450" y2="180" stroke="#10b981" stroke-width="1.5" opacity="0.4"/>
@@ -1128,7 +1128,7 @@ const getGoogleMapsUrl = (location) => {
         <line class="connection-link link-4" x1="120" y1="150" x2="180" y2="280" stroke="#10b981" stroke-width="1.5" opacity="0.4"/>
         <line class="connection-link link-5" x1="180" y1="280" x2="380" y2="250" stroke="#10b981" stroke-width="1.5" opacity="0.4"/>
         <line class="connection-link link-6" x1="380" y1="250" x2="450" y2="180" stroke="#10b981" stroke-width="1.5" opacity="0.4"/>
-        
+
         <!-- Additional connection lines for richer network -->
         <line class="connection-link link-7" x1="450" y1="180" x2="520" y2="260" stroke="#10b981" stroke-width="1.2" opacity="0.3"/>
         <line class="connection-link link-8" x1="280" y1="120" x2="350" y2="100" stroke="#10b981" stroke-width="1.2" opacity="0.3"/>
@@ -1138,7 +1138,7 @@ const getGoogleMapsUrl = (location) => {
         <line class="connection-link link-12" x1="380" y1="250" x2="520" y2="260" stroke="#10b981" stroke-width="1.2" opacity="0.3"/>
         <line class="connection-link link-13" x1="520" y1="260" x2="600" y2="140" stroke="#10b981" stroke-width="1.2" opacity="0.3"/>
         <line class="connection-link link-14" x1="350" y1="100" x2="600" y2="140" stroke="#10b981" stroke-width="1" opacity="0.25"/>
-        
+
         <!-- Animated pulse lines -->
         <line class="pulse-line pulse-1" x1="120" y1="150" x2="280" y2="120" stroke="#22c55e" stroke-width="2" opacity="0"/>
         <line class="pulse-line pulse-2" x1="280" y1="120" x2="450" y2="180" stroke="#22c55e" stroke-width="2" opacity="0"/>
@@ -1148,7 +1148,7 @@ const getGoogleMapsUrl = (location) => {
         <line class="pulse-line pulse-6" x1="380" y1="250" x2="520" y2="260" stroke="#22c55e" stroke-width="2" opacity="0"/>
       </svg>
     </div>
-    
+
   <div class="container-fluid px-4 py-3 position-relative" style="z-index: 10;">
     <div class="row align-items-center g-5">
       <!-- Left: Title & Description -->
@@ -1165,7 +1165,7 @@ const getGoogleMapsUrl = (location) => {
 
           <!-- Stats Row -->
           <div class=" d-flex gap-4 flex-wrap">
-            <div class="stats-card d-flex align-items-center gap-3 px-4 py-3 rounded-4" 
+            <div class="stats-card d-flex align-items-center gap-3 px-4 py-3 rounded-4"
                  style="background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(10px);">
               <i class="bi bi-people-fill fs-2 text-dark"></i>
               <div>
@@ -1173,7 +1173,7 @@ const getGoogleMapsUrl = (location) => {
                 <small class="text-dark">Items Shared</small>
               </div>
             </div>
-            <div class=" stats-card d-flex align-items-center gap-3 px-4 py-3 rounded-4" 
+            <div class=" stats-card d-flex align-items-center gap-3 px-4 py-3 rounded-4"
                  style="background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(10px);">
               <i class="bi bi-box-seam fs-2 text-dark"></i>
               <div>
@@ -1181,7 +1181,7 @@ const getGoogleMapsUrl = (location) => {
                 <small class="text-dark">Available</small>
               </div>
             </div>
-            <div class=" stats-card d-flex align-items-center gap-3 px-4 py-3 rounded-4" 
+            <div class=" stats-card d-flex align-items-center gap-3 px-4 py-3 rounded-4"
                  style="background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(10px);">
               <i class="bi bi-recycle fs-2 text-dark"></i>
               <div>
@@ -1195,18 +1195,18 @@ const getGoogleMapsUrl = (location) => {
 
       <!-- Right: Location Picker Card (replacing grocery bag) -->
       <div class="col-lg-6">
-        <div class="location-picker-card card border-0 shadow-lg rounded-4 position-relative p-1" 
+        <div class="location-picker-card card border-0 shadow-lg rounded-4 position-relative p-1"
              style="min-height: 300px; transition: all 0.3s ease;">
-          
+
           <!-- Step Badge -->
-          <div class="step-badge position-absolute d-flex align-items-center justify-content-center rounded-circle fw-bold shadow-lg" 
+          <div class="step-badge position-absolute d-flex align-items-center justify-content-center rounded-circle fw-bold shadow-lg"
                style="top: -12px; left: -12px; width: 56px; height: 56px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; font-size: 1.25rem;">
             <i class="bi bi-geo-alt-fill"></i>
           </div>
 
           <div class="card-body p-4 text-center">
             <!-- Centered Icon -->
-            <div class="mx-auto mb-4 rounded-circle d-flex align-items-center justify-content-center" 
+            <div class="mx-auto mb-4 rounded-circle d-flex align-items-center justify-content-center"
                  style="width: 80px; height: 80px; background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); color: #22c55e; transition: all 0.3s ease;">
               <i class="bi bi-pin-map-fill" style="font-size: 2.5rem;"></i>
             </div>
@@ -1228,15 +1228,15 @@ const getGoogleMapsUrl = (location) => {
               <!-- Location selected -->
               <template v-else>
                 <div>
-                  <div class="d-flex align-items-start gap-3 p-3 rounded-3 border border-2 text-start" 
+                  <div class="d-flex align-items-start gap-3 p-3 rounded-3 border border-2 text-start"
                        style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);">
                     <i class="bi bi-geo-alt-fill text-success fs-4 mt-1"></i>
                     <div class="flex-grow-1">
                       <strong class="d-block">Current Location</strong>
                       <small class="text-muted">{{ preferredLocation.address }}</small>
                     </div>
-                    <button @click="clearPreferredLocation" 
-                            class="btn btn-sm btn-outline-danger rounded-circle p-0" 
+                    <button @click="clearPreferredLocation"
+                            class="btn btn-sm btn-outline-danger rounded-circle p-0"
                             style="width: 32px; height: 32px;"
                             title="Clear location">
                       <i class="bi bi-x-lg"></i>
@@ -1486,149 +1486,102 @@ const getGoogleMapsUrl = (location) => {
     <div class="modal-backdrop fade show" @click="showContactModal = false" style="z-index: 1050;"></div>
     <div class="modal-dialog modal-dialog-centered contact-modal-dialog" style="z-index: 1060;">
       <div class="modal-content contact-modal-content">
-        <!-- Header with gradient -->
+        <!-- Header -->
         <div class="contact-modal-header">
-          <div class="contact-avatar">
-            <i class="bi bi-person-fill"></i>
-          </div>
-          <div class="contact-header-info">
-            <h5 class="contact-name">{{ selectedContact?.sharedBy }}</h5>
-            <p class="contact-subtitle">Community Member</p>
-          </div>
-          <button type="button" class="btn-close btn-close-white" @click="showContactModal = false"></button>
-        </div>
-
-        <!-- Food Item Card -->
-        <div class="contact-food-card">
-          <div class="food-card-icon">
-            <i class="bi bi-basket2-fill"></i>
-          </div>
-          <div class="food-card-details">
-            <h6 class="food-card-title">{{ selectedContact?.foodName }}</h6>
-            <div class="food-card-meta">
-              <span class="food-quantity">
-                <i class="bi bi-layers-fill me-1"></i>
-                {{ selectedContact?.quantity }} {{ selectedContact?.unit }}
-              </span>
-              <span class="food-expiry" :class="{
-                'expiry-urgent': selectedContact?.daysUntilExpiration <= 2,
-                'expiry-warning': selectedContact?.daysUntilExpiration <= 5 && selectedContact?.daysUntilExpiration > 2,
-                'expiry-normal': selectedContact?.daysUntilExpiration > 5
-              }">
-                <i class="bi bi-calendar-check me-1"></i>
-                {{ selectedContact?.daysUntilExpiration }} day{{ selectedContact?.daysUntilExpiration !== 1 ? 's' : ''
-                }}
-                left
-              </span>
-            </div>
-          </div>
+          <h5 class="contact-name">{{ selectedContact?.foodName }}</h5>
+          <button type="button" class="btn-close" @click="showContactModal = false"></button>
         </div>
 
         <div class="modal-body contact-modal-body">
-          <!-- Contact Information Grid -->
-          <div class="contact-info-grid">
-            <!-- Email -->
-            <div class="contact-info-card" v-if="selectedContact?.contact?.email">
-              <div class="contact-info-icon email-icon">
-                <i class="bi bi-envelope-fill"></i>
-              </div>
-              <div class="contact-info-content">
-                <label class="contact-info-label">Email Address</label>
-                <a :href="`mailto:${selectedContact.contact.email}`" class="contact-info-value contact-link">
-                  {{ selectedContact.contact.email }}
-                </a>
-              </div>
-            </div>
+          <!-- Shared By -->
+          <div class="contact-info-item">
+            <i class="bi bi-person-fill"></i>
+            <span class="contact-label">Shared by:</span>
+            <span class="contact-value">{{ selectedContact?.sharedBy }}</span>
+          </div>
 
-            <!-- Phone -->
-            <div class="contact-info-card"
-              v-if="selectedContact?.contact?.phone && selectedContact.contact.phone !== 'Not provided'">
-              <div class="contact-info-icon phone-icon">
-                <i class="bi bi-telephone-fill"></i>
-              </div>
-              <div class="contact-info-content">
-                <label class="contact-info-label">Phone Number</label>
-                <a :href="`tel:${selectedContact.contact.phone}`" class="contact-info-value contact-link">
-                  {{ selectedContact.contact.phone }}
-                </a>
-              </div>
-            </div>
-            <div class="contact-info-card" v-else>
-              <div class="contact-info-icon phone-icon disabled">
-                <i class="bi bi-telephone-x-fill"></i>
-              </div>
-              <div class="contact-info-content">
-                <label class="contact-info-label">Phone Number</label>
-                <span class="contact-info-value text-muted">Not provided</span>
-              </div>
-            </div>
+          <!-- Quantity -->
+          <div class="contact-info-item">
+            <i class="bi bi-layers-fill"></i>
+            <span class="contact-label">Quantity:</span>
+            <span class="contact-value">{{ selectedContact?.quantity }} {{ selectedContact?.unit }}</span>
+          </div>
 
-            <!-- Handle -->
-            <div class="contact-info-card" v-if="selectedContact?.contact?.handle">
-              <div class="contact-info-icon handle-icon">
-                <i class="bi bi-at"></i>
-              </div>
-              <div class="contact-info-content">
-                <label class="contact-info-label">Telegram Handle</label>
-                <span class="contact-info-value">{{ selectedContact.contact.handle }}</span>
-              </div>
-            </div>
+          <!-- Expiration -->
+          <div class="contact-info-item">
+            <i class="bi bi-calendar-check"></i>
+            <span class="contact-label">Expires in:</span>
+            <span class="contact-value" :class="{
+              'text-danger': selectedContact?.daysUntilExpiration <= 2,
+              'text-warning': selectedContact?.daysUntilExpiration <= 5 && selectedContact?.daysUntilExpiration > 2,
+              'text-success': selectedContact?.daysUntilExpiration > 5
+            }">
+              {{ selectedContact?.daysUntilExpiration }} day{{ selectedContact?.daysUntilExpiration !== 1 ? 's' : '' }}
+            </span>
+          </div>
 
-            <!-- Location -->
-            <div class="contact-info-card contact-location-card">
-              <div class="contact-info-icon location-icon-cc">
-                <i class="bi bi-geo-alt-fill"></i>
-              </div>
-              <div class="contact-info-content">
-                <label class="contact-info-label">Pickup Location</label>
-                <span class="contact-info-value">{{ selectedContact?.location?.address || 'Not specified' }}</span>
+          <!-- Email -->
+          <div class="contact-info-item" v-if="selectedContact?.contact?.email">
+            <i class="bi bi-envelope-fill"></i>
+            <span class="contact-label">Email:</span>
+            <a :href="`mailto:${selectedContact.contact.email}`" class="contact-value contact-link">
+              {{ selectedContact.contact.email }}
+            </a>
+          </div>
 
-                <!-- Clickable Map Preview -->
-                <a v-if="selectedContact?.location?.lat && selectedContact?.location?.lng"
-                  :href="getGoogleMapsUrl(selectedContact.location)" target="_blank" class="map-preview-link">
-                  <div class="map-preview">
-                    <iframe
-                      :src="`https://www.google.com/maps?q=${selectedContact.location.lat},${selectedContact.location.lng}&output=embed&z=15`"
-                      class="map-iframe" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-                    <div class="map-overlay">
-                      <i class="bi bi-box-arrow-up-right"></i>
-                      <span>Open in Google Maps</span>
-                    </div>
-                  </div>
-                </a>
-              </div>
-            </div>
+          <!-- Phone -->
+          <div class="contact-info-item" v-if="selectedContact?.contact?.phone && selectedContact.contact.phone !== 'Not provided'">
+            <i class="bi bi-telephone-fill"></i>
+            <span class="contact-label">Phone:</span>
+            <a :href="`tel:${selectedContact.contact.phone}`" class="contact-value contact-link">
+              {{ selectedContact.contact.phone }}
+            </a>
+          </div>
 
-            <!-- Pickup Time -->
-            <div class="contact-info-card"
-              v-if="selectedContact?.pickupTime && selectedContact.pickupTime !== 'Not specified'">
-              <div class="contact-info-icon time-icon">
-                <i class="bi bi-clock-fill"></i>
-              </div>
-              <div class="contact-info-content">
-                <label class="contact-info-label">Pickup Time</label>
-                <span class="contact-info-value">{{ selectedContact.pickupTime }}</span>
-              </div>
-            </div>
+          <!-- Handle -->
+          <div class="contact-info-item" v-if="selectedContact?.contact?.handle">
+            <i class="bi bi-at"></i>
+            <span class="contact-label">Telegram:</span>
+            <span class="contact-value">{{ selectedContact.contact.handle }}</span>
+          </div>
 
-            <!-- Notes -->
-            <div class="contact-info-card contact-notes-card" v-if="selectedContact?.notes">
-              <div class="contact-info-icon notes-icon">
-                <i class="bi bi-chat-left-text-fill"></i>
+          <!-- Pickup Time -->
+          <div class="contact-info-item" v-if="selectedContact?.pickupTime && selectedContact.pickupTime !== 'Not specified'">
+            <i class="bi bi-clock-fill"></i>
+            <span class="contact-label">Pickup Time:</span>
+            <span class="contact-value">{{ selectedContact.pickupTime }}</span>
+          </div>
+
+          <!-- Location -->
+          <div class="contact-info-item" v-if="selectedContact?.location?.address">
+            <i class="bi bi-geo-alt-fill"></i>
+            <span class="contact-label">Location:</span>
+            <span class="contact-value">{{ selectedContact.location.address }}</span>
+          </div>
+
+          <!-- Map -->
+          <div class="contact-map" v-if="selectedContact?.location?.lat && selectedContact?.location?.lng">
+            <a :href="getGoogleMapsUrl(selectedContact.location)" target="_blank" class="map-link">
+              <iframe
+                :src="`https://www.google.com/maps?q=${selectedContact.location.lat},${selectedContact.location.lng}&output=embed&z=15`"
+                class="map-iframe" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+              <div class="map-overlay">
+                <i class="bi bi-box-arrow-up-right me-2"></i>Open in Google Maps
               </div>
-              <div class="contact-info-content">
-                <label class="contact-info-label">Additional Notes</label>
-                <span class="contact-info-value">{{ selectedContact.notes }}</span>
-              </div>
-            </div>
+            </a>
+          </div>
+
+          <!-- Notes -->
+          <div class="contact-notes" v-if="selectedContact?.notes">
+            <label><i class="bi bi-chat-left-text-fill me-2"></i>Notes:</label>
+            <p>{{ selectedContact.notes }}</p>
           </div>
         </div>
 
-        <!-- Footer with action buttons -->
+        <!-- Footer -->
         <div class="contact-modal-footer">
-          <button type="button" class="btn btn-primary contact-btn-close-primary" @click="showContactModal = false">
-            <i class="bi bi-check-circle-fill me-2"></i>
-            Got It
+          <button type="button" class="btn btn-primary w-100" @click="showContactModal = false">
+            Close
           </button>
         </div>
       </div>
@@ -1739,13 +1692,13 @@ const getGoogleMapsUrl = (location) => {
 .node-9 { animation-delay: 3.2s; }
 
 @keyframes nodePulse {
-  0%, 100% { 
-    r: 5; 
-    opacity: 0.6; 
+  0%, 100% {
+    r: 5;
+    opacity: 0.6;
   }
-  50% { 
-    r: 8; 
-    opacity: 1; 
+  50% {
+    r: 8;
+    opacity: 1;
   }
 }
 
@@ -1769,23 +1722,23 @@ const getGoogleMapsUrl = (location) => {
 .pulse-6 { animation-delay: 4s; }
 
 @keyframes pulseTravelBrighter {
-  0% { 
-    opacity: 0; 
-    stroke-dasharray: 0, 1000; 
+  0% {
+    opacity: 0;
+    stroke-dasharray: 0, 1000;
   }
-  20% { 
-    opacity: 0.8; 
-    stroke-dasharray: 20, 1000; 
+  20% {
+    opacity: 0.8;
+    stroke-dasharray: 20, 1000;
   }
-  80% { 
-    opacity: 0.8; 
-    stroke-dasharray: 20, 1000; 
-    stroke-dashoffset: -100; 
+  80% {
+    opacity: 0.8;
+    stroke-dasharray: 20, 1000;
+    stroke-dashoffset: -100;
   }
-  100% { 
-    opacity: 0; 
-    stroke-dasharray: 0, 1000; 
-    stroke-dashoffset: -100; 
+  100% {
+    opacity: 0;
+    stroke-dasharray: 0, 1000;
+    stroke-dashoffset: -100;
   }
 }
 
@@ -1821,21 +1774,21 @@ const getGoogleMapsUrl = (location) => {
   .community-blobs .blob {
     opacity: 0.4;
   }
-  
+
   .blob-green {
     width: 200px;
     height: 200px;
   }
-  
+
   .blob-blue {
     width: 150px;
     height: 150px;
   }
-  
+
   .connection-network {
     opacity: 0.4;
   }
-  
+
   .floating-community-icon {
     opacity: 0.6;
     font-size: 1.2rem !important;
@@ -1847,15 +1800,15 @@ const getGoogleMapsUrl = (location) => {
     z-index: 0 !important;
     pointer-events: none !important;
   }
-  
+
   .community-blobs .blob {
     opacity: 0.2;
   }
-  
+
   .connection-network {
     opacity: 0.2;
   }
-  
+
   .floating-community-icon {
     opacity: 0.4;
   }
@@ -1911,7 +1864,7 @@ const getGoogleMapsUrl = (location) => {
     min-height: auto;
     padding: 30px 15px;
   }
-  
+
   .hero-content h1 {
     font-size: 2.5rem !important;
   }
@@ -2376,9 +2329,8 @@ padding: 20px 24px;
 .items-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  /* Changed from 320px to 240px */
-  gap: 1.25rem;
-  /* Slightly reduced gap */
+  gap: 1rem;
+  /* Reduced gap for tighter layout */
 }
 
 /* Item Card */
@@ -2400,8 +2352,8 @@ padding: 20px 24px;
 
 .item-card {
   background: white;
-  border-radius: 16px;
-  /* Reduced from 20px */
+  border-radius: 12px;
+  /* Slightly reduced */
   overflow: hidden;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
@@ -2410,7 +2362,8 @@ padding: 20px 24px;
 }
 
 .item-card:hover {
-  transform: translateY(-8px);
+  transform: translateY(-6px);
+  /* Reduced hover lift */
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
   border-color: #667eea;
 }
@@ -2524,16 +2477,16 @@ padding: 20px 24px;
 
 /* Card Content */
 .card-content {
-  padding: 1.5rem;
-  padding-top: 4rem;
+  padding: 1.1rem;
+  padding-top: 3.2rem;
 }
 
 .card-image {
-  width: 80px;
-  height: 80px;
-  margin: 0 auto 1.5rem;
+  width: 65px;
+  height: 65px;
+  margin: 0 auto 1.1rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 20px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2546,17 +2499,17 @@ padding: 20px 24px;
 }
 
 .card-image i {
-  font-size: 2.5rem;
+  font-size: 2rem;
   color: white;
 }
 
 .card-info {
   text-align: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.1rem;
 }
 
 .card-food-name {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 800;
   color: #1e293b;
   margin-bottom: 0.5rem;
@@ -2566,7 +2519,7 @@ padding: 20px 24px;
   display: inline-flex;
   align-items: center;
   background: #f1f5f9;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.8rem;
   border-radius: 10px;
   font-weight: 600;
   color: #475569;
@@ -2586,16 +2539,16 @@ padding: 20px 24px;
 .card-details {
   background: #f8fafc;
   border-radius: 12px;
-  padding: 1rem;
-  margin-bottom: 1rem;
+  padding: 0.8rem;
+  margin-bottom: 0.8rem;
 }
 
 .detail-item {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.5rem 0;
-  font-size: 0.875rem;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  font-size: 0.85rem;
   color: #475569;
 }
 
@@ -2619,7 +2572,7 @@ padding: 20px 24px;
 .card-footer {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
 /* Expiry Badge */
@@ -2627,11 +2580,9 @@ padding: 20px 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem 0.8rem;
-  /* Reduced from 0.625rem 1rem */
+  padding: 0.4rem 0.7rem;
   border-radius: 8px;
-  font-size: 0.8rem;
-  /* Reduced from 0.875rem */
+  font-size: 0.75rem;
   font-weight: 700;
   width: 100%;
 }
@@ -2658,13 +2609,11 @@ padding: 20px 24px;
 .btn-mark-donated,
 .btn-contact {
   width: 100%;
-  padding: 0.75rem;
-  /* Reduced from 0.875rem */
+  padding: 0.65rem;
   border-radius: 10px;
   border: none;
   font-weight: 700;
-  font-size: 0.85rem;
-  /* Reduced from 0.95rem */
+  font-size: 0.8rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3014,324 +2963,104 @@ padding: 20px 24px;
 }
 
 /* ============================================
-   CONTACT MODAL BEAUTIFICATION
+   CONTACT MODAL
    ============================================ */
 
 /* Contact Modal Dialog */
 .contact-modal-dialog {
-  max-width: 600px;
-  margin: 1rem auto;
-  max-height: calc(100vh - 2rem);
-  display: flex;
-  align-items: center;
+  max-width: 550px;
 }
 
 .contact-modal-content {
-  border-radius: 24px;
-  overflow: hidden;
+  border-radius: 16px;
   border: none;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  max-height: calc(100vh - 2rem);
-  display: flex;
-  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
 }
 
-/* Contact Modal Header with Gradient */
+/* Contact Modal Header */
 .contact-modal-header {
-  background: #059669;
-  padding: 1.5rem 2rem;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  padding: 1.25rem 1.5rem;
   display: flex;
   align-items: center;
-  gap: 1.25rem;
-  position: relative;
-  border: none;
-  flex-shrink: 0;
-}
-
-.contact-avatar {
-  width: 70px;
-  height: 70px;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-}
-
-.contact-avatar i {
-  font-size: 2rem;
-  color: white;
-}
-
-.contact-header-info {
-  flex: 1;
+  justify-content: space-between;
+  border-bottom: none;
 }
 
 .contact-name {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 600;
   color: white;
   margin: 0;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.contact-subtitle {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.9);
-  margin: 0.25rem 0 0 0;
-  font-weight: 500;
-}
-
-.btn-close-white {
-  filter: brightness(0) invert(1);
-  opacity: 0.8;
-  transition: all 0.3s ease;
-}
-
-.btn-close-white:hover {
-  opacity: 1;
-  transform: rotate(90deg);
-}
-
-/* Food Item Card */
-.contact-food-card {
-  background: linear-gradient(135deg, #f8fafc 0%, #e5e7eb 100%);
-  padding: 1.25rem 2rem;
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  border-bottom: 3px solid #e5e7eb;
-  flex-shrink: 0;
-}
-
-.food-card-icon {
-  width: 60px;
-  height: 60px;
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
-  flex-shrink: 0;
-}
-
-.food-card-icon i {
-  font-size: 1.75rem;
-  color: white;
-}
-
-.food-card-details {
-  flex: 1;
-  min-width: 0;
-}
-
-.food-card-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 0.5rem 0;
-}
-
-.food-card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.food-quantity {
-  display: inline-flex;
-  align-items: center;
-  background: white;
-  padding: 0.375rem 0.75rem;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #475569;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.food-expiry {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.375rem 0.75rem;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.food-expiry.expiry-urgent {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  color: #991b1b;
-}
-
-.food-expiry.expiry-warning {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  color: #92400e;
-}
-
-.food-expiry.expiry-normal {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  color: #065f46;
 }
 
 /* Contact Modal Body */
 .contact-modal-body {
-  padding: 1.5rem 2rem;
-  background: white;
+  padding: 1.5rem;
+  max-height: 60vh;
   overflow-y: auto;
-  flex: 1;
-  min-height: 0;
 }
 
-/* Contact Info Grid */
-.contact-info-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: 1fr;
-}
-
-.contact-info-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  padding: 1.25rem;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-radius: 16px;
-  border: 2px solid #e5e7eb;
-  transition: all 0.3s ease;
-}
-
-.contact-info-card:hover {
-  border-color: #667eea;
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.15);
-  transform: translateY(-2px);
-}
-
-.contact-info-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+.contact-info-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  gap: 0.75rem;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 3px solid #059669;
 }
 
-.email-icon {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
+.contact-info-item i {
+  font-size: 1.1rem;
+  color: #059669;
+  min-width: 20px;
+  text-align: center;
 }
 
-.phone-icon {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: white;
-}
-
-.phone-icon.disabled {
-  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
-}
-
-.handle-icon {
-  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-  color: white;
-}
-
-.location-icon-cc {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  color: white;
-}
-
-.time-icon {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  color: white;
-}
-
-.notes-icon {
-  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
-  color: white;
-}
-
-.contact-info-icon i {
-  font-size: 1.25rem;
-}
-
-.contact-info-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.contact-info-label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #64748b;
-  margin-bottom: 0.375rem;
-}
-
-.contact-info-value {
-  display: block;
-  font-size: 1rem;
+.contact-label {
+  font-size: 0.875rem;
   font-weight: 600;
+  color: #64748b;
+  min-width: 100px;
+}
+
+.contact-value {
+  font-size: 0.875rem;
   color: #1e293b;
-  word-break: break-word;
+  flex: 1;
 }
 
 .contact-link {
   color: #3b82f6;
   text-decoration: none;
-  transition: all 0.2s ease;
 }
 
 .contact-link:hover {
-  color: #2563eb;
   text-decoration: underline;
 }
 
-/* Special cards that span full width */
-.contact-location-card,
-.contact-notes-card {
-  grid-column: 1 / -1;
-}
-
-/* Map Preview Styles */
-.map-preview-link {
-  display: block;
+/* Map */
+.contact-map {
   margin-top: 1rem;
-  text-decoration: none;
-  color: inherit;
-}
-
-.map-preview {
-  position: relative;
-  width: 100%;
-  height: 200px;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  transition: all 0.3s ease;
+  position: relative;
 }
 
-.map-preview:hover {
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-  transform: scale(1.02);
+.map-link {
+  display: block;
+  position: relative;
+  text-decoration: none;
 }
 
 .map-iframe {
   width: 100%;
-  height: 100%;
+  height: 200px;
   border: none;
-  pointer-events: none;
   display: block;
+  pointer-events: none;
 }
 
 .map-overlay {
@@ -3339,231 +3068,64 @@ padding: 20px 24px;
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
-  padding: 1rem;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 0.75rem;
   color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+  text-align: center;
+  font-size: 0.875rem;
   font-weight: 600;
-  font-size: 0.95rem;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s;
 }
 
-.map-preview:hover .map-overlay {
+.map-link:hover .map-overlay {
   opacity: 1;
 }
 
-.map-overlay i {
-  font-size: 1.25rem;
+/* Notes */
+.contact-notes {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #fef3c7;
+  border-radius: 8px;
+  border-left: 3px solid #f59e0b;
+}
+
+.contact-notes label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.contact-notes p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #78350f;
+  line-height: 1.5;
 }
 
 /* Contact Modal Footer */
 .contact-modal-footer {
-  padding: 1.25rem 2rem;
-  background: linear-gradient(135deg, #f8fafc 0%, #e5e7eb 100%);
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  border-top: 2px solid #e5e7eb;
-  flex-shrink: 0;
-}
-
-.contact-btn-close-primary {
-  padding: 0.75rem 2rem;
-  border-radius: 12px;
-  font-weight: 600;
-  background: blue;
-  border: none;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-  transition: all 0.3s ease;
-  min-width: 140px;
-}
-
-.contact-btn-close-primary:hover {
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  padding: 1rem 1.5rem;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
 }
 
 /* Responsive Design for Contact Modal */
 @media (max-width: 768px) {
-  .contact-modal-dialog {
-    margin: 0.5rem;
-    max-height: calc(100vh - 1rem);
-  }
-
-  .contact-modal-content {
-    max-height: calc(100vh - 1rem);
-    border-radius: 16px;
-  }
-
-  .contact-modal-header {
-    padding: 1.25rem 1.5rem;
-  }
-
-  .contact-avatar {
-    width: 55px;
-    height: 55px;
-  }
-
-  .contact-avatar i {
-    font-size: 1.5rem;
-  }
-
-  .contact-name {
-    font-size: 1.15rem;
-  }
-
-  .contact-subtitle {
-    font-size: 0.825rem;
-  }
-
-  .contact-food-card {
-    padding: 1rem 1.5rem;
-  }
-
-  .food-card-icon {
-    width: 48px;
-    height: 48px;
-  }
-
-  .food-card-icon i {
-    font-size: 1.4rem;
-  }
-
-  .food-card-title {
-    font-size: 1rem;
-  }
-
   .contact-modal-body {
-    padding: 1.25rem 1.5rem;
-  }
-
-  .contact-info-card {
     padding: 1rem;
   }
 
-  .contact-info-icon {
-    width: 40px;
-    height: 40px;
+  .contact-label {
+    min-width: 80px;
+    font-size: 0.8rem;
   }
 
-  .contact-info-icon i {
-    font-size: 1rem;
-  }
-
-  .contact-modal-footer {
-    padding: 1rem 1.5rem;
-  }
-
-  .contact-btn-close-primary {
-    width: 100%;
-    justify-content: center;
-    padding: 0.625rem 1.25rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .contact-modal-dialog {
-    margin: 0.5rem;
-    max-height: calc(100vh - 1rem);
-  }
-
-  .contact-modal-content {
-    max-height: calc(100vh - 1rem);
-    border-radius: 12px;
-  }
-
-  .contact-modal-header {
-    flex-direction: row;
-    text-align: left;
-    padding: 1rem 1.25rem;
-    gap: 1rem;
-  }
-
-  .contact-avatar {
-    width: 50px;
-    height: 50px;
-  }
-
-  .contact-avatar i {
-    font-size: 1.25rem;
-  }
-
-  .contact-name {
-    font-size: 1rem;
-  }
-
-  .contact-subtitle {
-    font-size: 0.75rem;
-  }
-
-  .contact-food-card {
-    padding: 1rem 1.25rem;
-  }
-
-  .food-card-icon {
-    width: 42px;
-    height: 42px;
-  }
-
-  .food-card-icon i {
-    font-size: 1.25rem;
-  }
-
-  .food-card-title {
-    font-size: 0.95rem;
-  }
-
-  .food-card-meta {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-
-  .food-quantity,
-  .food-expiry {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .contact-modal-body {
-    padding: 1rem 1.25rem;
-  }
-
-  .contact-info-card {
-    padding: 0.875rem;
-    gap: 0.75rem;
-  }
-
-  .contact-info-icon {
-    width: 38px;
-    height: 38px;
-  }
-
-  .contact-info-icon i {
-    font-size: 0.95rem;
-  }
-
-  .contact-info-label {
-    font-size: 0.7rem;
-  }
-
-  .contact-info-value {
-    font-size: 0.9rem;
-  }
-
-  .contact-modal-footer {
-    padding: 0.875rem 1.25rem;
-  }
-
-  .contact-btn-close-primary {
-    padding: 0.625rem 1rem;
-    font-size: 0.9rem;
-    width: 100%;
+  .contact-value {
+    font-size: 0.8rem;
   }
 }
 </style>
