@@ -514,4 +514,8 @@ onAuthStateChanged(auth, async (u) => {
 .fade-leave-to {
   opacity: 0;
 }
+
+.recipe-discovery-page {
+    background: url('/recipe-bg.jpg');
+}
 </style>
