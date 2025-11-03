@@ -22,7 +22,6 @@ const currentUser = ref(null)
 const itemsWithDistance = ref([])
 const preferredLocation = ref(null)
 const geometry = ref(null)
-const PREFERRED_LOC_KEY = 'foodshare_preferred_location'
 
 const showDonatedItems = ref(false)
 
@@ -337,9 +336,9 @@ async function submitShare() {
 
     const expDate = new Date(shareForm.value.expirationDate)
 
+
     const data = {
       ownerId: currentUser.value.uid,
-      foodName: shareForm.value.foodName || '',
       foodId: shareForm.value.foodItemId,
       category: shareForm.value.category,
       quantity: qtyToShare,
@@ -357,21 +356,20 @@ async function submitShare() {
 
     const docRef = await addDoc(collection(db, "communityListings"), data)
 
-    // Decrement user's foodItem quantity once
+
     const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', shareForm.value.foodItemId)
     const currentItem = foodItems.value.find(f => f.id === shareForm.value.foodItemId)
     const currentQty = Number(currentItem?.quantity || 0)
     const totalPrice = Number(currentItem?.price || 0)
-    
-    // Calculate per-unit price
+
+    // Calculate price per unit from total price
     const pricePerUnit = currentQty > 0 ? totalPrice / currentQty : 0
-    
-    // Calculate remaining quantity and price
     const newQty = Math.max(0, currentQty - qtyToShare)
     const remainingPrice = pricePerUnit * newQty
+    const sharedPrice = pricePerUnit * qtyToShare
 
     if (currentQty < qtyToShare) {
-      // Rollback created listing
+
       try {
         await deleteDoc(doc(db, 'communityListings', docRef.id))
       } catch (rollbackErr) {
@@ -382,21 +380,17 @@ async function submitShare() {
     }
 
     // Update both quantity AND price
-    await updateDoc(foodItemRef, { 
+    await updateDoc(foodItemRef, {
       quantity: newQty,
       price: remainingPrice
     })
 
-
-    const originalPrice = Number(currentItem?.price || 0)
-    
-    // Log pending donation activity
     await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
       activityType: 'pendingDonFood',
       createdAt: new Date().toISOString(),
       category: data.category,
-      price: totalPrice,
-      foodName: data.foodName,
+      price: sharedPrice,
+      foodName: currentItem?.name || shareForm.value.foodName || '',
       foodId: data.foodId,
       quantity: data.quantity,
       unit: data.unit,
@@ -412,9 +406,64 @@ async function submitShare() {
   }
 }
 
+// Helper function to get streak days
+const getStreakDays = async (uid) => {
+  if (!uid) return 0
+  
+  try {
+    const activityRef = collection(db, 'user', uid, 'activities')
+    const activitySnapshot = await getDocs(activityRef)
+    const activities = activitySnapshot.docs.map((doc) => doc.data())
+    
+    if (activities.length === 0) return 0
+
+    const activityDates = [
+      ...new Set(
+        activities
+          .map((a) => {
+            const date = new Date(a.createdAt)
+            return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+          })
+          .filter((timestamp) => !isNaN(timestamp)),
+      ),
+    ].sort((a, b) => b - a)
+
+    if (activityDates.length === 0) return 0
+
+    const today = new Date()
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+    const oneDayMs = 24 * 60 * 60 * 1000
+
+    let streak = 0
+    let expectedDate = todayMidnight
+
+    if (activityDates[0] < todayMidnight - oneDayMs) {
+      return 0
+    }
+
+    for (const activityDate of activityDates) {
+      if (activityDate === expectedDate || activityDate === expectedDate - oneDayMs) {
+        streak++
+        expectedDate = activityDate - oneDayMs
+      } else {
+        break
+      }
+    }
+
+    return streak
+  } catch (err) {
+    console.error('Failed to calculate streak:', err)
+    return 0
+  }
+}
 
 async function markAsDonated(item) {
-  if (!confirm(`Mark "${item.foodName}" as donated?`)) return
+  const confirmed = await confirm(
+    `Are you sure you want to mark "${item.foodName}" as donated? This action cannot be undone.`,
+    'Confirm Donation'
+  )
+
+  if (!confirmed) return
 
   try {
     // Update listing as donated
@@ -422,6 +471,15 @@ async function markAsDonated(item) {
       donated: true,
       donatedAt: serverTimestamp()
     })
+
+    const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', item.foodId)
+    const foodItemSnap = await getDoc(foodItemRef)
+
+    let isFullyDonated = false
+    if (foodItemSnap.exists()) {
+      const remainingQty = Number(foodItemSnap.data().quantity || 0)
+      isFullyDonated = remainingQty <= 0
+    }
 
     try {
       const pendingActivitiesQuery = query(
@@ -440,34 +498,54 @@ async function markAsDonated(item) {
       console.warn('Failed to delete pending activities:', activityError)
     }
 
-    const donationPrice = Number(item.price) || 0
     const donationQty = Number(item.quantity) || 1
+    const donationTotalPrice = Number(item.price) || 0  // This is total price from listing
 
-    // manually updateFoodScore
-    const baseScoreChange = (0.4 * donationQty) + (0.2 * donationPrice) + (0.5 * donationQty)
+    // Get streak for multiplier
+    const streakDays = await getStreakDays(currentUser.value.uid)
+    const streakMultiplier = streakDays > 0 ? (1 + streakDays / 7) : 1
+
+    // Calculate score: (0.4 * qty) + (0.2 * totalPrice) + (0.5 * qty for donation bonus)
+    const baseScoreChange = (0.4 * donationQty) + (0.2 * donationTotalPrice) + (0.5 * donationQty)
+    const adjustedChange = baseScoreChange * streakMultiplier
 
     const userDocRef = doc(db, 'user', currentUser.value.uid)
     const userSnap = await getDoc(userDocRef)
     const currentScore = userSnap.exists() ? (userSnap.data().foodScore || 0) : 0
-    const newScore = Math.round(Math.max(0, currentScore + baseScoreChange))
+    const newScore = Math.round(Math.max(0, currentScore + adjustedChange))
 
     await updateDoc(userDocRef, {
-      foodScore: newScore
+      foodScore: newScore,
+      streak: streakDays
     })
 
     // Log donation activity with points earned
-    await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), {
+    const activityPayload = {
       activityType: 'donFood',
       category: item.category,
       createdAt: new Date().toISOString(),
       foodName: item.foodName,
-      price: donationPrice,
+      price: donationTotalPrice,  // Store total price
       quantity: donationQty,
       unit: item.unit,
-      pointsEarned: Math.round(baseScoreChange)
-    })
+      pointsEarned: Math.round(adjustedChange)
+    }
 
-    await success('Marked as donated!')
+    // If fully donated, add note to mark it
+    if (isFullyDonated) {
+      activityPayload.note = 'fully donated'
+
+      // Delete the food item from inventory
+      await deleteDoc(foodItemRef)
+    }
+
+    await addDoc(collection(db, 'user', currentUser.value.uid, 'activities'), activityPayload)
+
+    const successMsg = isFullyDonated
+      ? `${item.foodName} fully donated and removed from inventory!`
+      : 'Food marked as donated successfully!'
+
+    await success(successMsg)
     await loadMyListings()
     await loadFoodItems()
   } catch (err) {
@@ -572,6 +650,9 @@ function clearPreferredLocation() {
 }
 
 function loadPreferredLocation() {
+  if (!currentUser.value) return
+
+  const PREFERRED_LOC_KEY = `foodshare_preferred_location_${currentUser.value.uid}`
   const raw = localStorage.getItem(PREFERRED_LOC_KEY)
   console.log('Raw from localStorage:', raw)
   if (raw) {
@@ -590,6 +671,9 @@ function loadPreferredLocation() {
 }
 
 function savePreferredLocation() {
+  if (!currentUser.value) return
+
+  const PREFERRED_LOC_KEY = `foodshare_preferred_location_${currentUser.value.uid}`
   if (preferredLocation.value) {
     localStorage.setItem(PREFERRED_LOC_KEY, JSON.stringify(preferredLocation.value))
   } else {
@@ -776,10 +860,10 @@ async function submitEdit() {
         if (foodItemSnap.exists()) {
           const currentFoodQty = Number(foodItemSnap.data().quantity || 0)
           const currentFoodPrice = Number(foodItemSnap.data().price || 0)
-          
+
           // Calculate per-unit price from current food item
           const pricePerUnit = currentFoodQty > 0 ? currentFoodPrice / currentFoodQty : 0
-          
+
           // Calculate new quantity and price
           const updatedFoodQty = currentFoodQty - qtyDifference
           const updatedFoodPrice = pricePerUnit * updatedFoodQty
@@ -810,18 +894,18 @@ async function submitEdit() {
       const activitiesSnap = await getDocs(activitiesQuery)
 
       if (!activitiesSnap.empty) {
-        const activityDoc = activitiesSnap.docs[0]
+        // Find the activity with matching original quantity
+        const matchingActivity = activitiesSnap.docs.find(doc =>
+          Number(doc.data().quantity) === originalQty
+        )
 
-        // Get the food item from memory to calculate price
-        const foodItem = foodItems.value.find(f => f.id === editForm.value.foodItemId)
+        const activityDoc = matchingActivity || activitiesSnap.docs[0]
+        const oldActivityPrice = Number(activityDoc.data().price) || 0
+        const oldActivityQty = Number(activityDoc.data().quantity) || 1
 
-        let updatedPrice = 0
-        if (foodItem) {
-          // Calculate price based on original total quantity and price
-          const originalTotalQty = Number(foodItem.quantity || 0) + originalQty
-          const pricePerUnit = Number(foodItem.price || 0) / originalTotalQty
-          updatedPrice = pricePerUnit * newQty
-        }
+        // Calculate price per unit from the activity (which stores the original proportional price)
+        const pricePerUnit = oldActivityQty > 0 ? oldActivityPrice / oldActivityQty : 0
+        const updatedPrice = pricePerUnit * newQty
 
         await updateDoc(activityDoc.ref, {
           quantity: newQty,
@@ -847,6 +931,12 @@ async function submitEdit() {
 
 // Cancel donated function
 async function canDonated(item) {
+  // Check if already donated/claimed
+  if (item.donated) {
+    await error("This item has already been donated and cannot be cancelled.")
+    return
+  }
+
   const confirmed = await confirm(`Are you sure you want to cancel "${item.foodName}"? This will remove it from community listings.`, 'Cancel Donation')
 
   if (!confirmed) {
@@ -857,27 +947,93 @@ async function canDonated(item) {
   let originalFoodQty = null
 
   try {
+
+    if (!item.id) {
+      console.error('❌ Item ID is missing')
+      await error("Listing ID is missing")
+      return
+    }
+
     const listingRef = doc(db, 'communityListings', item.id)
     const listingSnap = await getDoc(listingRef)
 
     if (!listingSnap.exists()) {
-      await error("Listing not found")
+      await error("Listing not found. It may have already been deleted.")
       return
     }
 
-    deletedListing = { id: item.id, ...listingSnap.data() }
+    // Double check if it was marked as donated after the UI was loaded
+    const listingData = listingSnap.data()
+    if (listingData.donated) {
+      await error("This item has already been donated and cannot be cancelled.")
+      await loadMyListings() // Refresh the list
+      return
+    }
+
+    deletedListing = { id: item.id, ...listingData }
     const returnQty = Number(deletedListing.quantity || 0)
 
     const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', item.foodId)
     const foodItemSnap = await getDoc(foodItemRef)
 
     if (!foodItemSnap.exists()) {
+
       await error('Food item not found. Cannot cancel donation.')
       return
     }
 
     originalFoodQty = Number(foodItemSnap.data().quantity || 0)
+    const currentFoodPrice = Number(foodItemSnap.data().price || 0)
     const newQty = originalFoodQty + returnQty
+
+    // Find the specific pending donation activity for THIS listing
+    const activitiesQuery = query(
+      collection(db, 'user', currentUser.value.uid, 'activities'),
+      where('activityType', '==', 'pendingDonFood'),
+      where('foodId', '==', item.foodId)
+    )
+    const activitiesSnap = await getDocs(activitiesQuery)
+
+    // Find the activity that matches this listing's quantity
+    // Only return the price for THIS specific donation being cancelled
+    let priceToReturn = 0
+    let activityToDelete = null
+
+    if (!activitiesSnap.empty) {
+      // Try to find an activity with matching quantity
+      const matchingActivity = activitiesSnap.docs.find(doc =>
+        Number(doc.data().quantity) === returnQty
+      )
+
+      if (matchingActivity) {
+        priceToReturn = Number(matchingActivity.data().price) || 0
+        activityToDelete = matchingActivity
+      } else {
+        // If no exact match, calculate proportionally from the first activity
+        const firstActivity = activitiesSnap.docs[0]
+        const activityQty = Number(firstActivity.data().quantity) || 1
+        const activityPrice = Number(firstActivity.data().price) || 0
+        const pricePerUnit = activityQty > 0 ? activityPrice / activityQty : 0
+        priceToReturn = pricePerUnit * returnQty
+        activityToDelete = firstActivity
+      }
+    } else {
+      // Fallback: calculate proportionally from current food price
+      const pricePerUnit = originalFoodQty > 0 ? currentFoodPrice / originalFoodQty : 0
+      priceToReturn = pricePerUnit * returnQty
+    }
+
+    const newPrice = currentFoodPrice + priceToReturn
+
+    console.log('💰 Price calculation:', {
+      currentFoodPrice,
+      priceToReturn,
+      newPrice,
+      originalQty: originalFoodQty,
+      returnQty,
+      newQty,
+      activityFound: !!activityToDelete
+    })
 
     await deleteDoc(listingRef)
 
@@ -893,22 +1049,13 @@ async function canDonated(item) {
       throw new Error('Failed to update food item quantity. Listing restored.')
     }
 
-    // Remove pending donation activity
+    // Remove only the specific pending donation activity
     try {
-      const activitiesQuery = query(
-        collection(db, 'user', currentUser.value.uid, 'activities'),
-        where('activityType', '==', 'pendingDonFood'),
-        where('foodId', '==', item.foodId)
-      )
-
-      const activitiesSnap = await getDocs(activitiesQuery)
-
-      if (!activitiesSnap.empty) {
-        const deletePromises = activitiesSnap.docs.map(doc => deleteDoc(doc.ref))
-        await Promise.all(deletePromises)
+      if (activityToDelete) {
+        await deleteDoc(activityToDelete.ref)
       }
     } catch (activityError) {
-      console.warn('Failed to delete activities, but listing was cancelled:', activityError)
+      console.warn('Failed to delete activity, but listing was cancelled:', activityError)
 
     }
 
@@ -1150,7 +1297,7 @@ const getGoogleMapsUrl = (location) => {
                   <i class="bi bi-calendar-x me-1"></i>
                   <span v-if="item.donated">Was expiring in {{ item.daysUntilExpiration }} days</span>
                   <span v-else>Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : ''
-                  }}</span>
+                    }}</span>
                 </div>
 
                 <button v-if="!item.donated" @click="markAsDonated(item)" class="btn-mark-donated">
@@ -1433,18 +1580,9 @@ const getGoogleMapsUrl = (location) => {
                 :key="foodItems.map(i => i.id + ':' + i.quantity).join('|') + '|' + donationActivities.length">
                 <option value="" disabled>Select a food item...</option>
                 <option v-for="item in foodItems" :key="item.id" :value="item.id"
-                  :disabled="getRemainingQuantity(item.id) <= 0 || isExpiredItem(item)" :title="getRemainingQuantity(item.id) <= 0
-                    ? 'No quantity left to share'
-                    : isExpiredItem(item)
-                      ? 'Item expired'
-                      : `Remaining: ${getRemainingQuantity(item.id)} ${item.unit}`
-                    ">
-                  {{ item.name }}
-                  <small v-if="getRemainingQuantity(item.id) > 0 && !isExpiredItem(item)" class="text-success ms-1">
-                    ({{ getRemainingQuantity(item.id) }} left)
-                  </small>
-                  <small v-else-if="isExpiredItem(item)" class="text-danger ms-1">(expired)</small>
-                  <small v-else class="text-muted ms-1">(none left)</small>
+                  :disabled="getRemainingQuantity(item.id) <= 0 || isExpiredItem(item)">
+                  {{ item.name }} - {{ getRemainingQuantity(item.id) }} {{ item.unit }} left
+                  <template v-if="isExpiredItem(item)"> (expired)</template>
                 </option>
               </select>
             </div>

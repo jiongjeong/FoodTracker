@@ -15,14 +15,7 @@
             <i class="bi bi-person-fill"></i>
             Full Name
           </label>
-          <input
-            type="text"
-            id="name"
-            v-model="name"
-            placeholder="Enter your full name"
-            required
-            autocomplete="name"
-          />
+          <input type="text" id="name" v-model="name" placeholder="Enter your full name" required autocomplete="name" />
         </div>
 
         <div class="form-group">
@@ -30,14 +23,7 @@
             <i class="bi bi-envelope-fill"></i>
             Email Address
           </label>
-          <input
-            type="email"
-            id="email"
-            v-model="email"
-            placeholder="Enter your email"
-            required
-            autocomplete="email"
-          />
+          <input type="email" id="email" v-model="email" placeholder="Enter your email" required autocomplete="email" />
         </div>
 
         <div class="form-group">
@@ -46,20 +32,9 @@
             Password
           </label>
           <div class="password-input-wrapper">
-            <input
-              :type="showPassword ? 'text' : 'password'"
-              id="password"
-              v-model="password"
-              placeholder="Create a password"
-              required
-              autocomplete="new-password"
-            />
-            <button
-              type="button"
-              class="toggle-password"
-              @click="showPassword = !showPassword"
-              tabindex="-1"
-            >
+            <input :type="showPassword ? 'text' : 'password'" id="password" v-model="password"
+              placeholder="Create a password" required autocomplete="new-password" />
+            <button type="button" class="toggle-password" @click="showPassword = !showPassword" tabindex="-1">
               <i :class="showPassword ? 'bi bi-eye-slash-fill' : 'bi bi-eye-fill'"></i>
             </button>
           </div>
@@ -72,20 +47,10 @@
             Confirm Password
           </label>
           <div class="password-input-wrapper">
-            <input
-              :type="showConfirmPassword ? 'text' : 'password'"
-              id="confirmPassword"
-              v-model="confirmPassword"
-              placeholder="Confirm your password"
-              required
-              autocomplete="new-password"
-            />
-            <button
-              type="button"
-              class="toggle-password"
-              @click="showConfirmPassword = !showConfirmPassword"
-              tabindex="-1"
-            >
+            <input :type="showConfirmPassword ? 'text' : 'password'" id="confirmPassword" v-model="confirmPassword"
+              placeholder="Confirm your password" required autocomplete="new-password" />
+            <button type="button" class="toggle-password" @click="showConfirmPassword = !showConfirmPassword"
+              tabindex="-1">
               <i :class="showConfirmPassword ? 'bi bi-eye-slash-fill' : 'bi bi-eye-fill'"></i>
             </button>
           </div>
@@ -165,13 +130,13 @@ export default {
           handle: "",
           foodScore: 0,
           createdAt: new Date().toISOString(),
-          monkey: { selected: 'monkey1',
+          monkey: {
+            selected: 'monkey1',
             unlocked: ['monkey1']
-           },
-          village: { x: 45, y: 60}
+          },
+          village: { x: 45, y: 60 }
         });
 
-        await this.initializeUserCollections(user.uid);
 
         this.successMessage = "Account created successfully! Redirecting...";
 
@@ -196,51 +161,6 @@ export default {
         this.isLoading = false;
       }
     },
-
-    async initializeUserCollections(userId) {
-      try {
-        await this.initializeFoodItemsCollection(userId);
-        await this.initializeActivitiesCollection(userId);
-        await this.initializeRecipesCollection(userId);
-        console.log('User collections initialized successfully');
-      } catch (error) {
-        console.error('Error initializing user collections:', error);
-      }
-    },
-
-    async initializeFoodItemsCollection(userId) {
-      const foodItemsRef = collection(doc(db, "user", userId), "foodItems");
-      await addDoc(foodItemsRef, {
-        _placeholder: true,
-        name: "",
-        category: "",
-        quantity: 0,
-        unit: "",
-        expirationDate: "",
-        price: 0,
-      });
-    },
-
-    async initializeActivitiesCollection(userId) {
-      const activitiesRef = collection(doc(db, "user", userId), "activities");
-      await addDoc(activitiesRef, {
-        _placeholder: true,
-        activityType: "",
-        foodName: "",
-        quantity: "",
-        price: "",
-        createdAt: ""
-      });
-    },
-
-    async initializeRecipesCollection(userId) {
-      const recipesRef = collection(doc(db, "user", userId), "recipes");
-      await addDoc(recipesRef, {
-        _placeholder: true,
-        idMeal: "",
-      });
-    },
-
     goToLogin() {
       this.$router.push('/login');
     }
@@ -273,6 +193,7 @@ export default {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -408,9 +329,19 @@ input:focus {
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-5px);
+  }
+
+  75% {
+    transform: translateX(5px);
+  }
 }
 
 .btn-signup {
