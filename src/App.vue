@@ -10,7 +10,7 @@
           <transition name="fade">
             <!-- Wrap router-view in a single element so Transition can animate an element root.
                  This avoids the Vue warning when a routed component renders a fragment/multiple roots. -->
-            <div :key="$route.fullPath" class="route-wrapper">
+            <div :key="route.path" class="route-wrapper">
               <router-view />
             </div>
           </transition>
