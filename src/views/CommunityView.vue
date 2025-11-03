@@ -1093,93 +1093,102 @@ const getGoogleMapsUrl = (location) => {
 
 <template>
   <!-- Hero Section with Gradient Background -->
-  <div class="hero-section">
-    <div class="container-fluid p-4">
-      <div class="row align-items-center g-4">
-        <!-- Left: Title & Description -->
-        <div class="col-lg-7">
-          <div class="hero-content">
-            <div class="d-flex align-items-center gap-3 mb-3">
-              <div class="icon-wrapper">
-                <i class="bi bi-heart-fill"></i>
-              </div>
+  <div class="hero-section bg-light">
+  <div class="container-fluid px-4 py-3">
+    <div class="row align-items-center g-5">
+      <!-- Left: Title & Description -->
+      <div class="col-lg-6">
+        <div class="hero-content">
+          <h1 class="display-5 fw-bold mb-3" style="line-height: 1.2;">
+            <span class="text-success"> Community </span> <br>
+  <span class="typing-line-1">Food Sharing</span>
+</h1>
+          <p class="lead text-dark mb-4">
+            Share expiring food with neighbours<br>
+            to reduce waste and build community
+          </p>
+
+          <!-- Stats Row -->
+          <div class=" d-flex gap-4 flex-wrap">
+            <div class="stats-card d-flex align-items-center gap-3 px-4 py-3 rounded-4" 
+                 style="background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(10px);">
+              <i class="bi bi-people-fill fs-2 text-dark"></i>
               <div>
-                <h1 class="hero-title mb-2">Community Food Sharing</h1>
-                <p class="hero-subtitle mb-0">
-                  <i class="bi bi-leaf me-2"></i>
-                  Share expiring food with neighbors to reduce waste and build community
-                </p>
+                <strong class="d-block fs-5 text-dark">{{ mySharedItems.length }}</strong>
+                <small class="text-dark">Items Shared</small>
               </div>
             </div>
-
-            <!-- Stats Row -->
-            <div class="stats-row d-flex gap-4 mt-4">
-              <div class="stat-item">
-                <i class="bi bi-people-fill text-success"></i>
-                <div>
-                  <strong>{{ mySharedItems.length }}</strong>
-                  <small>Items Shared</small>
-                </div>
+            <div class=" stats-card d-flex align-items-center gap-3 px-4 py-3 rounded-4" 
+                 style="background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(10px);">
+              <i class="bi bi-box-seam fs-2 text-dark"></i>
+              <div>
+                <strong class="d-block fs-5 text-dark">{{ itemsWithDistance.length }}</strong>
+                <small class="text-dark">Available</small>
               </div>
-              <div class="stat-item">
-                <i class="bi bi-box-seam text-primary"></i>
-                <div>
-                  <strong>{{ itemsWithDistance.length }}</strong>
-                  <small>Available</small>
-                </div>
-              </div>
-              <div class="stat-item">
-                <i class="bi bi-recycle text-warning"></i>
-                <div>
-                  <strong>Zero</strong>
-                  <small>Waste Goal</small>
-                </div>
+            </div>
+            <div class=" stats-card d-flex align-items-center gap-3 px-4 py-3 rounded-4" 
+                 style="background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(10px);">
+              <i class="bi bi-recycle fs-2 text-dark"></i>
+              <div>
+                <strong class="d-block fs-5 text-dark">Zero</strong>
+                <small class="text-dark">Waste Goal</small>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Right: Location Picker Card -->
-        <div class="col-lg-5">
-          <div class="location-card">
-            <div class="location-card-header">
-              <div class="d-flex align-items-center gap-2">
-                <div class="location-icon">
-                  <i class="bi bi-geo-alt-fill"></i>
-                </div>
-                <div>
-                  <h5 class="mb-0">Pickup Location</h5>
-                  <small class="text-muted">Find items near you</small>
-                </div>
-              </div>
+      <!-- Right: Location Picker Card (replacing grocery bag) -->
+      <div class="col-lg-6">
+        <div class="location-picker-card card border-0 shadow-lg rounded-4 position-relative p-1" 
+             style="min-height: 300px; transition: all 0.3s ease;">
+          
+          <!-- Step Badge -->
+          <div class="step-badge position-absolute d-flex align-items-center justify-content-center rounded-circle fw-bold shadow-lg" 
+               style="top: -12px; left: -12px; width: 56px; height: 56px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; font-size: 1.25rem;">
+            <i class="bi bi-geo-alt-fill"></i>
+          </div>
+
+          <div class="card-body p-4 text-center">
+            <!-- Centered Icon -->
+            <div class="mx-auto mb-4 rounded-circle d-flex align-items-center justify-content-center" 
+                 style="width: 80px; height: 80px; background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); color: #22c55e; transition: all 0.3s ease;">
+              <i class="bi bi-pin-map-fill" style="font-size: 2.5rem;"></i>
             </div>
 
-            <div class="location-card-body">
+            <!-- Title -->
+            <h3 class="fw-bold mb-2 fs-4">Pickup Location</h3>
+            <p class="text-muted mb-4">Find items near you</p>
+
+            <!-- Location Picker Body -->
+            <div class="mt-2">
               <!-- No location selected -->
               <template v-if="!preferredLocation">
-                <div class="empty-location">
-                  <i class="bi bi-pin-map display-4 text-muted mb-3"></i>
+                <div class="text-center py-4">
                   <p class="text-muted mb-3">Set your preferred location to see distances</p>
-                  <LocationPicker @place-selected="setPreferredLocation" class="w-100" />
+                  <LocationPicker @place-selected="setPreferredLocation" class="" />
                 </div>
               </template>
 
               <!-- Location selected -->
               <template v-else>
-                <div class="selected-location">
-                  <div class="location-display">
-                    <i class="bi bi-geo-alt-fill text-success"></i>
+                <div>
+                  <div class="d-flex align-items-start gap-3 p-3 rounded-3 border border-2 text-start" 
+                       style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);">
+                    <i class="bi bi-geo-alt-fill text-success fs-4 mt-1"></i>
                     <div class="flex-grow-1">
                       <strong class="d-block">Current Location</strong>
-                      <span class="text-muted">{{ preferredLocation.address }}</span>
+                      <small class="text-muted">{{ preferredLocation.address }}</small>
                     </div>
-                    <button @click="clearPreferredLocation" class="btn btn-sm btn-outline-danger"
-                      title="Clear location">
+                    <button @click="clearPreferredLocation" 
+                            class="btn btn-sm btn-outline-danger rounded-circle p-0" 
+                            style="width: 32px; height: 32px;"
+                            title="Clear location">
                       <i class="bi bi-x-lg"></i>
                     </button>
                   </div>
 
-                  <div class="change-location mt-3">
+                  <div class="mt-3 text-start">
                     <label class="form-label text-muted small mb-2">
                       <i class="bi bi-arrow-repeat me-1"></i>
                       Change Location
@@ -1190,10 +1199,11 @@ const getGoogleMapsUrl = (location) => {
               </template>
             </div>
           </div>
-        </div>
-      </div>
+          </div>
+          </div>
     </div>
   </div>
+</div>
 
   <!-- Shared Items Section -->
   <div class="section-container mb-4">
@@ -1604,32 +1614,76 @@ const getGoogleMapsUrl = (location) => {
 <style scoped>
 /* Hero Section */
 .hero-section {
-  background: url('community.jpg');
-  background-size: cover;
-  background-position: 10% 40%;
-  background-repeat: no-repeat;
-  position: relative;
-  overflow: hidden;
-  margin: -1rem 0 2rem 0;
-  padding: 2rem 1rem;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 40%, #a7f3d0 100%);
+  padding: 40px 20px;
+  min-height: 550px;
+  display: flex;
+  align-items: center;
 }
 
-.hero-section::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background:
-    radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
-  pointer-events: none;
+.hero-content h1 {
+  color: #1a1a1a;
+  letter-spacing: -1px;
 }
 
-.hero-content {
-  position: relative;
-  z-index: 1;
+.hero-content p.lead {
+  color: #374151;
+}
+.card:hover .rounded-circle {
+  transform: scale(1.1);
+}
+
+.typing-line-1 {
+  overflow:hidden;
+  display: inline-block;
+  border-right: 3px solid #666;
+  animation: typing 1.5s steps(20, end), blink 0.75s step-end infinite;
+}
+
+
+/* Keyframes for typing effect */
+@keyframes typing {
+  from { width: 0 }
+  to { width: 100% }
+}
+
+/* Cursor blink */
+@keyframes blink {
+  50% { border-color: transparent }
+}
+
+
+
+
+@keyframes show-text {
+  to {
+    opacity: 1;
+    border-right: 3px solid #1a1a1a;
+  }
+}
+
+@media (max-width: 992px) {
+  .hero-section {
+    min-height: auto;
+    padding: 30px 15px;
+  }
+  
+  .hero-content h1 {
+    font-size: 2.5rem !important;
+  }
+}
+
+.stats-card{
+padding: 20px 24px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .icon-wrapper {
@@ -1730,21 +1784,35 @@ const getGoogleMapsUrl = (location) => {
 }
 
 /* Location Card */
-.location-card {
-  background: white;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  border: 3px solid rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(10px);
-  transition: all 0.3s ease;
-  position: relative;
-  z-index: 1;
+.location-picker-card {
+  animation: fadeInUp 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-.location-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.4);
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Hover effects */
+.location-picker-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15) !important;
+}
+
+.location-picker-card:hover .icon-circle {
+  transform: scale(1.1);
+  background: linear-gradient(135deg, #bbf7d0 0%, #86efac 100%);
+}
+
+.location-picker-card:hover .step-badge {
+  transform: scale(1.1);
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4);
 }
 
 .location-card-header {
@@ -1934,7 +2002,6 @@ const getGoogleMapsUrl = (location) => {
 /* Section Container */
 .section-container {
   background: white;
-  border-radius: 24px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
