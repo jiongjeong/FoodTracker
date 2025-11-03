@@ -1,19 +1,57 @@
 <!-- src/components/DashboardHeader.vue -->
 <template>
   <section class="dashboard-hero">
-    <!-- Decorative Background Blobs -->
-    <div class="position-absolute top-0 end-0 h-100 w-50 dashboard-blobs" style="z-index: 0; pointer-events: none;">
-      <!-- Top green blob -->
-      <div 
-        class="position-absolute top-0 end-0 rounded-circle bg-success bg-gradient opacity-75 shadow"
-        style="width: 350px; height: 350px; background: radial-gradient(circle at 30% 30%, #10b981, #059669); transform: translate(20%, -20%);">
-      </div>
-
-      <!-- Bottom blue blob -->
-      <div 
-        class="position-absolute bottom-0 end-0 rounded-circle bg-info bg-gradient opacity-75 shadow"
-        style="width: 280px; height: 280px; background: radial-gradient(circle at 70% 70%, #06b6d4, #0891b2); transform: translate(20%, 20%); z-index: 0;">
-      </div>
+    <!-- Decorative Background Lines -->
+    <div class="position-absolute top-0 start-0 w-100 h-100 dashboard-lines" style="z-index: 0; pointer-events: none; overflow: hidden;">
+      <!-- Curved lines -->
+      <svg class="position-absolute w-100 h-100" style="top: 0; left: 0;" viewBox="0 0 1440 800" preserveAspectRatio="none">
+        <!-- Green gradient line -->
+        <path 
+          d="M-100,200 Q400,100 800,250 T1600,200" 
+          fill="none" 
+          stroke="url(#greenGradient)" 
+          stroke-width="3" 
+          opacity="0.4"
+        />
+        <!-- Cyan gradient line -->
+        <path 
+          d="M-100,400 Q300,500 700,350 T1600,450" 
+          fill="none" 
+          stroke="url(#cyanGradient)" 
+          stroke-width="3" 
+          opacity="0.4"
+        />
+        <!-- Light green line -->
+        <path 
+          d="M-100,600 Q500,550 900,650 T1600,600" 
+          fill="none" 
+          stroke="url(#lightGreenGradient)" 
+          stroke-width="2" 
+          opacity="0.3"
+        />
+        
+        <!-- Gradient definitions -->
+        <defs>
+          <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+          </linearGradient>
+          <linearGradient id="cyanGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#0891b2;stop-opacity:1" />
+          </linearGradient>
+          <linearGradient id="lightGreenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#34d399;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+      </svg>
+      
+      <!-- Decorative dots -->
+      <div class="position-absolute dashboard-dot" style="top: 15%; right: 20%; width: 8px; height: 8px; background: #10b981; border-radius: 50%; opacity: 0.5;"></div>
+      <div class="position-absolute dashboard-dot" style="top: 45%; right: 15%; width: 6px; height: 6px; background: #06b6d4; border-radius: 50%; opacity: 0.4;"></div>
+      <div class="position-absolute dashboard-dot" style="top: 70%; right: 25%; width: 10px; height: 10px; background: #34d399; border-radius: 50%; opacity: 0.3;"></div>
+      <div class="position-absolute dashboard-dot" style="top: 30%; right: 8%; width: 7px; height: 7px; background: #059669; border-radius: 50%; opacity: 0.5;"></div>
     </div>
 
     <div class="container-fluid px-4 h-100">
@@ -129,30 +167,18 @@
               </button>
             </div>
           </div>
-
-          <!-- Right: Animated Graph Image (Desktop only) -->
-          <div class="col-12 col-lg-5 d-none d-lg-flex justify-content-center align-items-center position-relative" style="z-index: 5; min-height: 400px;">
-            <div class="position-relative graph-container" style="width: 320px; height: 320px;">
-              <!-- Main Graph Image with Animation -->
-              <div class="graph-image-wrapper">
-                <img 
-                  src="/graph-img.png" 
-                  alt="Analytics Graph" 
-                  class="graph-image"
-                  style="width: 100%; height: 100%; object-fit: contain;"
-                />
-              </div>
-              
-              <!-- Floating emojis emanating from the graph -->
-              <div class="floating-emoji emoji-1" style="top: 10%; left: 15%;">💹</div>
-              <div class="floating-emoji emoji-2" style="top: 25%; right: 10%;">📊</div>
-              <div class="floating-emoji emoji-3" style="bottom: 30%; left: 5%;">📈</div>
-              <div class="floating-emoji emoji-5" style="top: 40%; left: -5%;">📉</div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
+  </div>
+  
+  <!-- Floating Monkey Avatars -->
+  <div class="floating-monkeys">
+    <img src="/monkey/monkey1.png" alt="" class="floating-monkey monkey-1" />
+    <img src="/monkey/monkey2.png" alt="" class="floating-monkey monkey-2" />
+    <img src="/monkey/monkey3.png" alt="" class="floating-monkey monkey-3" />
+    <img src="/monkey/monkey4.png" alt="" class="floating-monkey monkey-4" />
+    <img src="/monkey/monkey5.png" alt="" class="floating-monkey monkey-5" />
   </div>
   </section>
 </template>
@@ -440,18 +466,130 @@ defineEmits(['toggle-overview'])
   font-weight: 600;
 }
 
-/* Ensure blobs sit behind content on small screens */
-.dashboard-blobs {
+/* Ensure lines sit behind content */
+.dashboard-lines {
   position: absolute;
   z-index: 0;
   pointer-events: none;
 }
 
+.dashboard-lines svg path {
+  animation: dashFlow 20s linear infinite;
+  stroke-dasharray: 10 5;
+}
+
+.dashboard-dot {
+  animation: dotPulse 3s ease-in-out infinite;
+}
+
+@keyframes dashFlow {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 100;
+  }
+}
+
+@keyframes dotPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.8;
+  }
+}
+
+/* Floating Monkeys */
+.floating-monkeys {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.floating-monkey {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  animation: monkeyFloat 6s ease-in-out infinite;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+}
+
+.monkey-1 {
+  top: 15%;
+  right: 25%;
+  animation-delay: 0s;
+}
+
+.monkey-2 {
+  top: 35%;
+  right: 10%;
+  animation-delay: 1.2s;
+}
+
+.monkey-3 {
+  bottom: 25%;
+  right: 30%;
+  animation-delay: 2.4s;
+}
+
+.monkey-4 {
+  top: 50%;
+  right: 5%;
+  animation-delay: 3.6s;
+}
+
+.monkey-5 {
+  bottom: 15%;
+  right: 15%;
+  animation-delay: 4.8s;
+}
+
+@keyframes monkeyFloat {
+  0%, 100% {
+    transform: translateY(0) translateX(0) rotate(-5deg);
+    opacity: 0.7;
+  }
+  25% {
+    transform: translateY(-15px) translateX(5px) rotate(0deg);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translateY(-10px) translateX(-5px) rotate(5deg);
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(-20px) translateX(3px) rotate(0deg);
+    opacity: 0.9;
+  }
+}
+
 @media (max-width: 575px) {
-  .dashboard-blobs,
-  .dashboard-blobs > div {
+  .dashboard-lines,
+  .dashboard-lines > * {
     z-index: 0 !important;
     pointer-events: none !important;
+  }
+  
+  .dashboard-dot {
+    display: none;
+  }
+  
+  .floating-monkey {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .monkey-4,
+  .monkey-5 {
+    display: none;
   }
 }
 

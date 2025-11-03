@@ -246,7 +246,6 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
           class="monkey-img"
           @mouseenter="onHover(monkey.uid)"
           @mouseleave="onHoverLeave"
-          @click.stop="onMonkeyClick(monkey)"
           alt=""
         />
 
