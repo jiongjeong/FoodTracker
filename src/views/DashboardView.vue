@@ -1119,7 +1119,7 @@ const confirmDelete = async () => {
     </div>
 
     <!-- Floating Add Button -->
-    <button class="fab-add d-flex align-items-center justify-content-center" @click="openAdd" title="Add Food">
+    <button v-if="!showAddModal" class="fab-add d-flex align-items-center justify-content-center" @click="openAdd" title="Add Food">
       <i class="bi bi-plus-lg d-flex align-items-center justify-content-center fs-3"></i>
       <span class="fab-text">Add Food</span>
     </button>
