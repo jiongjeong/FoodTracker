@@ -113,12 +113,12 @@ const buildWasteVsSavingsData = (activities = []) => {
     const m = toMonthIndex(a?.createdAt)
     if (m == null) continue
     if (a.activityType === 'expFood') {
-      waste[m] += Number(a.quantity) || 1
-    } else if (a.activityType === 'conFood' && a.note === 'fully consumed') {
-      saved[m] += Number(a.quantity) || 1
+      waste[m] += 1 
+    } else if ((a.activityType === 'conFood' && a.note === 'fully consumed') ||
+      (a.activityType === 'donFood')) {
+      saved[m] += 1 
     }
   }
-
   const lastIdx = Math.max(
     waste.findLastIndex(v => v>0),
     saved.findLastIndex(v => v>0)
@@ -134,8 +134,8 @@ const buildWasteVsSavingsData = (activities = []) => {
         data: saved.slice(0, end),
         tension: 0.35,
         fill: true,
-        backgroundColor: 'rgba(123, 97, 255, 0.25)',
-        borderColor: '#7B61FF',
+        backgroundColor: 'rgba(255, 165, 0, 0.25)',
+        borderColor: '#FFA449',
         pointRadius: 0,
         borderWidth: 2
       },
@@ -144,8 +144,8 @@ const buildWasteVsSavingsData = (activities = []) => {
         data: waste.slice(0, end),
         tension: 0.35,
         fill: true,
-        backgroundColor: 'rgba(255, 165, 0, 0.25)',
-        borderColor: '#FFA449',
+        backgroundColor: 'rgba(123, 97, 255, 0.25)',
+        borderColor: '#7B61FF',
         pointRadius: 0,
         borderWidth: 2
       }
