@@ -10,7 +10,6 @@ import { useAlert } from '@/composables/useAlert'
 
 const { success, error, warning, confirm } = useAlert()
 
-// Ref for LocationPicker component to reset it
 const locationPickerRef = ref(null)
 
 const mySharedItems = ref([])
@@ -1093,8 +1092,64 @@ const getGoogleMapsUrl = (location) => {
 
 <template>
   <!-- Hero Section with Gradient Background -->
-  <div class="hero-section bg-light">
-  <div class="container-fluid px-4 py-3">
+  <div class="hero-section">
+    <!-- Community Connection Background -->
+    <div class="position-absolute top-0 start-0 w-100 h-100 community-connections" style="z-index: 0;">
+      <!-- Decorative Blobs - matching recipe page style -->
+      <div class="position-absolute top-0 end-0 h-100 w-50 community-blobs pe-none">
+        <div class="blob blob-green position-absolute top-0 end-0 rounded-circle opacity-75 shadow"></div>
+        <div class="blob blob-blue position-absolute bottom-0 end-0 rounded-circle opacity-75 shadow"></div>
+      </div>
+      
+      <!-- Connection Network Animation -->
+      <svg class="connection-network position-absolute w-100 h-100" viewBox="0 0 800 400" preserveAspectRatio="none">
+        <defs>
+          <radialGradient id="nodeGradient" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.8" />
+            <stop offset="100%" style="stop-color:#10b981;stop-opacity:0.2" />
+          </radialGradient>
+        </defs>
+        
+        <!-- Connection nodes -->
+        <circle class="connection-node node-1" cx="120" cy="150" r="6" fill="url(#nodeGradient)"/>
+        <circle class="connection-node node-2" cx="280" cy="120" r="5" fill="url(#nodeGradient)"/>
+        <circle class="connection-node node-3" cx="450" cy="180" r="7" fill="url(#nodeGradient)"/>
+        <circle class="connection-node node-4" cx="600" cy="140" r="5" fill="url(#nodeGradient)"/>
+        <circle class="connection-node node-5" cx="180" cy="280" r="6" fill="url(#nodeGradient)"/>
+        <circle class="connection-node node-6" cx="380" cy="250" r="5" fill="url(#nodeGradient)"/>
+        <circle class="connection-node node-7" cx="520" cy="260" r="6" fill="url(#nodeGradient)"/>
+        <circle class="connection-node node-8" cx="350" cy="100" r="4" fill="url(#nodeGradient)"/>
+        <circle class="connection-node node-9" cx="90" cy="220" r="5" fill="url(#nodeGradient)"/>
+        
+        <!-- Main connection lines between nodes -->
+        <line class="connection-link link-1" x1="120" y1="150" x2="280" y2="120" stroke="#10b981" stroke-width="1.5" opacity="0.4"/>
+        <line class="connection-link link-2" x1="280" y1="120" x2="450" y2="180" stroke="#10b981" stroke-width="1.5" opacity="0.4"/>
+        <line class="connection-link link-3" x1="450" y1="180" x2="600" y2="140" stroke="#10b981" stroke-width="1.5" opacity="0.4"/>
+        <line class="connection-link link-4" x1="120" y1="150" x2="180" y2="280" stroke="#10b981" stroke-width="1.5" opacity="0.4"/>
+        <line class="connection-link link-5" x1="180" y1="280" x2="380" y2="250" stroke="#10b981" stroke-width="1.5" opacity="0.4"/>
+        <line class="connection-link link-6" x1="380" y1="250" x2="450" y2="180" stroke="#10b981" stroke-width="1.5" opacity="0.4"/>
+        
+        <!-- Additional connection lines for richer network -->
+        <line class="connection-link link-7" x1="450" y1="180" x2="520" y2="260" stroke="#10b981" stroke-width="1.2" opacity="0.3"/>
+        <line class="connection-link link-8" x1="280" y1="120" x2="350" y2="100" stroke="#10b981" stroke-width="1.2" opacity="0.3"/>
+        <line class="connection-link link-9" x1="350" y1="100" x2="450" y2="180" stroke="#10b981" stroke-width="1.2" opacity="0.3"/>
+        <line class="connection-link link-10" x1="120" y1="150" x2="90" y2="220" stroke="#10b981" stroke-width="1.2" opacity="0.3"/>
+        <line class="connection-link link-11" x1="90" y1="220" x2="180" y2="280" stroke="#10b981" stroke-width="1.2" opacity="0.3"/>
+        <line class="connection-link link-12" x1="380" y1="250" x2="520" y2="260" stroke="#10b981" stroke-width="1.2" opacity="0.3"/>
+        <line class="connection-link link-13" x1="520" y1="260" x2="600" y2="140" stroke="#10b981" stroke-width="1.2" opacity="0.3"/>
+        <line class="connection-link link-14" x1="350" y1="100" x2="600" y2="140" stroke="#10b981" stroke-width="1" opacity="0.25"/>
+        
+        <!-- Animated pulse lines -->
+        <line class="pulse-line pulse-1" x1="120" y1="150" x2="280" y2="120" stroke="#22c55e" stroke-width="2" opacity="0"/>
+        <line class="pulse-line pulse-2" x1="280" y1="120" x2="450" y2="180" stroke="#22c55e" stroke-width="2" opacity="0"/>
+        <line class="pulse-line pulse-3" x1="450" y1="180" x2="600" y2="140" stroke="#22c55e" stroke-width="2" opacity="0"/>
+        <line class="pulse-line pulse-4" x1="180" y1="280" x2="380" y2="250" stroke="#22c55e" stroke-width="2" opacity="0"/>
+        <line class="pulse-line pulse-5" x1="350" y1="100" x2="450" y2="180" stroke="#22c55e" stroke-width="2" opacity="0"/>
+        <line class="pulse-line pulse-6" x1="380" y1="250" x2="520" y2="260" stroke="#22c55e" stroke-width="2" opacity="0"/>
+      </svg>
+    </div>
+    
+  <div class="container-fluid px-4 py-3 position-relative" style="z-index: 10;">
     <div class="row align-items-center g-5">
       <!-- Left: Title & Description -->
       <div class="col-lg-6">
@@ -1614,11 +1669,196 @@ const getGoogleMapsUrl = (location) => {
 <style scoped>
 /* Hero Section */
 .hero-section {
-  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 40%, #a7f3d0 100%);
+  background: linear-gradient(135deg, #fefefe 0%, #f9f7f4 40%, #f5f2ed 100%);
   padding: 40px 20px;
   min-height: 550px;
   display: flex;
   align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Community Connection Animations */
+.community-connections {
+  pointer-events: none;
+}
+
+/* Decorative Blobs - matching recipe page style */
+.community-blobs {
+  z-index: 0;
+}
+
+.blob {
+  width: 280px;
+  height: 280px;
+}
+
+.blob-green {
+  background: radial-gradient(circle at 30% 30%, #34d399, #10b981);
+  transform: translate(20%, -20%);
+  animation: blobFloat1 8s ease-in-out infinite;
+}
+
+.blob-blue {
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle at 70% 70%, #60a5fa, #3b82f6);
+  transform: translate(20%, 20%);
+  animation: blobFloat2 10s ease-in-out infinite reverse;
+}
+
+@keyframes blobFloat1 {
+  0%, 100% { transform: translate(20%, -20%) scale(1); }
+  50% { transform: translate(25%, -15%) scale(1.05); }
+}
+
+@keyframes blobFloat2 {
+  0%, 100% { transform: translate(20%, 20%) scale(1); }
+  50% { transform: translate(15%, 25%) scale(0.95); }
+}
+
+/* Connection Network Animation */
+.connection-network {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Connection nodes with subtle pulse */
+.connection-node {
+  animation: nodePulse 4s ease-in-out infinite;
+}
+
+.node-1 { animation-delay: 0s; }
+.node-2 { animation-delay: 0.4s; }
+.node-3 { animation-delay: 0.8s; }
+.node-4 { animation-delay: 1.2s; }
+.node-5 { animation-delay: 1.6s; }
+.node-6 { animation-delay: 2s; }
+.node-7 { animation-delay: 2.4s; }
+.node-8 { animation-delay: 2.8s; }
+.node-9 { animation-delay: 3.2s; }
+
+@keyframes nodePulse {
+  0%, 100% { 
+    r: 5; 
+    opacity: 0.6; 
+  }
+  50% { 
+    r: 8; 
+    opacity: 1; 
+  }
+}
+
+/* Static connection links */
+.connection-link {
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+/* Animated pulse lines that travel along connections */
+.pulse-line {
+  stroke-linecap: round;
+  animation: pulseTravelBrighter 3s ease-in-out infinite;
+}
+
+.pulse-1 { animation-delay: 0s; }
+.pulse-2 { animation-delay: 0.8s; }
+.pulse-3 { animation-delay: 1.6s; }
+.pulse-4 { animation-delay: 2.4s; }
+.pulse-5 { animation-delay: 3.2s; }
+.pulse-6 { animation-delay: 4s; }
+
+@keyframes pulseTravelBrighter {
+  0% { 
+    opacity: 0; 
+    stroke-dasharray: 0, 1000; 
+  }
+  20% { 
+    opacity: 0.8; 
+    stroke-dasharray: 20, 1000; 
+  }
+  80% { 
+    opacity: 0.8; 
+    stroke-dasharray: 20, 1000; 
+    stroke-dashoffset: -100; 
+  }
+  100% { 
+    opacity: 0; 
+    stroke-dasharray: 0, 1000; 
+    stroke-dashoffset: -100; 
+  }
+}
+
+/* Floating Community Icons */
+.floating-community-icon {
+  animation: communityFloat 5s ease-in-out infinite;
+  pointer-events: none;
+  transform-origin: center;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+@keyframes communityFloat {
+  0%, 100% {
+    transform: translateY(0) scale(0.9);
+    opacity: 0.7;
+  }
+  25% {
+    transform: translateY(-8px) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-12px) scale(1.1);
+    opacity: 0.9;
+  }
+  75% {
+    transform: translateY(-6px) scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+/* Mobile Responsive for Community Animations */
+@media (max-width: 768px) {
+  .community-blobs .blob {
+    opacity: 0.4;
+  }
+  
+  .blob-green {
+    width: 200px;
+    height: 200px;
+  }
+  
+  .blob-blue {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .connection-network {
+    opacity: 0.4;
+  }
+  
+  .floating-community-icon {
+    opacity: 0.6;
+    font-size: 1.2rem !important;
+  }
+}
+
+@media (max-width: 575px) {
+  .community-connections {
+    z-index: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  .community-blobs .blob {
+    opacity: 0.2;
+  }
+  
+  .connection-network {
+    opacity: 0.2;
+  }
+  
+  .floating-community-icon {
+    opacity: 0.4;
+  }
 }
 
 .hero-content h1 {
@@ -1634,12 +1874,11 @@ const getGoogleMapsUrl = (location) => {
 }
 
 .typing-line-1 {
-  overflow:hidden;
+  overflow: hidden;
   display: inline-block;
   border-right: 3px solid #666;
-  animation: typing 1.5s steps(20, end), blink 0.75s step-end infinite;
+  animation: typing 1.5s steps(20, end), blink 0.75s step-end infinite 1.5s, cursorFade 0.5s ease-out 3s forwards;
 }
-
 
 /* Keyframes for typing effect */
 @keyframes typing {
@@ -1647,9 +1886,14 @@ const getGoogleMapsUrl = (location) => {
   to { width: 100% }
 }
 
-/* Cursor blink */
+/* Cursor blink - only for 1.5 seconds after typing starts */
 @keyframes blink {
   50% { border-color: transparent }
+}
+
+/* Fade out cursor after typing completes */
+@keyframes cursorFade {
+  to { border-color: transparent }
 }
 
 
