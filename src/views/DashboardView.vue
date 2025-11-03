@@ -979,7 +979,6 @@ const confirmDelete = async () => {
               <select v-model="sortBy" class="form-select">
                 <option value="expiration">Expiration Date</option>
                 <option value="name">Name (A-Z)</option>
-                <option value="category">Category</option>
                 <option value="quantity">Quantity (High-Low)</option>
                 <option value="price">Price (High-Low)</option>
               </select>
