@@ -29,6 +29,7 @@ const MAX_LOOKUP_IDS = 30
 // Reactive state
 const activeTab = ref('suggested')
 const searchQuery = ref('')
+const searchFilter = ref('') // Filter for single-term search
 const searchFilterAll = ref('') // Independent filter for Match All section
 const searchFilterAny = ref('') // Independent filter for Any section
 const route = useRoute()
@@ -581,7 +582,8 @@ const formatInstructions = (instructions) => {
 // Handle search
 const handleSearch = async () => {
   activeTab.value = 'search'
-  searchFilter.value = ''
+  searchFilterAll.value = ''
+  searchFilterAny.value = ''
   await searchRecipes(searchQuery.value)
 }
 

@@ -1,5 +1,5 @@
 <script setup>
-defineProps({
+const props = defineProps({
   item: {
     type: Object,
     required: true
@@ -14,19 +14,19 @@ defineProps({
 const emit = defineEmits(['edit', 'cancel', 'mark-donated', 'contact'])
 
 const handleEdit = () => {
-  emit('edit', item)
+  emit('edit', props.item)
 }
 
 const handleCancel = () => {
-  emit('cancel', item)
+  emit('cancel', props.item)
 }
 
 const handleMarkDonated = () => {
-  emit('mark-donated', item)
+  emit('mark-donated', props.item)
 }
 
 const handleContact = () => {
-  emit('contact', item)
+  emit('contact', props.item)
 }
 </script>
 

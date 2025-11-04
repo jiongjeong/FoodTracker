@@ -67,7 +67,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, defineProps } from 'vue'
+import { computed, ref, watch } from 'vue'
 import RecipeCard from './RecipeCard.vue'
 import RecipePagination from './RecipePagination.vue'
 
