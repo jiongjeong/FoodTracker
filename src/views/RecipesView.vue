@@ -29,7 +29,9 @@ const MAX_LOOKUP_IDS = 30
 // Reactive state
 const activeTab = ref('suggested')
 const searchQuery = ref('')
-const searchFilter = ref('')
+const searchFilter = ref('') // For single-term search
+const searchFilterAll = ref('') // Independent filter for Match All section
+const searchFilterAny = ref('') // Independent filter for Any section
 const route = useRoute()
 const isLoading = ref(false)
 const searchResults = ref([])
@@ -693,16 +695,6 @@ onAuthStateChanged(auth, async (u) => {
 
             <!-- Match All Section -->
             <div class="mb-5">
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                  <div class="d-flex align-items-center gap-2">
-                    <h4 class="fw-bold mb-0 h5 text-dark">Match All Ingredients</h4>
-                    <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-semibold shadow-sm">{{ searchAllTotal }}</span>
-                  </div>
-                  <small v-if="searchResultsAll.length && searchAllTotal > searchResultsAll.length" class="text-muted">
-                    Showing {{ searchResultsAll.length }} of {{ searchAllTotal }}
-                  </small>
-                </div>
-
               <div v-if="isLoadingAll" class="text-center py-5">
                 <div class="spinner-border text-primary" role="status">
                   <span class="visually-hidden">Loading...</span>
@@ -719,8 +711,11 @@ onAuthStateChanged(auth, async (u) => {
 
               <RecipeGrid
                 v-else
+                v-model:search-filter="searchFilterAll"
+                :show-filter="true"
                 :recipes="searchResultsAll"
-                :show-title="false"
+                title="Match All Ingredients"
+                :show-title="true"
                 badge-variant="primary"
                 :is-bookmarked-fn="isRecipeBookmarked"
                 :count-ingredients-fn="countUserIngredients"
@@ -731,13 +726,6 @@ onAuthStateChanged(auth, async (u) => {
 
             <!-- Any Ingredient Section -->
             <div class="mt-5">
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                  <div class="d-flex align-items-center gap-2">
-                    <h4 class="fw-bold mb-0 h5 text-dark">Any Ingredient</h4>
-                    <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-semibold shadow-sm">{{ searchAnyTotal }}</span>
-                  </div>
-                </div>
-
               <div v-if="isLoadingAny" class="text-center py-5">
                 <div class="spinner-border text-secondary" role="status">
                   <span class="visually-hidden">Loading...</span>
@@ -754,9 +742,10 @@ onAuthStateChanged(auth, async (u) => {
 
               <RecipeGrid
                 v-else
-                v-model:search-filter="searchFilter"
+                v-model:search-filter="searchFilterAny"
                 :recipes="searchResultsAny"
-                :show-title="false"
+                title="Any Ingredient"
+                :show-title="true"
                 badge-variant="secondary"
                 :show-filter="true"
                 :is-bookmarked-fn="isRecipeBookmarked"

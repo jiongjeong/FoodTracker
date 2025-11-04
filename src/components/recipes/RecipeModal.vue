@@ -1,23 +1,11 @@
 <template>
   <Teleport to="body">
-    <Transition name="modal-fade">
-      <div 
+    <Transition name="modal-fade" appear>
+      <div v-if="true" class="modal-wrapper">
+        <div class="modal-backdrop" @click="emit('close')"></div>
         
-        class="modal fade show d-block" 
-        tabindex="-1" 
-        role="dialog"
-        aria-modal="true"
-        :aria-labelledby="'modal-title-' + recipe.id"
-        style="z-index: 1055;"
-      >
-        <div 
-          class="modal-backdrop fade show" 
-          @click="emit('close')" 
-          style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); z-index: 1050;"
-        ></div>
-        
-        <div class="modal-dialog modal-dialog-centered modal-lg" style="position: relative; z-index: 1060; pointer-events: auto; max-width: 900px;">
-          <div class="modal-content rounded-3 shadow-lg border-0">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+          <div class="modal-content rounded-3 shadow-lg border-0 bg-white">
             <div class="modal-body p-0">
               <button 
                 type="button" 
@@ -26,11 +14,22 @@
                 @click="emit('close')"
               ></button>
 
+              <!-- Mobile Title (shown only on mobile) -->
+              <div class="d-md-none border-bottom bg-white p-3 pb-2">
+                <h3 class="fw-bold mb-1" style="font-size: 1.2rem; line-height: 1.3;">
+                  {{ recipe.name }}
+                </h3>
+                <div class="d-flex gap-1 mb-1">
+                  <span class="badge bg-primary rounded-pill px-2 py-1" style="font-size: 0.7rem;">{{ recipe.category }}</span>
+                  <span class="badge bg-success rounded-pill px-2 py-1" style="font-size: 0.7rem;">{{ recipe.area }}</span>
+                </div>
+              </div>
+
               <div class="row g-0 modal-row">
                 <!-- Left column: Image and Ingredients -->
-                <div class="col-md-5 bg-light border-end left-col">
-                  <div class="p-3 left-content">
-                    <div class="image-wrapper">
+                <div class="col-md-5 bg-light border-end d-flex flex-column overflow-hidden mobile-col">
+                  <div class="p-3 d-flex flex-column overflow-hidden content-wrapper">
+                    <div class="flex-shrink-0 mb-2">
                       <div class="compact-image-container">
                         <img 
                           :src="recipe.image" 
@@ -41,7 +40,7 @@
                     </div>
 
                     <!-- Recipe Info -->
-                    <div class="mb-2">
+                    <div class="mb-2 flex-shrink-0">
                       <h6 class="fw-bold mb-2" style="font-size: 0.85rem;">
                         <i class="bi bi-info-circle me-1"></i>Recipe Info
                       </h6>
@@ -52,18 +51,18 @@
                     </div>
 
                     <!-- Ingredients (separate scrollable section) -->
-                    <div class="ingredients-section">
-                      <h6 class="fw-bold mb-2" style="font-size: 0.85rem;">
+                    <div class="flex-fill d-flex flex-column overflow-hidden">
+                      <h6 class="fw-bold mb-2 flex-shrink-0" style="font-size: 0.85rem;">
                         <i class="bi bi-list-ul me-1"></i>Ingredients ({{ recipe.ingredients?.length || 0 }})
                       </h6>
-                      <div class="ingredients-scroll">
+                      <div class="flex-fill overflow-auto custom-scrollbar ingredients-list">
                         <div 
                           v-for="(ingredient, idx) in recipe.ingredients" 
                           :key="idx" 
                           class="ingredient-item d-flex align-items-start py-1"
                         >
                           <i class="bi bi-dot text-primary me-2 fs-6 flex-shrink-0"></i>
-                          <span class="ingredient-text">{{ ingredient }}</span>
+                          <span class="small">{{ ingredient }}</span>
                         </div>
                       </div>
                     </div>
@@ -71,9 +70,10 @@
                 </div>
 
                 <!-- Right column: Instructions and Actions -->
-                <div class="col-md-7 right-col">
-                  <div class="p-3 right-content">
-                    <div class="mb-2">
+                <div class="col-md-7 d-flex flex-column overflow-hidden mobile-col">
+                  <div class="p-3 d-flex flex-column overflow-hidden content-wrapper">
+                    <!-- Desktop Title (hidden on mobile) -->
+                    <div class="mb-2 flex-shrink-0 d-none d-md-block">
                       <h3 
                         :id="'modal-title-' + recipe.id" 
                         class="fw-bold mb-1" 
@@ -81,29 +81,29 @@
                       >
                         {{ recipe.name }}
                       </h3>
-                      <p class="text-muted mb-0" style="font-size: 0.8rem;">Follow these step-by-step instructions</p>
+                      <p class="text-muted mb-0 small">Follow these step-by-step instructions</p>
                     </div>
 
                     <!-- Instructions -->
-                    <div class="instructions-section">
-                      <h6 class="fw-bold mb-2" style="font-size: 0.85rem;">
+                    <div class="flex-fill d-flex flex-column overflow-hidden mb-2">
+                      <h6 class="fw-bold mb-2 flex-shrink-0" style="font-size: 0.85rem;">
                         <i class="bi bi-clipboard-check me-1"></i>Instructions
                       </h6>
-                      <div class="instructions-scroll">
-                        <ol class="instruction-list ps-0 mb-0">
+                      <div class="flex-fill overflow-auto custom-scrollbar ps-2">
+                        <ol class="instruction-list list-unstyled ps-0 mb-0">
                           <li 
                             v-for="(step, index) in formattedInstructions" 
                             :key="index" 
                             class="mb-2 instruction-step"
                           >
-                            <span class="text-secondary" style="font-size: 0.85rem; line-height: 1.5;">{{ step }}</span>
+                            <span class="text-secondary small lh-base">{{ step }}</span>
                           </li>
                         </ol>
                       </div>
                     </div>
 
                     <!-- Action Buttons -->
-                    <div class="action-buttons">
+                    <div class="d-flex gap-2 pt-2 border-top flex-shrink-0">
                       <button
                         @click="emit('toggle-bookmark', recipe)"
                         class="btn btn-sm flex-fill action-btn"
@@ -170,6 +170,7 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
 </script>
 
 <style scoped>
+/* Modal sizing */
 .modal-content {
   max-height: 85vh;
   overflow: hidden;
@@ -182,37 +183,27 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
 
 .modal-row {
   height: 100%;
-  display: flex;
 }
 
-.left-col {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
+/* Desktop: columns have fixed height */
+@media (min-width: 768px) {
+  .mobile-col {
+    height: 100%;
+  }
+  
+  .content-wrapper {
+    height: 100%;
+  }
 }
 
-.left-content {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.image-wrapper {
-  flex: 0 0 auto;
-  width: 100%;
-  margin-bottom: 0.5rem;
-}
-
+/* Image container with aspect ratio */
 .compact-image-container {
   width: 100%;
   padding-bottom: 60%;
   position: relative;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0.5rem;
   margin-bottom: 0.5rem;
-  box-sizing: border-box;
 }
 
 .recipe-modal-img {
@@ -223,40 +214,32 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
   object-fit: cover;
 }
 
-.ingredients-section {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.ingredients-scroll {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
+/* Custom scrollbar for ingredients and instructions */
+.custom-scrollbar {
   -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
 }
 
-.ingredients-scroll::-webkit-scrollbar {
+.custom-scrollbar::-webkit-scrollbar {
   width: 6px;
+  height: 0; /* Hide horizontal scrollbar */
 }
 
-.ingredients-scroll::-webkit-scrollbar-track {
+.custom-scrollbar::-webkit-scrollbar-track {
   background: #f1f1f1;
   border-radius: 10px;
 }
 
-.ingredients-scroll::-webkit-scrollbar-thumb {
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background: #059669;
   border-radius: 10px;
 }
 
-.ingredients-scroll::-webkit-scrollbar-thumb:hover {
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #047857;
 }
 
+/* Ingredient item hover effect */
 .ingredient-item {
   transition: all 0.2s ease;
 }
@@ -266,67 +249,9 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
   transform: translateX(4px);
 }
 
-.ingredient-text {
-  font-size: 0.84rem;
-  line-height: 1.4;
-  word-break: break-word;
-  white-space: normal;
-}
-
-.right-col {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.right-content {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.instructions-section {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-  margin-bottom: 0.5rem;
-}
-
-.instructions-scroll {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-  padding-left: 0.8rem;
-  -webkit-overflow-scrolling: touch;
-}
-
-.instructions-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.instructions-scroll::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-}
-
-.instructions-scroll::-webkit-scrollbar-thumb {
-  background: #059669;
-  border-radius: 10px;
-}
-
-.instructions-scroll::-webkit-scrollbar-thumb:hover {
-  background: #047857;
-}
-
+/* Numbered instruction steps */
 .instruction-list {
-  list-style: none;
   counter-reset: step-counter;
-  padding-left: 0;
 }
 
 .instruction-list li {
@@ -359,14 +284,7 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
   transform: scale(1.1) rotate(5deg);
 }
 
-.action-buttons {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #dee2e6;
-}
-
+/* Action button hover effect */
 .action-btn {
   transition: all 0.2s ease;
 }
@@ -376,63 +294,168 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
+/* Modal wrapper and backdrop */
+.modal-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1055;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.75rem;
+}
+
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: -1;
+}
+
+.modal-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  z-index: 1;
+}
+
+/* Transition animations */
 .modal-fade-enter-active,
 .modal-fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.25s ease;
+}
+
+.modal-fade-enter-active .modal-backdrop,
+.modal-fade-leave-active .modal-backdrop {
+  transition: opacity 0.25s ease;
 }
 
 .modal-fade-enter-active .modal-dialog,
 .modal-fade-leave-active .modal-dialog {
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.modal-fade-enter-from,
+.modal-fade-enter-from {
+  opacity: 0;
+}
+
+.modal-fade-enter-from .modal-backdrop {
+  opacity: 0;
+}
+
+.modal-fade-enter-from .modal-dialog {
+  transform: scale(0.95) translateY(-10px);
+  opacity: 0;
+}
+
 .modal-fade-leave-to {
   opacity: 0;
 }
 
-.modal-fade-enter-from .modal-dialog,
+.modal-fade-leave-to .modal-backdrop {
+  opacity: 0;
+}
+
 .modal-fade-leave-to .modal-dialog {
-  transform: scale(0.9) translateY(-20px);
+  transform: scale(0.98);
+  opacity: 0;
 }
 
-.modal-fade-enter-to .modal-dialog,
-.modal-fade-leave-from .modal-dialog {
-  transform: scale(1) translateY(0);
+.modal-fade-enter-to,
+.modal-fade-leave-from {
+  opacity: 1;
 }
 
-.modal-backdrop.fade.show {
-  animation: backdropFadeIn 0.3s ease;
-}
-
-@keyframes backdropFadeIn {
-  from {
-    opacity: 0;
-    backdrop-filter: blur(0);
-  }
-  to {
-    opacity: 1;
-    backdrop-filter: blur(4px);
-  }
-}
-
+/* Close button animation */
 .btn-close:hover {
   transform: rotate(90deg);
   transition: transform 0.3s ease;
 }
 
+/* Mobile responsive */
 @media (max-width: 767.98px) {
-  .modal-dialog {
-    margin: 0.5rem;
-    max-width: calc(100% - 1rem);
+  .modal-wrapper {
+    padding: 0.5rem;
   }
   
   .modal-content {
     max-height: 90vh;
+    height: auto;
   }
   
   .modal-body {
-    height: 90vh;
+    height: auto;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .modal-row {
+    height: auto;
+  }
+  
+  /* Remove border on mobile since columns stack */
+  .mobile-col {
+    border-right: none !important;
+    height: auto;
+  }
+  
+  .content-wrapper {
+    height: auto;
+  }
+  
+  /* Remove internal scrolling on mobile, use main modal scroll */
+  .custom-scrollbar {
+    overflow: visible;
+    overflow-x: hidden;
+    height: auto;
+  }
+  
+  /* Column layout for ingredients on mobile - prevent horizontal overflow */
+  .ingredients-list {
+    column-count: 2;
+    column-gap: 0.75rem;
+    overflow-x: hidden !important;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  /* Ensure ingredient items wrap properly within columns */
+  .ingredient-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    display: flex !important;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+  
+  /* Force text wrapping on ingredient text */
+  .ingredient-item .small {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+    max-width: calc(100% - 1.5rem); /* Account for icon width */
+    flex: 1;
+  }
+  
+  /* Ensure icon doesn't cause overflow */
+  .ingredient-item .bi-dot {
+    flex-shrink: 0;
+  }
+  
+  /* Compact image on mobile */
+  .compact-image-container {
+    padding-bottom: 50%;
   }
 }
 </style>
