@@ -69,23 +69,16 @@ const props = defineProps({
   activities: {
     type: Array,
     default: () => []
+  },
+  pendingDonationQty: {
+    type: Number,
+    default: 0
   }
 })
 
 const emit = defineEmits(['edit', 'use', 'delete', 'go-to-recipes'])
 
-// Calculate pending donation quantity for this food item
-const pendingDonationQty = computed(() => {
-  const pendingDonations = props.activities.filter(
-    (activity) => 
-      activity.activityType === 'pendingDonFood' && 
-      activity.foodId === props.food.id
-  )
-  
-  return pendingDonations.reduce((total, activity) => {
-    return total + (Number(activity.quantity) || 0)
-  }, 0)
-})
+// pendingDonationQty is now passed as a prop from the parent component
 
 const getDaysLeft = (food) => {
   const now = new Date()
