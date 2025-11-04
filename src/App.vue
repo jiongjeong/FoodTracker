@@ -7,17 +7,14 @@
     <template v-else>
       <navbar v-if="showNavbar" />
       <div class="main-content" :class="{ 'with-navbar': showNavbar }">
-          <transition name="fade">
-            <!-- Wrap router-view in a single element so Transition can animate an element root.
-                 This avoids the Vue warning when a routed component renders a fragment/multiple roots. -->
-            <div :key="route.path" class="route-wrapper">
-              <router-view />
-            </div>
-          </transition>
+        <transition name="fade" mode="out-in">
+          <div :key="route.path" class="route-wrapper">
+            <router-view />
+          </div>
+        </transition>
       </div>
     </template>
 
-    <!-- Custom Alert Box -->
     <CustomAlert
       v-model:show="alertState.show"
       :type="alertState.type"
@@ -34,7 +31,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { auth } from '@/firebase'
 import navbar from '@/components/navbar/navbar.vue'
@@ -45,20 +42,25 @@ const route = useRoute()
 const authLoading = ref(true)
 const { alertState } = useAlert()
 
-// Show navbar on all routes except login/signup/landing
 const showNavbar = computed(() => {
-  return route.path !== '/login' && route.path !== '/signup' && route.path !== '/'
+  const excludedRoutes = ['/', '/login', '/signup']
+  return !excludedRoutes.includes(route.path)
+})
+
+// Disable browser scroll restoration
+if (history.scrollRestoration) {
+  history.scrollRestoration = 'manual'
+}
+
+// Scroll to top on route change
+watch(() => route.path, () => {
+  window.scrollTo(0, 0)
 })
 
 onMounted(() => {
-  // Wait for auth to initialize
   const unsubscribe = auth.onAuthStateChanged(user => {
     authLoading.value = false
-    if (user) {
-      console.log('User authenticated:', user.uid)
-    } else {
-      console.log('No user authenticated')
-    }
+    console.log(user ? `User authenticated: ${user.uid}` : 'No user authenticated')
     unsubscribe()
   })
 })
@@ -101,38 +103,42 @@ onMounted(() => {
   font-weight: 600;
 }
 
-/* Page transitions for route changes (used when clicking navbar links) */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.28s ease, transform 0.28s ease;
 }
+
 .fade-enter-from {
   opacity: 0;
   transform: translateY(8px);
 }
+
 .fade-leave-to {
   opacity: 0;
   transform: translateY(-8px);
 }
+
 .fade-enter-to,
 .fade-leave-from {
   opacity: 1;
   transform: translateY(0);
 }
 
-/* optional slide transition if you set meta.transition = 'slide' on a route */
 .slide-enter-active,
 .slide-leave-active {
   transition: all 0.36s ease;
 }
+
 .slide-enter-from {
   opacity: 0;
   transform: translateX(26px);
 }
+
 .slide-leave-to {
   opacity: 0;
   transform: translateX(-26px);
 }
+
 .slide-enter-to,
 .slide-leave-from {
   opacity: 1;

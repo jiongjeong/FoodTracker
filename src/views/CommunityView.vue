@@ -349,7 +349,6 @@ async function submitShare(formData) {
     const payload = {
       ownerId: currentUser.value.uid,
       foodId: data.foodItemId,
-      foodName: data.foodName, // Store food name for reference
       category: data.category,
       quantity: qtyToShare,
       unit: data.unit,
@@ -1284,7 +1283,7 @@ const getGoogleMapsUrl = (location) => {
 <div class="container-fluid px-3 px-md-4 mb-4">
   <div class="tabs-container">
     <div class="tabs-nav d-flex gap-3 overflow-auto pb-2" style="scrollbar-width: none; -ms-overflow-style: none;">
-      <button 
+      <button
         @click="activeTab = 'myShared'"
         class="tab-button"
         :class="{ 'tab-button-active': activeTab === 'myShared' }"
@@ -1293,7 +1292,7 @@ const getGoogleMapsUrl = (location) => {
         My Shared
         <span v-if="mySharedItems.length" class="badge bg-primary ms-2">{{ mySharedItems.length }}</span>
       </button>
-      <button 
+      <button
         @click="activeTab = 'available'"
         class="tab-button"
         :class="{ 'tab-button-active': activeTab === 'available' }"
@@ -1313,7 +1312,7 @@ const getGoogleMapsUrl = (location) => {
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h4 class="fw-bold mb-0">My Shared Items</h4>
       <div class="d-flex gap-2">
-        <button v-if="mySharedItems.some(item => item.donated)" 
+        <button v-if="mySharedItems.some(item => item.donated)"
                 class="btn btn-outline-secondary"
                 @click="showDonatedItems = !showDonatedItems">
           <i :class="showDonatedItems ? 'bi bi-eye-slash' : 'bi bi-eye'" class="me-2"></i>
@@ -3034,12 +3033,15 @@ padding: 20px 24px;
 /* Contact Modal Dialog */
 .contact-modal-dialog {
   max-width: 550px;
+  border-radius: 20px;
+
 }
 
 .contact-modal-content {
   border-radius: 16px;
   border: none;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  overflow:hidden
 }
 
 /* Contact Modal Header */
@@ -3050,6 +3052,7 @@ padding: 20px 24px;
   align-items: center;
   justify-content: space-between;
   border-bottom: none;
+
 }
 
 .contact-name {
