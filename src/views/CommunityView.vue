@@ -3032,12 +3032,15 @@ padding: 20px 24px;
 /* Contact Modal Dialog */
 .contact-modal-dialog {
   max-width: 550px;
+  border-radius: 20px;
+
 }
 
 .contact-modal-content {
   border-radius: 16px;
   border: none;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  overflow:hidden
 }
 
 /* Contact Modal Header */
@@ -3048,6 +3051,7 @@ padding: 20px 24px;
   align-items: center;
   justify-content: space-between;
   border-bottom: none;
+
 }
 
 .contact-name {
