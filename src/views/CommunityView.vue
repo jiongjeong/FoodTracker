@@ -56,7 +56,7 @@ const displayedMySharedItems = computed(() => {
 
 // Filtered available items with search
 const filteredAvailableItems = computed(() => {
-  let filtered = [...itemsWithDistance.value]
+  let filtered = itemsWithDistance.value
   
   // Apply search filter
   if (searchQuery.value && searchQuery.value.trim()) {
