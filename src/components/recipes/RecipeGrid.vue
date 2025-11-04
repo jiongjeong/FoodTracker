@@ -8,8 +8,8 @@
           <span class="badge ms-2" style="background-color: rgba(25, 135, 84, 0.2); color: #198754;">{{ totalRecipes }}</span>
         </h4>
         <!-- Show filtered count if filtering is active -->
-        <small v-if="showFilter && searchFilter && totalRecipes < props.recipes.length" class="text-muted ms-2">
-          (showing {{ totalRecipes }} of {{ props.recipes.length }})
+        <small v-if="showFilter && searchFilter && totalRecipes < recipes.length" class="text-muted ms-2">
+          (showing {{ totalRecipes }} of {{ recipes.length }})
         </small>
       </div>
 
