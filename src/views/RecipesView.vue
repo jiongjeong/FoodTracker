@@ -29,7 +29,6 @@ const MAX_LOOKUP_IDS = 30
 // Reactive state
 const activeTab = ref('suggested')
 const searchQuery = ref('')
-const searchFilter = ref('') // For single-term search
 const searchFilterAll = ref('') // Independent filter for Match All section
 const searchFilterAny = ref('') // Independent filter for Any section
 const route = useRoute()
