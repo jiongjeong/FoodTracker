@@ -22,8 +22,10 @@ const currentUser = ref(null)
 const itemsWithDistance = ref([])
 const preferredLocation = ref(null)
 const geometry = ref(null)
+const activeTab= ref('myShared')
+const searchQuery= ref('')
+const showDonatedItems= ref(false)
 
-const showDonatedItems = ref(false)
 
 // Show my shared items
 const displayedMySharedItems = computed(() => {
@@ -1260,228 +1262,237 @@ const getGoogleMapsUrl = (location) => {
   </div>
 </div>
 
-  <!-- Shared Items Section -->
-  <div class="section-container mb-4">
-    <div class="section-header">
-      <div class="section-header-content">
-        <div class="section-icon-wrapper">
-          <i class="bi bi-share-fill"></i>
-        </div>
-        <div>
-          <h3 class="section-title mb-1">My Shared Items</h3>
-          <p class="section-subtitle mb-0">Manage your food donations</p>
-        </div>
-      </div>
-      <div class="d-flex gap-2 align-items-center">
-        <!-- Toggle Donated Items Button -->
-        <button v-if="mySharedItems.some(item => item.donated)" class="btn btn-outline-secondary"
-          @click="showDonatedItems = !showDonatedItems">
+  <div class="container-fluid px-3 px-md-4 mb-4">
+  <div class="search-bar-container">
+    <div class="input-group shadow-sm" style="border-radius: 50px; overflow: hidden; background: white;">
+      <span class="input-group-text border-0 bg-white ps-4">
+        <i class="bi bi-search text-muted"></i>
+      </span>
+      <input
+        v-model="searchQuery"
+        type="text"
+        class="form-control border-0"
+        placeholder="Search for items or locations..."
+        style="padding: 15px 10px;"
+      />
+    </div>
+  </div>
+</div>
+
+<!-- Tabs Navigation -->
+<div class="container-fluid px-3 px-md-4 mb-4">
+  <div class="tabs-container">
+    <div class="tabs-nav d-flex gap-3 overflow-auto pb-2" style="scrollbar-width: none; -ms-overflow-style: none;">
+      <button 
+        @click="activeTab = 'myShared'"
+        class="tab-button"
+        :class="{ 'tab-button-active': activeTab === 'myShared' }"
+      >
+        <i class="bi bi-share-fill me-2"></i>
+        My Shared
+        <span v-if="mySharedItems.length" class="badge bg-primary ms-2">{{ mySharedItems.length }}</span>
+      </button>
+      <button 
+        @click="activeTab = 'available'"
+        class="tab-button"
+        :class="{ 'tab-button-active': activeTab === 'available' }"
+      >
+        <i class="bi bi-basket3-fill me-2"></i>
+        Available
+        <span v-if="itemsWithDistance.length" class="badge bg-success ms-2">{{ itemsWithDistance.length }}</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Tab Content -->
+<div class="container-fluid px-3 px-md-4">
+  <!-- My Shared Items Tab -->
+  <div v-if="activeTab === 'myShared'" class="tab-content-section">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h4 class="fw-bold mb-0">My Shared Items</h4>
+      <div class="d-flex gap-2">
+        <button v-if="mySharedItems.some(item => item.donated)" 
+                class="btn btn-outline-secondary"
+                @click="showDonatedItems = !showDonatedItems">
           <i :class="showDonatedItems ? 'bi bi-eye-slash' : 'bi bi-eye'" class="me-2"></i>
           {{ showDonatedItems ? 'Hide' : 'Show' }} Donated ({{mySharedItems.filter(i => i.donated).length}})
         </button>
-
-        <!-- Share Food Button -->
-        <button class="btn btn-gradient" @click="handleShareFood">
+        <button class="btn btn-success" @click="handleShareFood">
           <i class="bi bi-plus-circle-fill me-2"></i>
           Share Food
         </button>
       </div>
     </div>
 
-    <div class="section-body">
-      <!-- Empty State -->
-      <div v-if="mySharedItems.length === 0" class="empty-state">
-        <div class="empty-state-icon">
-          <i class="bi bi-inbox"></i>
-        </div>
-        <h5 class="empty-state-title">No items shared yet</h5>
-        <p class="empty-state-text">Start sharing food to help your community and reduce waste</p>
-        <button class="btn btn-primary mt-3" @click="handleShareFood">
-          <i class="bi bi-plus-lg me-2"></i>
-          Share Your First Item
-        </button>
-      </div>
+    <!-- Empty State -->
+    <div v-if="mySharedItems.length === 0" class="empty-state-card text-center py-5">
+      <i class="bi bi-inbox display-1 text-muted opacity-50"></i>
+      <h5 class="mt-3">No items shared yet</h5>
+      <p class="text-muted">Start sharing food to help your community</p>
+      <button class="btn btn-primary mt-3" @click="handleShareFood">
+        <i class="bi bi-plus-lg me-2"></i>
+        Share Your First Item
+      </button>
+    </div>
 
-      <!-- No Active Items State -->
-      <div v-else-if="displayedMySharedItems.length === 0" class="empty-state">
-        <div class="empty-state-icon">
-          <i class="bi bi-check-circle"></i>
-        </div>
-        <h5 class="empty-state-title">All items donated!</h5>
-        <p class="empty-state-text">Great job! Click "Show Donated" to see your donation history</p>
-      </div>
+    <!-- No Active Items -->
+    <div v-else-if="displayedMySharedItems.length === 0" class="empty-state-card text-center py-5">
+      <i class="bi bi-check-circle display-1 text-success opacity-50"></i>
+      <h5 class="mt-3">All items donated!</h5>
+      <p class="text-muted">Click "Show Donated" to see history</p>
+    </div>
 
-      <!-- Items Grid -->
-      <div v-else class="items-grid">
-        <div v-for="item in displayedMySharedItems" :key="item.id" class="item-card-wrapper">
-          <div class="item-card" :class="{ 'item-card-donated': item.donated }">
-            <!-- Status Badge -->
-            <div class="card-status-badge" v-if="item.donated">
+    <!-- Items Grid -->
+    <div v-else class="row g-3">
+      <div v-for="item in displayedMySharedItems" :key="item.id" class="col-12 col-md-6 col-lg-4">
+        <div class="food-card" :class="{ 'food-card-donated': item.donated }">
+          <!-- Status Badge -->
+          <div class="position-absolute top-0 end-0 m-3">
+            <span class="badge" :class="item.donated ? 'bg-secondary' : 'bg-success'">
+              <i :class="item.donated ? 'bi bi-check-circle-fill' : 'bi bi-clock-fill'" class="me-1"></i>
+              {{ item.donated ? 'Donated' : 'Active' }}
+            </span>
+          </div>
+
+          <!-- Action Buttons -->
+          <div v-if="!item.donated" class="position-absolute top-0 start-0 m-3 d-flex gap-2">
+            <button @click="editDonated(item)" class="btn btn-light btn-sm rounded-circle" style="width: 36px; height: 36px;">
+              <i class="bi bi-pencil-fill"></i>
+            </button>
+            <button @click="canDonated(item)" class="btn btn-danger btn-sm rounded-circle" style="width: 36px; height: 36px;">
+              <i class="bi bi-trash-fill"></i>
+            </button>
+          </div>
+
+          <div class="food-card-body">
+            <div class="food-icon mb-3 mx-auto" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center;">
+              <i class="bi bi-box-seam-fill text-white fs-1"></i>
+            </div>
+
+            <h5 class="fw-bold mb-2 text-center">{{ item.foodName }}</h5>
+            <p class="text-muted text-center mb-3">
+              <i class="bi bi-layers-fill me-1"></i>
+              {{ item.quantity }} {{ item.unit }}
+            </p>
+
+            <div class="mb-3">
+              <div class="d-flex align-items-center text-muted small mb-2">
+                <i class="bi bi-geo-alt-fill me-2"></i>
+                <span class="text-truncate">{{ item.location?.address || 'No address' }}</span>
+              </div>
+              <div class="d-flex align-items-center text-muted small mb-2">
+                <i class="bi bi-clock-history me-2"></i>
+                <span>{{ item.pickupTime }}</span>
+              </div>
+              <div v-if="item.notes" class="d-flex align-items-start text-muted small">
+                <i class="bi bi-chat-left-text-fill me-2 mt-1"></i>
+                <span class="text-truncate">{{ item.notes }}</span>
+              </div>
+            </div>
+
+            <div class="alert mb-3" :class="{
+              'alert-danger': item.daysUntilExpiration <= 2,
+              'alert-warning': item.daysUntilExpiration <= 5 && item.daysUntilExpiration > 2,
+              'alert-success': item.daysUntilExpiration > 5
+            }" style="padding: 8px 12px;">
+              <small>
+                <i class="bi bi-calendar-x me-1"></i>
+                <span v-if="item.donated">Was expiring in {{ item.daysUntilExpiration }} days</span>
+                <span v-else>Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }}</span>
+              </small>
+            </div>
+
+            <button v-if="!item.donated" @click="markAsDonated(item)" class="btn btn-success w-100">
               <i class="bi bi-check-circle-fill me-1"></i>
-              Donated
-            </div>
-            <div class="card-status-badge status-active" v-else>
-              <i class="bi bi-clock-fill me-1"></i>
-              Active
-            </div>
-
-            <!-- Action Buttons -->
-            <div v-if="!item.donated" class="card-action-buttons">
-              <button @click="editDonated(item)" class="action-btn action-btn-edit" title="Edit">
-                <i class="bi bi-pencil-fill"></i>
-              </button>
-              <button @click="canDonated(item)" class="action-btn action-btn-delete" title="Cancel">
-                <i class="bi bi-trash-fill"></i>
-              </button>
-            </div>
-
-            <!-- Card Content -->
-            <div class="card-content">
-              <div class="card-image">
-                <i class="bi bi-box-seam-fill"></i>
-              </div>
-
-              <div class="card-info">
-                <h5 class="card-food-name">{{ item.foodName }}</h5>
-                <div class="card-quantity">
-                  <i class="bi bi-layers-fill me-1"></i>
-                  {{ item.quantity }} {{ item.unit }}
-                </div>
-              </div>
-
-              <div class="card-details">
-                <div class="detail-item">
-                  <i class="bi bi-geo-alt-fill"></i>
-                  <span>{{ item.location?.address || 'No address' }}</span>
-                </div>
-                <div class="detail-item">
-                  <i class="bi bi-clock-history"></i>
-                  <span>{{ item.pickupTime }}</span>
-                </div>
-                <div class="detail-item" v-if="item.notes">
-                  <i class="bi bi-chat-left-text-fill"></i>
-                  <span>{{ item.notes }}</span>
-                </div>
-              </div>
-
-              <div class="card-footer">
-                <div class="expiry-badge" :class="{
-                  'expiry-urgent': item.daysUntilExpiration <= 2,
-                  'expiry-warning': item.daysUntilExpiration <= 5 && item.daysUntilExpiration > 2,
-                  'expiry-normal': item.daysUntilExpiration > 5
-                }">
-                  <i class="bi bi-calendar-x me-1"></i>
-                  <span v-if="item.donated">Was expiring in {{ item.daysUntilExpiration }} days</span>
-                  <span v-else>Expires in {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : ''
-                    }}</span>
-                </div>
-
-                <button v-if="!item.donated" @click="markAsDonated(item)" class="btn-mark-donated">
-                  <i class="bi bi-check-circle-fill me-1"></i>
-                  Mark as Donated
-                </button>
-              </div>
-            </div>
+              Mark as Donated
+            </button>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Available Near You Section -->
-  <div class="section-container">
-    <div class="section-header">
-      <div class="section-header-content">
-        <div class="section-icon-wrapper section-icon-available">
-          <i class="bi bi-geo-alt-fill"></i>
-        </div>
-        <div>
-          <h3 class="section-title mb-1">Available Near You</h3>
-          <p class="section-subtitle mb-0">Food items from your community</p>
-        </div>
-      </div>
-      <div class="items-count-badge">
+  <!-- Available Near You Tab -->
+  <div v-if="activeTab === 'available'" class="tab-content-section">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h4 class="fw-bold mb-0">Available Near You</h4>
+      <span class="badge bg-primary" style="padding: 8px 16px; font-size: 0.9rem;">
         <i class="bi bi-basket3-fill me-2"></i>
         {{ itemsWithDistance.length }} Items
-      </div>
+      </span>
     </div>
 
-    <div class="section-body">
-      <!-- Empty State -->
-      <div v-if="itemsWithDistance.length === 0" class="empty-state">
-        <div class="empty-state-icon">
-          <i class="bi bi-basket"></i>
-        </div>
-        <h5 class="empty-state-title">No items available</h5>
-        <p class="empty-state-text">Check back later for food donations in your area</p>
-      </div>
+    <!-- Empty State -->
+    <div v-if="itemsWithDistance.length === 0" class="empty-state-card text-center py-5">
+      <i class="bi bi-basket display-1 text-muted opacity-50"></i>
+      <h5 class="mt-3">No items available</h5>
+      <p class="text-muted">Check back later for food donations</p>
+    </div>
 
-      <!-- Items Grid -->
-      <div v-else class="items-grid">
-        <div v-for="item in itemsWithDistance" :key="item.id" class="item-card-wrapper">
-          <div class="item-card item-card-available">
-            <!-- Distance Badge -->
-            <div class="distance-badge" v-if="preferredLocation && item.distance">
+    <!-- Items Grid -->
+    <div v-else class="row g-3">
+      <div v-for="item in itemsWithDistance" :key="item.id" class="col-12 col-md-6 col-lg-4">
+        <div class="food-card">
+          <!-- Distance Badge -->
+          <div v-if="preferredLocation && item.distance" class="position-absolute top-0 end-0 m-3">
+            <span class="badge bg-info">
               <i class="bi bi-pin-map-fill me-1"></i>
               {{ item.distance }}
+            </span>
+          </div>
+
+          <div class="food-card-body">
+            <div class="food-icon mb-3 mx-auto" style="width: 80px; height: 80px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center;">
+              <i class="bi bi-basket2-fill text-white fs-1"></i>
             </div>
 
-            <!-- Card Content -->
-            <div class="card-content">
-              <div class="card-image card-image-available">
-                <i class="bi bi-basket2-fill"></i>
+            <h5 class="fw-bold mb-2 text-center">{{ item.foodName }}</h5>
+            <p class="text-muted text-center mb-2">
+              <i class="bi bi-layers-fill me-1"></i>
+              {{ item.quantity }} {{ item.unit }}
+            </p>
+            <p class="text-muted text-center small mb-3">
+              <i class="bi bi-person-circle me-1"></i>
+              by {{ item.sharedBy || 'Anonymous' }}
+            </p>
+
+            <div class="mb-3">
+              <div class="d-flex align-items-center text-muted small mb-2">
+                <i class="bi bi-geo-alt-fill me-2"></i>
+                <span class="text-truncate">{{ item.location?.address || 'No address' }}</span>
               </div>
-
-              <div class="card-info">
-                <h5 class="card-food-name">{{ item.foodName }}</h5>
-                <div class="card-quantity">
-                  <i class="bi bi-layers-fill me-1"></i>
-                  {{ item.quantity }} {{ item.unit }}
-                </div>
-                <div class="shared-by">
-                  <i class="bi bi-person-circle me-1"></i>
-                  by {{ item.sharedBy || 'Anonymous' }}
-                </div>
+              <div class="d-flex align-items-center text-muted small mb-2">
+                <i class="bi bi-clock-history me-2"></i>
+                <span>{{ item.pickupTime }}</span>
               </div>
-
-              <div class="card-details">
-                <div class="detail-item">
-                  <i class="bi bi-geo-alt-fill"></i>
-                  <span>{{ item.location?.address || 'No address' }}</span>
-                </div>
-                <div class="detail-item">
-                  <i class="bi bi-clock-history"></i>
-                  <span>{{ item.pickupTime }}</span>
-                </div>
-                <div class="detail-item" v-if="item.notes">
-                  <i class="bi bi-chat-left-text-fill"></i>
-                  <span class="text-truncate">{{ item.notes }}</span>
-                </div>
-              </div>
-
-              <div class="card-footer">
-                <div class="expiry-badge" :class="{
-                  'expiry-urgent': item.daysUntilExpiration <= 2,
-                  'expiry-warning': item.daysUntilExpiration <= 5 && item.daysUntilExpiration > 2,
-                  'expiry-normal': item.daysUntilExpiration > 5
-                }">
-                  <i class="bi bi-calendar-x me-1"></i>
-                  {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }} left
-                </div>
-
-                <button @click="handleContact(item)" class="btn-contact">
-                  <i class="bi bi-telephone-fill me-1"></i>
-                  Contact {{ item.sharedBy?.split(' ')[0] || 'Donor' }}
-                </button>
+              <div v-if="item.notes" class="d-flex align-items-start text-muted small">
+                <i class="bi bi-chat-left-text-fill me-2 mt-1"></i>
+                <span class="text-truncate">{{ item.notes }}</span>
               </div>
             </div>
+
+            <div class="alert mb-3" :class="{
+              'alert-danger': item.daysUntilExpiration <= 2,
+              'alert-warning': item.daysUntilExpiration <= 5 && item.daysUntilExpiration > 2,
+              'alert-success': item.daysUntilExpiration > 5
+            }" style="padding: 8px 12px;">
+              <small>
+                <i class="bi bi-calendar-x me-1"></i>
+                {{ item.daysUntilExpiration }} day{{ item.daysUntilExpiration !== 1 ? 's' : '' }} left
+              </small>
+            </div>
+
+            <button @click="handleContact(item)" class="btn btn-primary w-100">
+              <i class="bi bi-telephone-fill me-1"></i>
+              Contact {{ item.sharedBy?.split(' ')[0] || 'Donor' }}
+            </button>
           </div>
         </div>
       </div>
     </div>
   </div>
-
-  <!-- Contact Modal -->
+    <!-- Contact Modal -->
   <div v-if="showContactModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
     <div class="modal-backdrop fade show" @click="showContactModal = false" style="z-index: 1050;"></div>
     <div class="modal-dialog modal-dialog-centered contact-modal-dialog" style="z-index: 1060;">
@@ -1587,6 +1598,7 @@ const getGoogleMapsUrl = (location) => {
       </div>
     </div>
   </div>
+</div>
 
   <!-- Share Food Modal -->
   <ShareFoodModal
@@ -1630,7 +1642,62 @@ const getGoogleMapsUrl = (location) => {
 .community-connections {
   pointer-events: none;
 }
+.tabs-nav::-webkit-scrollbar {
+  display: none;
+}
 
+.tab-button {
+  padding: 12px 24px;
+  border: none;
+  background: white;
+  border-radius: 50px;
+  font-weight: 500;
+  color: #6b7280;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+.tab-button:hover {
+  background: #f3f4f6;
+  color: #198754;
+}
+
+.tab-button-active {
+  background: #198754!important;
+  color: white !important;
+}
+
+.tab-button-active .badge {
+  background: white !important;
+  color:#198754 !important;
+}
+
+.food-card {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.food-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
+.food-card-donated {
+  opacity: 0.7;
+}
+
+.empty-state-card {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
 /* Decorative Blobs - matching recipe page style */
 .community-blobs {
   z-index: 0;
