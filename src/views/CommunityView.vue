@@ -39,11 +39,37 @@ const displayedMySharedItems = computed(() => {
   })
 
   // Filter based on toggle
-  if (showDonatedItems.value) {
-    return sorted
-  } else {
-    return sorted.filter(item => !item.donated)
+  let filtered = showDonatedItems.value ? sorted : sorted.filter(item => !item.donated)
+  
+  // Apply search filter
+  if (searchQuery.value && searchQuery.value.trim()) {
+    const search = searchQuery.value.toLowerCase().trim()
+    filtered = filtered.filter(item => 
+      item.foodName?.toLowerCase().includes(search) ||
+      item.category?.toLowerCase().includes(search) ||
+      item.location?.address?.toLowerCase().includes(search)
+    )
   }
+  
+  return filtered
+})
+
+// Filtered available items with search
+const filteredAvailableItems = computed(() => {
+  let filtered = [...itemsWithDistance.value]
+  
+  // Apply search filter
+  if (searchQuery.value && searchQuery.value.trim()) {
+    const search = searchQuery.value.toLowerCase().trim()
+    filtered = filtered.filter(item => 
+      item.foodName?.toLowerCase().includes(search) ||
+      item.category?.toLowerCase().includes(search) ||
+      item.location?.address?.toLowerCase().includes(search) ||
+      item.sharedBy?.toLowerCase().includes(search)
+    )
+  }
+  
+  return filtered
 })
 
 const handleContact = (item) => {
@@ -1158,16 +1184,16 @@ const getGoogleMapsUrl = (location) => {
           <h4 class="fw-bold mb-0">Available Near You</h4>
           <span class="badge bg-primary" style="padding: 8px 16px; font-size: 0.9rem;">
             <i class="bi bi-basket3-fill me-2"></i>
-            {{ itemsWithDistance.length }} Items
+            {{ filteredAvailableItems.length }} Items
           </span>
         </div>
 
         <!-- Empty State -->
-        <EmptyState v-if="itemsWithDistance.length === 0" type="no-available" />
+        <EmptyState v-if="filteredAvailableItems.length === 0" type="no-available" />
 
         <!-- Items Grid -->
         <div v-else class="row g-3">
-          <div v-for="item in itemsWithDistance" :key="item.id" class="col-12 col-md-6 col-lg-4">
+          <div v-for="item in filteredAvailableItems" :key="item.id" class="col-12 col-md-6 col-lg-4">
             <FoodItemCard
               :item="item"
               mode="available"

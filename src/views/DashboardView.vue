@@ -129,16 +129,16 @@ const categoryUnits = {
   'Fruits & Vegetables': ['piece(s)', 'kg(s)', 'gram(s)', 'bag(s)', 'bunch(es)', 'lb(s)'],
   'Dairy & Eggs': ['liter(s)', 'milliliter(s)', 'dozen(s)', 'piece(s)', 'carton(s)', 'gram(s)'],
   'Meat & Poultry': ['kg(s)', 'gram(s)', 'lb(s)', 'ounce(s)', 'pack(s)', 'piece(s)'],
-  Seafood: ['kg(s)', 'gram(s)', 'lb(s)', 'ounce(s)', 'piece(s)', 'pack(s)'],
-  Snacks: ['piece(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)', 'lb(s)'],
-  Beverages: ['liter(s)', 'milliliter(s)', 'bottle(s)', 'can(s)', 'pack(s)', 'gallon(s)'],
+  'Seafood': ['kg(s)', 'gram(s)', 'lb(s)', 'ounce(s)', 'piece(s)', 'pack(s)'],
+  'Snacks': ['piece(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)', 'lb(s)'],
+  'Beverages': ['liter(s)', 'milliliter(s)', 'bottle(s)', 'can(s)', 'pack(s)', 'gallon(s)'],
   'Condiments & Sauces': ['milliliter(s)', 'liter(s)', 'jar(s)', 'bottle(s)', 'gram(s)', 'ounce(s)'],
   'Canned & Jarred Goods': ['can(s)', 'jar(s)', 'gram(s)', 'ounce(s)', 'pack(s)'],
   'Frozen Foods': ['kg(s)', 'gram(s)', 'pack(s)', 'bag(s)', 'box(es)', 'lb(s)'],
   'Grains & Pasta': ['kg(s)', 'gram(s)', 'lb(s)', 'bag(s)', 'box(es)', 'pack(s)'],
   'Herbs & Spices': ['gram(s)', 'ounce(s)', 'jar(s)', 'bottle(s)', 'bunch(es)', 'piece(s)'],
   'Breakfast & Cereal': ['box(es)', 'bag(s)', 'pack(s)', 'kg(s)', 'gram(s)', 'bottle(s)'],
-  Other: ['piece(s)', 'unit(s)', 'pack(s)', 'box(es)', 'kg(s)', 'gram(s)'],
+  'Other': ['piece(s)', 'unit(s)', 'pack(s)', 'box(es)', 'kg(s)', 'gram(s)'],
 }
 
 // Functions
@@ -369,11 +369,6 @@ const getDaysLeft = (food) => {
 }
 
 // Computed properties
-const availableUnits = computed(() => {
-  const category = editForm.category || addForm.category || 'All Categories'
-  return categoryUnits[category] || categoryUnits['All Categories']
-})
-
 const filteredFoodItems = computed(() => {
   const uniqueItems = foodItems.value.filter(
     (item, index, self) => index === self.findIndex((i) => i.id === item.id),
@@ -1001,6 +996,7 @@ const confirmDelete = async () => {
                 v-for="food in filteredFoodItems"
                 :key="food.id"
                 :food="food"
+                :activities="activities"
                 @go-to-recipes="goToRecipes"
                 @edit="openEdit"
                 @use="openUse"
@@ -1066,7 +1062,7 @@ const confirmDelete = async () => {
     mode="edit"
     :formData="editForm"
     :categories="categories"
-    :availableUnits="availableUnits"
+    :categoryUnits="categoryUnits"
     @close="closeEdit"
     @save="saveEdit"
   />
@@ -1125,7 +1121,7 @@ const confirmDelete = async () => {
       mode="add"
       :formData="addForm"
       :categories="categories"
-      :availableUnits="availableUnits"
+      :categoryUnits="categoryUnits"
       @close="closeAdd"
       @save="saveAdd"
     />

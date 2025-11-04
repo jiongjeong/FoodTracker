@@ -21,6 +21,9 @@
         <div class="food-right">
           <div class="food-price">${{ food.price }}</div>
           <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
+          <div v-if="pendingDonationQty > 0" class="pending-donation-info">
+            <i class="bi bi-share-fill"></i> {{ pendingDonationQty }} {{ food.unit }} pending donation
+          </div>
         </div>
       </div>
     </div>
@@ -62,10 +65,27 @@ const props = defineProps({
   food: {
     type: Object,
     required: true
+  },
+  activities: {
+    type: Array,
+    default: () => []
   }
 })
 
 const emit = defineEmits(['edit', 'use', 'delete', 'go-to-recipes'])
+
+// Calculate pending donation quantity for this food item
+const pendingDonationQty = computed(() => {
+  const pendingDonations = props.activities.filter(
+    (activity) => 
+      activity.activityType === 'pendingDonFood' && 
+      activity.foodId === props.food.id
+  )
+  
+  return pendingDonations.reduce((total, activity) => {
+    return total + (Number(activity.quantity) || 0)
+  }, 0)
+})
 
 const getDaysLeft = (food) => {
   const now = new Date()
@@ -282,5 +302,19 @@ const badgeClass = computed(() => getBadgeClass(props.food))
 .food-quantity {
   font-size: 0.95rem;
   color: #555;
+}
+
+.pending-donation-info {
+  font-size: 0.85rem;
+  color: #10b981;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.pending-donation-info i {
+  font-size: 0.8rem;
 }
 </style>
