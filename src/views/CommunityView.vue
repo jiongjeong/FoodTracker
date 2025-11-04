@@ -349,7 +349,6 @@ async function submitShare(formData) {
     const payload = {
       ownerId: currentUser.value.uid,
       foodId: data.foodItemId,
-      foodName: data.foodName, // Store food name for reference
       category: data.category,
       quantity: qtyToShare,
       unit: data.unit,
@@ -1283,7 +1282,7 @@ const getGoogleMapsUrl = (location) => {
 <div class="container-fluid px-3 px-md-4 mb-4">
   <div class="tabs-container">
     <div class="tabs-nav d-flex gap-3 overflow-auto pb-2" style="scrollbar-width: none; -ms-overflow-style: none;">
-      <button 
+      <button
         @click="activeTab = 'myShared'"
         class="tab-button"
         :class="{ 'tab-button-active': activeTab === 'myShared' }"
@@ -1292,7 +1291,7 @@ const getGoogleMapsUrl = (location) => {
         My Shared
         <span v-if="mySharedItems.length" class="badge bg-primary ms-2">{{ mySharedItems.length }}</span>
       </button>
-      <button 
+      <button
         @click="activeTab = 'available'"
         class="tab-button"
         :class="{ 'tab-button-active': activeTab === 'available' }"
@@ -1312,7 +1311,7 @@ const getGoogleMapsUrl = (location) => {
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h4 class="fw-bold mb-0">My Shared Items</h4>
       <div class="d-flex gap-2">
-        <button v-if="mySharedItems.some(item => item.donated)" 
+        <button v-if="mySharedItems.some(item => item.donated)"
                 class="btn btn-outline-secondary"
                 @click="showDonatedItems = !showDonatedItems">
           <i :class="showDonatedItems ? 'bi bi-eye-slash' : 'bi bi-eye'" class="me-2"></i>
