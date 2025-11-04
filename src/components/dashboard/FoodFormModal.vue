@@ -43,7 +43,7 @@ const saveButtonText = computed(() => props.mode === 'add' ? 'Add' : 'Save')
 // Compute available units based on the local form's category
 const availableUnits = computed(() => {
   const category = localForm.value.category || 'All Categories'
-  return props.categoryUnits[category] || props.categoryUnits['All Categories'] || []
+  return props.categoryUnits[category] || []
 })
 
 // Expiration suggestion state (Gemini only)
