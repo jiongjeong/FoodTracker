@@ -922,7 +922,7 @@ const confirmDelete = async () => {
 </script>
 
 <template>
-  <div class="container-fluid p-0">
+  <div class="container-fluid p-0" style="background:#faf8f5;;">
     <!-- Dashboard Header with Stats Cards -->
     <DashboardHeader
       :userFoodScore="userFoodScore"

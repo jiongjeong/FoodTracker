@@ -1093,8 +1093,9 @@ const getGoogleMapsUrl = (location) => {
 
 
 <template>
-  <!-- Hero Section with Gradient Background -->
-  <div class="compact-hero position-relative py-4 py-md-5 mb-4 hero-section">
+  <div style="background: linear-gradient(135deg, #fefefe 0%, #f9f7f4 40%, #f5f2ed 100%);">
+    <!-- Hero Section with Gradient Background -->
+    <div class="compact-hero position-relative py-4 py-md-5 mb-4 hero-section">
     <!-- Community Connection Background -->
     <div class="position-absolute top-0 start-0 w-100 h-100 community-connections" style="z-index: 0;">
       <!-- Decorative Blobs - matching recipe page style -->
@@ -1599,6 +1600,7 @@ const getGoogleMapsUrl = (location) => {
     </div>
   </div>
 </div>
+  </div>
 
   <!-- Share Food Modal -->
   <ShareFoodModal
@@ -1635,7 +1637,6 @@ const getGoogleMapsUrl = (location) => {
 /* Hero Section */
 .hero-section {
   background: linear-gradient(135deg, #fefefe 0%, #f9f7f4 40%, #f5f2ed 100%);
-  overflow: hidden;
 }
 
 /* Community Connection Animations */
