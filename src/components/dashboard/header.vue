@@ -122,9 +122,10 @@
                 </template>
 
                 <template #back>
-                  <p class="mb-0 text-white small text-center mt-2" style="font-size:10px">
-                    Rewards when food is consumed and money saved,
-                    penalizes waste, and adds bonus points for food donations
+                  <p class="mb-0 text-white small text-center mt-lg-2" style="font-size:10px">
+                    Earn points for consuming food, lose points for waste, and gain bonuses for donations
+                    Your streakdays scales points earned. The higher your streak,
+                    the higher your score!
                   </p>
                 </template>
               </StatCard>
