@@ -20,8 +20,8 @@ const props = defineProps({
     type: Array,
     required: true
   },
-  availableUnits: {
-    type: Array,
+  categoryUnits: {
+    type: Object,
     required: true
   }
 })
@@ -39,6 +39,12 @@ watch(() => props.formData, (newVal) => {
 // Computed properties
 const modalTitle = computed(() => props.mode === 'add' ? 'Add Food Item' : 'Edit Food Item')
 const saveButtonText = computed(() => props.mode === 'add' ? 'Add' : 'Save')
+
+// Compute available units based on the local form's category
+const availableUnits = computed(() => {
+  const category = localForm.value.category || 'All Categories'
+  return props.categoryUnits[category] || []
+})
 
 // Expiration suggestion state (Gemini only)
 const lastSuggestion = ref('')

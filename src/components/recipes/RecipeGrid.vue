@@ -1,12 +1,16 @@
 <template>
   <div>
   <!-- Section Header with Search -->
-  <div v-if="showTitle" class="section-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+  <div v-if="showTitle || showFilter" class="section-header d-flex justify-content-between align-items-center gap-3 mb-4 flex-wrap">
       <div class="d-flex align-items-center gap-2">
         <h4 class="fw-bold mb-0 h5 text-dark">
           {{ title }} 
+          <span class="badge ms-2" style="background-color: rgba(25, 135, 84, 0.2); color: #198754;">{{ totalRecipes }}</span>
         </h4>
-        <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-semibold shadow-sm">{{ totalRecipes }}</span>
+        <!-- Show filtered count if filtering is active -->
+        <small v-if="showFilter && searchFilter && totalRecipes < recipes.length" class="text-muted ms-2">
+          (showing {{ totalRecipes }} of {{ recipes.length }})
+        </small>
       </div>
 
       <!-- Search Filter -->
@@ -63,7 +67,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, defineProps } from 'vue'
+import { computed, ref, watch } from 'vue'
 import RecipeCard from './RecipeCard.vue'
 import RecipePagination from './RecipePagination.vue'
 

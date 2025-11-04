@@ -21,6 +21,9 @@
         <div class="food-right">
           <div class="food-price">${{ food.price }}</div>
           <div class="food-quantity">{{ food.quantity }} {{ food.unit }}</div>
+          <div v-if="pendingDonationQty > 0" class="pending-donation-info">
+            <i class="bi bi-share-fill"></i> {{ pendingDonationQty }} {{ food.unit }} pending donation
+          </div>
         </div>
       </div>
     </div>
@@ -62,10 +65,20 @@ const props = defineProps({
   food: {
     type: Object,
     required: true
+  },
+  activities: {
+    type: Array,
+    default: () => []
+  },
+  pendingDonationQty: {
+    type: Number,
+    default: 0
   }
 })
 
 const emit = defineEmits(['edit', 'use', 'delete', 'go-to-recipes'])
+
+// pendingDonationQty is now passed as a prop from the parent component
 
 const getDaysLeft = (food) => {
   const now = new Date()
@@ -282,5 +295,19 @@ const badgeClass = computed(() => getBadgeClass(props.food))
 .food-quantity {
   font-size: 0.95rem;
   color: #555;
+}
+
+.pending-donation-info {
+  font-size: 0.85rem;
+  color: #10b981;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.pending-donation-info i {
+  font-size: 0.8rem;
 }
 </style>
