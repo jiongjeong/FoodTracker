@@ -95,7 +95,7 @@ router.beforeEach(async (to, from, next) => {
   // Public routes: if user is already logged in, redirect them away from auth/landing pages
   if (currentUser) {
     // If visiting root landing page while authenticated, send to dashboard
-    if (to.path === '/' || to.path === '/login' || to.path === '/signup') {
+    if (['landing', 'login', 'signup'].includes(to.name)) {
       next('/dashboard')
       return
     }
