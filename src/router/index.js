@@ -81,25 +81,28 @@ router.beforeEach(async (to, from, next) => {
 
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const currentUser = auth.currentUser
-
+  // If route requires auth, ensure user is authenticated
   if (requiresAuth) {
     if (currentUser) {
-      // User is authenticated via Firebase
       next()
     } else {
-      // Not authenticated, redirect to login
       console.log('Not authenticated, redirecting to login')
       next('/login')
     }
-  } else {
-    // Public route
-    if ((to.path === '/login' || to.path === '/signup') && currentUser) {
-      // Already logged in, redirect to dashboard
+    return
+  }
+
+  // Public routes: if user is already logged in, redirect them away from auth/landing pages
+  if (currentUser) {
+    // If visiting root landing page while authenticated, send to dashboard
+    if (to.path === '/' || to.path === '/login' || to.path === '/signup') {
       next('/dashboard')
-    } else {
-      next()
+      return
     }
   }
+
+  // Default allow
+  next()
 })
 
 export default router
