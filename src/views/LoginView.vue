@@ -104,8 +104,15 @@ export default {
         const persistence = this.remember ? browserLocalPersistence : browserSessionPersistence;
         await setPersistence(auth, persistence);
 
-        const userCredential = await signInWithEmailAndPassword(auth, this.email, this.password);
-        const user = userCredential.user;
+        let user;
+        if (!auth.currentUser) {
+          // User not signed in, proceed to sign in
+          const userCredential = await signInWithEmailAndPassword(auth, this.email, this.password);
+          user = userCredential.user;
+        } else {
+          // User already signed in, use currentUser
+          user = auth.currentUser;
+        }
 
         // Get user document from Firestore
         const userDocRef = doc(db, "users", user.uid);
