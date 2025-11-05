@@ -47,10 +47,6 @@ const feeds = [
   {
     name: 'Bon Appétit',
     url: 'https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.bonappetit.com%2Ffeed%2Frss'
-  },
-  {
-    name: 'Eater',
-    url: 'https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.eater.com%2Frss%2Findex.xml'
   }
 ]
 
