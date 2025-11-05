@@ -243,7 +243,7 @@ async function logout() {
     localStorage.removeItem('user')
     sessionStorage.removeItem('user')
     window.dispatchEvent(new Event('userChange'))
-    router.push('/login')
+    router.push('/')
   } catch (err) {
     console.error('Logout error:', err)
     await error('Error logging out: ' + err.message)

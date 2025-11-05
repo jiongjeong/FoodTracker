@@ -78,7 +78,7 @@
 
 <script>
 import { auth } from "@/firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, setPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
 import { db } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -100,8 +100,19 @@ export default {
       this.isLoading = true;
 
       try {
-        const userCredential = await signInWithEmailAndPassword(auth, this.email, this.password);
-        const user = userCredential.user;
+        // Set Firebase Auth persistence based on "Remember me"
+        const persistence = this.remember ? browserLocalPersistence : browserSessionPersistence;
+        await setPersistence(auth, persistence);
+
+        let user;
+        if (!auth.currentUser) {
+          // User not signed in, proceed to sign in
+          const userCredential = await signInWithEmailAndPassword(auth, this.email, this.password);
+          user = userCredential.user;
+        } else {
+          // User already signed in, use currentUser
+          user = auth.currentUser;
+        }
 
         // Get user document from Firestore
         const userDocRef = doc(db, "users", user.uid);
@@ -111,7 +122,7 @@ export default {
           ? userDoc.data()
           : { uid: user.uid, email: user.email };
 
-        // Save user data to storage based on remember me option
+        // Save user data to storage for UI convenience (auth persistence is handled by Firebase)
         const storage = this.remember ? localStorage : sessionStorage;
         storage.setItem("user", JSON.stringify(userToStore));
 
@@ -132,7 +143,7 @@ export default {
             this.errorMessage = 'Invalid email or password.';
             break;
           default:
-            this.errorMessage = 'An error occurred. Please try again.';
+            this.errorMessage = error.message || 'An error occurred. Please try again.';
         }
       } finally {
         this.isLoading = false;
