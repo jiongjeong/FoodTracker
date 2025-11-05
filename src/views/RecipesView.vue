@@ -89,7 +89,7 @@ const getDaysLeft = (food) => {
   const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate())
   const daysLeft = Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
-  
+
   return daysLeft
 }
 
@@ -101,9 +101,9 @@ const fetchBookmarkedRecipes = async () => {
   const recipes = []
   for (const id of ids) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/lookup.php`, { 
-        params: { i: id }, 
-        timeout: REQUEST_TIMEOUT 
+      const response = await axios.get(`${API_BASE_URL}/lookup.php`, {
+        params: { i: id },
+        timeout: REQUEST_TIMEOUT
       })
       if (response.data.meals?.[0]) {
         const meal = response.data.meals[0]
@@ -369,7 +369,7 @@ const getSuggestedRecipes = async () => {
           timeout: REQUEST_TIMEOUT
         })
         let meals = response.data.meals || []
-        
+
         // If no results, try general search as fallback (only once per ingredient)
         if (meals.length === 0 && !filterFailedCache.has(ingredient)) {
           filterFailedCache.add(ingredient)
@@ -379,7 +379,7 @@ const getSuggestedRecipes = async () => {
           })
           meals = response.data.meals || []
         }
-        
+
         return meals
       } catch (error) {
         console.error(`Error searching recipes for ${ingredient}:`, error)
@@ -415,18 +415,18 @@ const getSuggestedRecipes = async () => {
           const fullMeal = response.data.meals[0]
           const mealIngredients = getIngredientsList(fullMeal).map(ing => ing.toLowerCase())
           const recipeName = fullMeal.strMeal.toLowerCase()
-          
+
           // Match expiring foods to recipe ingredients OR recipe name
           const suggestingFoods = normalizedFoods.filter(food => {
             // Check recipe name first
             if (recipeName.includes(food.normalized)) return true
             if ([...food.words].some(word => recipeName.includes(word))) return true
-            
+
             // Check if any recipe ingredient contains the food name or any significant word
             return mealIngredients.some(ing => {
               // Direct match
               if (ing.includes(food.normalized) || food.normalized.includes(ing)) return true
-              
+
               // Check individual words from pre-computed set
               return [...food.words].some(word => {
                 return ing.includes(word) || word.includes(ing)
@@ -520,7 +520,7 @@ const countUserIngredients = (recipe) => {
     if (!ing) return
     const words = ing.toLowerCase().split(/\s+/)
     const last = words[words.length - 1].replace(/[^a-z]/g, '')
-    if (last && (userFoodKeywords.value.has(last) || 
+    if (last && (userFoodKeywords.value.has(last) ||
         [...userFoodKeywords.value].some(k => k.includes(last) || last.includes(k)))) {
       count++
     }
@@ -531,10 +531,10 @@ const countUserIngredients = (recipe) => {
 // Format instructions with step numbering (handles recipes that already have numbers)
 const formatInstructions = (instructions) => {
   if (!instructions) return []
-  
+
   // Check if instructions have leading numbers like "01.", "1.", "1)", etc.
   const hasLeadingNumbers = /^\s*0?\d+[\.\):]/.test(instructions)
-  
+
   if (hasLeadingNumbers) {
     // Split by line breaks first, then clean up step numbers
     const steps = instructions
@@ -546,24 +546,24 @@ const formatInstructions = (instructions) => {
         return step.replace(/^\s*0?(\d+)[\.\):]?\s*/i, '')
       })
       .filter(s => s.length > 10) // Keep only substantial steps
-    
+
     return steps
   }
-  
+
   // Check for STEP format
   const hasStepFormat = /\bSTEP\s+\d+/i.test(instructions)
-  
+
   if (hasStepFormat) {
     const steps = instructions
       .split(/(?=\s*\bSTEP\s+\d+)/i)
       .map(s => s.trim())
       .filter(s => s.length > 0)
-    
-    return steps.map(step => 
+
+    return steps.map(step =>
       step.replace(/^\s*\bSTEP\s+\d+[:\.\)]?\s*/i, '')
     )
   }
-  
+
   // No numbers - split by line breaks or sentences
   const steps = instructions
     .split(/[\r\n]+/)
@@ -575,7 +575,7 @@ const formatInstructions = (instructions) => {
     })
     .map(s => s.trim())
     .filter(s => s.length > 10)
-  
+
   return steps
 }
 
@@ -594,7 +594,7 @@ const viewRecipe = (recipe) => {
 }
 
 // Computed formatted instructions for modal
-const formattedInstructions = computed(() => 
+const formattedInstructions = computed(() =>
   selectedRecipe.value ? formatInstructions(selectedRecipe.value.instructions) : []
 )
 

@@ -204,7 +204,7 @@ function authListener() {
           userName.value = userDocSnap.data().name
         }
       } catch (error) {
-        console.error('Failed to fetch user profile:', error)
+        return error
       }
     }
   })

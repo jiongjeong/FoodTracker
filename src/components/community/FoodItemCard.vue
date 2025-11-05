@@ -60,8 +60,8 @@ const handleContact = () => {
 
     <div class="food-card-body">
       <!-- Icon -->
-      <div class="food-icon mb-3 mx-auto" 
-           :style="mode === 'myShared' 
+      <div class="food-icon mb-3 mx-auto"
+           :style="mode === 'myShared'
              ? 'width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center;'
              : 'width: 80px; height: 80px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center;'">
         <i :class="mode === 'myShared' ? 'bi bi-box-seam-fill' : 'bi bi-basket2-fill'" class="text-white fs-1"></i>
@@ -69,7 +69,7 @@ const handleContact = () => {
 
       <!-- Food Name -->
       <h5 class="fw-bold mb-2 text-center">{{ item.foodName }}</h5>
-      
+
       <!-- Quantity -->
       <p class="text-muted text-center mb-2">
         <i class="bi bi-layers-fill me-1"></i>

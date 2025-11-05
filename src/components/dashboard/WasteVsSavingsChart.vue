@@ -113,10 +113,10 @@ const buildWasteVsSavingsData = (activities = []) => {
     const m = toMonthIndex(a?.createdAt)
     if (m == null) continue
     if (a.activityType === 'expFood') {
-      waste[m] += 1 
+      waste[m] += 1
     } else if ((a.activityType === 'conFood' && a.note === 'fully consumed') ||
       (a.activityType === 'donFood')) {
-      saved[m] += 1 
+      saved[m] += 1
     }
   }
   const lastIdx = Math.max(

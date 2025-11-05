@@ -20,11 +20,10 @@ export function useGeminiAI() {
         model: "gemini-2.5-flash",
         contents: prompt,
       })
-      
+
       return response.text
     } catch (err) {
       error.value = errorMessage
-      console.error('Gemini AI Error:', err)
       throw err
     } finally {
       isLoading.value = false
@@ -54,7 +53,7 @@ User message: ${userMessage}`
 
   const generateFoodSuggestions = async (expiringItems) => {
     const prompt = `Given these food items that are expiring soon: ${expiringItems.join(', ')}, suggest 2-3 simple recipes or ways to use them. Keep each suggestion brief (one sentence) and focus on reducing waste.`
-    
+
     return makeAIRequest(prompt, 'Failed to generate suggestions. Please try again.')
   }
 

@@ -155,7 +155,6 @@ async function saveChanges() {
       window.location.reload()
     }, 1500)
   } catch (error) {
-    console.error('Error updating profile:', error)
     switch (error.code) {
       case 'auth/requires-recent-login':
         errorMessage.value = 'Please log out and log back in before changing your password.'
@@ -204,9 +203,7 @@ async function deleteAccount() {
 
     try {
       await deleteUser(user.value);
-      console.log("✓ Auth user deleted");
     } catch (authError) {
-      console.error("Error deleting auth user:", authError);
       if (authError.code === 'auth/requires-recent-login') {
         await error(
           "For security reasons, please log out and log back in, then try deleting your account again.",
@@ -226,7 +223,6 @@ async function deleteAccount() {
         const subcolRef = collection(userDocRef, subcol);
         await deleteCollection(subcolRef);
       }
-      console.log("✓ User subcollections deleted");
 
 
       const communityListingsQuery = query(
@@ -240,14 +236,12 @@ async function deleteAccount() {
           deleteDoc(doc.ref)
         );
         await Promise.all(deleteCommunityPromises);
-        console.log(`✓ Deleted ${communityListingsSnapshot.size} community listings`);
       }
 
+
       await deleteDoc(userDocRef);
-      console.log("✓ User document deleted");
     } catch (firestoreError) {
       console.error("Error deleting Firestore data:", firestoreError);
-      console.warn("⚠ Auth user deleted but some Firestore data may remain");
     }
 
     localStorage.clear()
@@ -256,7 +250,6 @@ async function deleteAccount() {
     await success("Your account has been successfully deleted.")
     router.push("/signup");
   } catch (err) {
-    console.error("Error deleting account:", err)
     await error("Error deleting account: " + err.message)
     showDeleteModal.value = false
   }

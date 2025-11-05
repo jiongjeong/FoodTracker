@@ -46,11 +46,9 @@ const localForm = ref({
 
 // Watch for changes to formData and update localForm
 watch(() => props.formData, (newVal) => {
-  console.log('ShareFoodModal: formData changed', newVal)
   // Update each property individually to maintain reactivity
   Object.keys(newVal).forEach(key => {
     if (localForm.value[key] !== newVal[key]) {
-      console.log(`Updating ${key} from`, localForm.value[key], 'to', newVal[key])
       localForm.value[key] = newVal[key]
     }
   })

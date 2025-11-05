@@ -31,12 +31,6 @@ const router = createRouter({
       component: () => import('../views/RecipesView.vue'),
       meta: { requiresAuth: true }
     },
-    // {
-    //   path: '/leaderboard',
-    //   name: 'leaderboard',
-    //   component: () => import('../views/LeaderboardView.vue'),
-    //   meta: { requiresAuth: true }
-    // },
     {
       path: '/community',
       name: 'community',
@@ -86,7 +80,6 @@ router.beforeEach(async (to, from, next) => {
     if (currentUser) {
       next()
     } else {
-      console.log('Not authenticated, redirecting to login')
       next('/login')
     }
     return

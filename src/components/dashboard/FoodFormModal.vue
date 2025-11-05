@@ -86,7 +86,6 @@ const suggestWithGemini = async () => {
     }
   } catch (err) {
     lastSuggestion.value = 'AI suggestion failed.'
-    console.error(err)
   }
 }
 

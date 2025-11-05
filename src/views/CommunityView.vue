@@ -40,35 +40,35 @@ const displayedMySharedItems = computed(() => {
 
   // Filter based on toggle
   let filtered = showDonatedItems.value ? sorted : sorted.filter(item => !item.donated)
-  
+
   // Apply search filter
   if (searchQuery.value && searchQuery.value.trim()) {
     const search = searchQuery.value.toLowerCase().trim()
-    filtered = filtered.filter(item => 
+    filtered = filtered.filter(item =>
       item.foodName?.toLowerCase().includes(search) ||
       item.category?.toLowerCase().includes(search) ||
       item.location?.address?.toLowerCase().includes(search)
     )
   }
-  
+
   return filtered
 })
 
 // Filtered available items with search
 const filteredAvailableItems = computed(() => {
   let filtered = itemsWithDistance.value
-  
+
   // Apply search filter
   if (searchQuery.value && searchQuery.value.trim()) {
     const search = searchQuery.value.toLowerCase().trim()
-    filtered = filtered.filter(item => 
+    filtered = filtered.filter(item =>
       item.foodName?.toLowerCase().includes(search) ||
       item.category?.toLowerCase().includes(search) ||
       item.location?.address?.toLowerCase().includes(search) ||
       item.sharedBy?.toLowerCase().includes(search)
     )
   }
-  
+
   return filtered
 })
 
@@ -163,13 +163,10 @@ async function loadFoodItems() {
 
   // Only show items with quantity > 0 in the dropdown
   foodItems.value = allItems.filter(item => item.quantity > 0);
-  console.log('loadFoodItems - filtered items (qty > 0):', foodItems.value)
 }
 
 function onSelectFoodItem() {
-  console.log('onSelectFoodItem called, foodId:', shareForm.value.foodItemId)
   const selected = foodItems.value.find(fi => fi.id === shareForm.value.foodItemId)
-  console.log('Selected food item:', selected)
   if (selected) {
     shareForm.value.category = selected.category || ''
     shareForm.value.foodName = selected.name || ''
@@ -190,7 +187,6 @@ function onSelectFoodItem() {
     shareForm.value.quantity = ''
     shareForm.value.unit = selected.unit || ''
 
-    console.log('Updated shareForm:', shareForm.value)
   }
 }
 
@@ -443,7 +439,6 @@ async function submitShare(formData) {
     await loadMyListings()
     await loadFoodItems()
   } catch (err) {
-    console.error("Error adding listing:", err)
     await error('Failed to share food: ' + (err.message || err))
   }
 }
@@ -552,7 +547,6 @@ async function markAsDonated(item) {
     await loadMyListings()
     await loadFoodItems()
   } catch (err) {
-    console.error(err)
     await error('Failed to mark as donated')
   }
 }
@@ -690,7 +684,6 @@ function loadPreferredLocation() {
 
   const PREFERRED_LOC_KEY = `foodshare_preferred_location_${currentUser.value.uid}`
   const raw = localStorage.getItem(PREFERRED_LOC_KEY)
-  console.log('Raw from localStorage:', raw)
   if (raw) {
     try {
       const parsed = JSON.parse(raw)
@@ -699,7 +692,6 @@ function loadPreferredLocation() {
         lng: Number(parsed.lng),
         address: parsed.address || ''
       }
-      console.log('Loaded preferred location:', preferredLocation.value)
     } catch (e) {
       console.warn('Invalid stored location', e)
     }
@@ -718,12 +710,6 @@ function savePreferredLocation() {
 }
 
 function calculateDistances() {
-  console.log('calculateDistances() called', {
-    hasPreferred: !!preferredLocation.value,
-    hasGeometry: !!geometry.value,
-    itemCount: sharedItems.value.length
-  })
-
   // If no items, clear the list
   if (sharedItems.value.length === 0) {
     itemsWithDistance.value = []
@@ -789,14 +775,12 @@ watch(
   [sharedItems, preferredLocation, geometry],
   () => {
     if (sharedItems.value.length && geometry.value) {
-      console.log('Watcher triggered → calculating distances')
       calculateDistances()
     }
   },
   { deep: true }
 )
 watch(preferredLocation, (newVal) => {
-  console.log('preferredLocation changed:', newVal)
 })
 
 
@@ -960,7 +944,6 @@ async function submitEdit() {
     await loadFoodItems()
     await loadDonationActivities()
   } catch (err) {
-    console.error("Error updating listing:", err)
     await error("Failed to update listing: " + err.message)
   }
 }

@@ -3,14 +3,14 @@
     <Transition name="modal-fade" appear>
       <div v-if="true" class="modal-wrapper">
         <div class="modal-backdrop" @click="emit('close')"></div>
-        
+
         <div class="modal-dialog modal-dialog-centered modal-lg">
           <div class="modal-content rounded-3 shadow-lg border-0 bg-white">
             <div class="modal-body p-0">
-              <button 
-                type="button" 
-                class="btn-close position-absolute top-0 end-0 m-2 bg-white rounded-circle p-2" 
-                style="z-index: 10; width: 32px; height: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);" 
+              <button
+                type="button"
+                class="btn-close position-absolute top-0 end-0 m-2 bg-white rounded-circle p-2"
+                style="z-index: 10; width: 32px; height: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"
                 @click="emit('close')"
               ></button>
 
@@ -31,10 +31,10 @@
                   <div class="p-3 d-flex flex-column overflow-hidden content-wrapper">
                     <div class="flex-shrink-0 mb-2">
                       <div class="compact-image-container">
-                        <img 
-                          :src="recipe.image" 
-                          :alt="recipe.name" 
-                          class="rounded-2 recipe-modal-img" 
+                        <img
+                          :src="recipe.image"
+                          :alt="recipe.name"
+                          class="rounded-2 recipe-modal-img"
                         />
                       </div>
                     </div>
@@ -56,9 +56,9 @@
                         <i class="bi bi-list-ul me-1"></i>Ingredients ({{ recipe.ingredients?.length || 0 }})
                       </h6>
                       <div class="flex-fill overflow-auto custom-scrollbar ingredients-list">
-                        <div 
-                          v-for="(ingredient, idx) in recipe.ingredients" 
-                          :key="idx" 
+                        <div
+                          v-for="(ingredient, idx) in recipe.ingredients"
+                          :key="idx"
                           class="ingredient-item d-flex align-items-start py-1"
                         >
                           <i class="bi bi-dot text-primary me-2 fs-6 flex-shrink-0"></i>
@@ -74,9 +74,9 @@
                   <div class="p-3 d-flex flex-column overflow-hidden content-wrapper">
                     <!-- Desktop Title (hidden on mobile) -->
                     <div class="mb-2 flex-shrink-0 d-none d-md-block">
-                      <h3 
-                        :id="'modal-title-' + recipe.id" 
-                        class="fw-bold mb-1" 
+                      <h3
+                        :id="'modal-title-' + recipe.id"
+                        class="fw-bold mb-1"
                         style="font-size: 1.3rem; line-height: 1.3;"
                       >
                         {{ recipe.name }}
@@ -91,9 +91,9 @@
                       </h6>
                       <div class="flex-fill overflow-auto custom-scrollbar ps-2">
                         <ol class="instruction-list list-unstyled ps-0 mb-0">
-                          <li 
-                            v-for="(step, index) in formattedInstructions" 
-                            :key="index" 
+                          <li
+                            v-for="(step, index) in formattedInstructions"
+                            :key="index"
                             class="mb-2 instruction-step"
                           >
                             <span class="text-secondary small lh-base">{{ step }}</span>
@@ -110,27 +110,27 @@
                         :class="isBookmarked ? 'btn-warning' : 'btn-outline-warning'"
                         style="font-size: 0.8rem; padding: 0.4rem 0.75rem;"
                       >
-                        <i 
-                          :class="isBookmarked ? 'bi bi-bookmark-heart-fill text-danger' : 'bi bi-bookmark-heart'" 
+                        <i
+                          :class="isBookmarked ? 'bi bi-bookmark-heart-fill text-danger' : 'bi bi-bookmark-heart'"
                           class="me-1"
                         ></i>
                         {{ isBookmarked ? 'Saved' : 'Save' }}
                       </button>
-                      
-                      <a 
-                        v-if="recipe.video" 
-                        :href="recipe.video" 
-                        target="_blank" 
+
+                      <a
+                        v-if="recipe.video"
+                        :href="recipe.video"
+                        target="_blank"
                         class="btn btn-outline-danger btn-sm flex-fill action-btn"
                         style="font-size: 0.8rem; padding: 0.4rem 0.75rem;"
                       >
                         <i class="bi bi-play-circle me-1"></i>Video
                       </a>
-                      
-                      <a 
-                        v-if="recipe.source" 
-                        :href="recipe.source" 
-                        target="_blank" 
+
+                      <a
+                        v-if="recipe.source"
+                        :href="recipe.source"
+                        target="_blank"
                         class="btn btn-outline-primary btn-sm flex-fill action-btn"
                         style="font-size: 0.8rem; padding: 0.4rem 0.75rem;"
                       >
@@ -190,7 +190,7 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
   .mobile-col {
     height: 100%;
   }
-  
+
   .content-wrapper {
     height: 100%;
   }
@@ -385,39 +385,39 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
   .modal-wrapper {
     padding: 0.5rem;
   }
-  
+
   .modal-content {
     max-height: 90vh;
     height: auto;
   }
-  
+
   .modal-body {
     height: auto;
     max-height: 90vh;
     overflow-y: auto;
   }
-  
+
   .modal-row {
     height: auto;
   }
-  
+
   /* Remove border on mobile since columns stack */
   .mobile-col {
     border-right: none !important;
     height: auto;
   }
-  
+
   .content-wrapper {
     height: auto;
   }
-  
+
   /* Remove internal scrolling on mobile, use main modal scroll */
   .custom-scrollbar {
     overflow: visible;
     overflow-x: hidden;
     height: auto;
   }
-  
+
   /* Column layout for ingredients on mobile - prevent horizontal overflow */
   .ingredients-list {
     column-count: 2;
@@ -427,7 +427,7 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
     width: 100%;
     max-width: 100%;
   }
-  
+
   /* Ensure ingredient items wrap properly within columns */
   .ingredient-item {
     break-inside: avoid;
@@ -438,7 +438,7 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
     box-sizing: border-box;
     overflow-x: hidden;
   }
-  
+
   /* Force text wrapping on ingredient text */
   .ingredient-item .small {
     word-break: break-word;
@@ -447,12 +447,12 @@ const emit = defineEmits(['close', 'toggle-bookmark'])
     max-width: calc(100% - 1.5rem); /* Account for icon width */
     flex: 1;
   }
-  
+
   /* Ensure icon doesn't cause overflow */
   .ingredient-item .bi-dot {
     flex-shrink: 0;
   }
-  
+
   /* Compact image on mobile */
   .compact-image-container {
     padding-bottom: 50%;
