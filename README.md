@@ -52,7 +52,7 @@ Thanks for checking out BigBacks — enjoy the monkeys! 🐒🍌
 
 ## Note about AI assistance
 
-This project use of AI/LLM tools to assist with certain project tasks. All AI-provided suggestions were reviewed, edited, and integrated by the group. 
+This project uses AI/LLM tools to assist with certain project tasks. All AI-provided suggestions were reviewed, edited, and integrated by the group. 
 
 - Exploring UI/UX ideas and layout concepts for inspiration.
 - Generating website themes
