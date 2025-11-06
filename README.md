@@ -16,22 +16,11 @@ Your smart companion for managing groceries, preventing food waste, and building
 - Node.js
 - npm
 
-### Install & run (development)
+### Install & run
 
 ```powershell
 npm install
 npm run dev
-```
-
-### Build (production)
-
-```powershell
-npm run build
-```
-### Deployment (firebase)
-
-```powershell
-firebase deploy
 ```
 
 ## Demo user accounts
