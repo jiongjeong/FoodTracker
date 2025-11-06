@@ -15,7 +15,6 @@ const fetchLeaderboard = async () => {
   loading.value = true
   error.value = ''
   try {
-    // Query all users sorted by foodScore desc (for rank)
     const allQ = query(collection(db, 'user'), orderBy('foodScore', 'desc'))
     const allSnap = await getDocs(allQ)
     let foundUser = false
@@ -28,7 +27,6 @@ const fetchLeaderboard = async () => {
           name: data.name || 'Anonymous',
           score: data.foodScore || 0,
           streak: data.currentStreak || 0,
-          // TODO: replace initials avatar with actual avatar in the future
           initials: (data.name ? data.name.trim().split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() : 'U'),
           isCurrentUser: true
         }
@@ -69,7 +67,6 @@ const getRankBadgeClass = (rank) => {
   if (rank === 3) return 'rank-badge-bronze'
   return ''
 }
-console.log(leaderboard)
 
 </script>
 
@@ -221,7 +218,6 @@ console.log(leaderboard)
 </template>
 
 <style scoped>
-/* Podium Styles */
 .podium-container {
   position: relative;
   min-height: 500px;
@@ -352,7 +348,6 @@ console.log(leaderboard)
   font-size: 1.1rem;
 }
 
-/* Sparkle Animation */
 .sparkle {
   position: absolute;
   width: 8px;
@@ -402,7 +397,6 @@ console.log(leaderboard)
   }
 }
 
-/* You Badge for Podium */
 .you-badge-podium {
   position: absolute;
   top: 10px;
@@ -422,7 +416,6 @@ console.log(leaderboard)
   box-shadow: 0 4px 20px rgba(13, 110, 253, 0.3);
 }
 
-/* Avatar Styles */
 .initials-avatar {
   display: inline-flex;
   align-items: center;
@@ -462,7 +455,6 @@ console.log(leaderboard)
   border: 4px solid #ffd700;
 }
 
-/* Responsive Design */
 @media (max-width: 768px) {
   .podium-wrapper {
     gap: 0.5rem;
@@ -629,7 +621,6 @@ console.log(leaderboard)
 .carousel-arrow.left { left: 0; }
 .carousel-arrow.right { right: 0; }
 
-/* Responsive */
 @media (max-width: 480px) {
   .monkey-carousel-container {
     max-width: 220px;

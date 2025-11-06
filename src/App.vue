@@ -60,7 +60,6 @@ watch(() => route.path, () => {
 onMounted(() => {
   const unsubscribe = auth.onAuthStateChanged(user => {
     authLoading.value = false
-    console.log(user ? `User authenticated: ${user.uid}` : 'No user authenticated')
     unsubscribe()
   })
 })

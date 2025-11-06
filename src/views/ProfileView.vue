@@ -40,7 +40,6 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const showDeleteModal = ref(false)
 
-// Check if there are any changes
 const hasChanges = computed(() => {
   const profileChanged =
     editableUser.value.name !== originalUser.value.name ||
@@ -104,22 +103,19 @@ async function saveChanges() {
   successMessage.value = ''
 
   try {
-    // Check if user document exists
     const userDocRef = doc(db, "user", user.value.uid)
     const userDoc = await getDoc(userDocRef)
 
     const userData = {
       name: editableUser.value.name,
-      email: user.value.email, // Keep original email
+      email: user.value.email,
       contactNo: editableUser.value.contactNo,
       handle: editableUser.value.handle
     }
 
     if (userDoc.exists()) {
-      // Update existing document
       await updateDoc(userDocRef, userData)
     } else {
-      // Create new document with setDoc
       await setDoc(userDocRef, {
         ...userData,
         points: 0,
@@ -127,10 +123,8 @@ async function saveChanges() {
       })
     }
 
-    // Update display name
     await updateProfile(user.value, { displayName: editableUser.value.name })
 
-    // Update password if provided
     if (passwords.value.new) {
       try {
         await updatePassword(user.value, passwords.value.new)
@@ -186,7 +180,6 @@ async function deleteAccount() {
     return
   }
 
-  // Confirm deletion with custom alert
   const confirmed = await confirm(
     "This action cannot be undone. All your data including food items, activities, recipes, and shared community listings will be permanently deleted.",
     "Delete Account?"

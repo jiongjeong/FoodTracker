@@ -25,7 +25,6 @@ export function loadGoogleMaps() {
       const interval = setInterval(() => {
         if (window.google?.maps?.geometry) {
           clearInterval(interval)
-          console.log('Google Maps API fully loaded (geometry ready)')
           resolve(window.google)
         } else if (attempts++ > maxAttempts) {
           clearInterval(interval)

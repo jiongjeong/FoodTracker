@@ -87,10 +87,8 @@ const sendMessage = async () => {
     messages.value.push(loadingMessage)
     scrollToBottom()
 
-    // Get AI response with user context
     const aiResponse = await generateResponse(currentInput, userContext.value)
     
-    // Remove loading message and add actual response
     messages.value.pop()
     const aiMessage = {
       id: (Date.now() + 2).toString(),
@@ -102,7 +100,6 @@ const sendMessage = async () => {
     scrollToBottom()
 
   } catch (err) {
-    // Remove loading message and show error
     messages.value.pop()
     const errorMessage = {
       id: (Date.now() + 3).toString(),
@@ -140,21 +137,12 @@ onMounted(() => {
   scrollToBottom()
 })
 
-// TODO: Add functions for future features:
-// - Save chat history to localStorage/Firebase
-// - Load previous conversations
-// - Clear chat history
-// - Export chat as text/PDF
-// - Voice input/output integration
-// - Message reactions/feedback
 </script>
 
 <template>
-  <div class="chatbot-page">
-    <!-- Hero Section - Full Width -->
+  <div class="chatbot-page">  
     <div class="hero-full-width">
       <div class="compact-hero position-relative py-4 py-md-5 mb-4">
-        <!-- Subtle Color Splashes Background -->
         <div class="color-splashes position-absolute w-100 h-100" style="z-index: 1;">
           <div class="color-splash splash-1"></div>
           <div class="color-splash splash-2"></div>
@@ -163,9 +151,9 @@ onMounted(() => {
           <div class="color-splash splash-5"></div>
         </div>
         
-        <!-- Educational Decorative Elements -->
+
         <div class="position-absolute top-0 end-0 h-100 w-50 brain-decorations pe-none" style="z-index: 0;">
-          <!-- Speech Bubbles -->
+          <!-- speech bubbles -->
           <div class="speech-bubble bubble-1">
             <div class="bubble-text">💬</div>
             <div class="bubble-tail"></div>
@@ -183,7 +171,6 @@ onMounted(() => {
             <div class="bubble-tail tail-left"></div>
           </div>
           
-          <!-- Connecting conversation lines -->
           <svg class="position-absolute w-100 h-100" style="top: 0; left: 0;" viewBox="0 0 400 400" preserveAspectRatio="none">
             <defs>
               <linearGradient id="conversationGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -191,8 +178,7 @@ onMounted(() => {
                 <stop offset="100%" style="stop-color:#34d399;stop-opacity:0.05" />
               </linearGradient>
             </defs>
-            
-            <!-- Subtle connecting lines between bubbles -->
+
             <path d="M 100,100 Q 150,150 200,180" stroke="url(#conversationGradient)" stroke-width="1.5" fill="none" class="conversation-line line-1" stroke-dasharray="5,5"/>
             <path d="M 200,180 Q 250,220 280,260" stroke="url(#conversationGradient)" stroke-width="1.5" fill="none" class="conversation-line line-2" stroke-dasharray="5,5"/>
           </svg>
@@ -200,7 +186,6 @@ onMounted(() => {
 
         <div class="container-fluid px-3 px-md-4">
           <div class="row align-items-center g-4 position-relative">
-            <!-- Left Content -->
             <div class="col-lg-6 position-relative" style="z-index: 10;">
               <div class="mb-4">
                 <h1 class="display-4 fw-bold mb-3 text-dark lh-sm">
@@ -210,7 +195,6 @@ onMounted(() => {
                   Smart Food AI & Latest Food News 🤖
                 </p>
                 
-                <!-- Feature Pills -->
                 <div class="feature-pills d-flex flex-wrap gap-2">
                   <span class="feature-pill">Storage Tips</span>
                   <span class="feature-pill">Recipe Ideas</span>
@@ -220,10 +204,8 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- Right Content - Speech Bubbles Conversation -->
             <div class="col-lg-6 position-relative d-none d-lg-flex justify-content-center align-items-center" style="z-index: 5;">
               <div class="speech-bubbles-container position-relative">
-                <!-- Main conversation bubbles -->
                 <div class="chat-bubble bubble-main-1">
                   <div class="bubble-content">
                     <p class="mb-0">Hey! Need help with your food?</p>
@@ -244,8 +226,6 @@ onMounted(() => {
                   </div>
                   <div class="bubble-tail-bottom"></div>
                 </div>
-                
-                <!-- Small floating thought bubbles -->
                 <div class="thought-bubble-small thought-1">💭</div>
                 <div class="thought-bubble-small thought-2">💡</div>
                 <div class="thought-bubble-small thought-3">🤖</div>
@@ -256,15 +236,11 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Content Wrapper -->
     <div class="container-fluid px-3 px-md-4" style="max-width: 1400px; margin: 0 auto;">
-      <!-- Two Column Layout -->
       <div class="row g-4">
-        <!-- Left Column: Chatbot -->
+        <!-- left col: chatbot -->
         <div class="col-12 col-lg-8 px-xxl-0 mx-0">
-          <!-- Chat Shell -->
           <div class="chat-shell">
-            <!-- Chat Messages -->
             <div class="chat-messages" id="chatContainer" ref="chatContainer">
               <div
                 v-for="msg in messages"
@@ -287,7 +263,6 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- Composer -->
             <div class="chat-composer">
               <div class="quick-questions-wrapper mb-3">
                 <div class="d-flex gap-2 flex-wrap justify-content-center">
@@ -303,9 +278,7 @@ onMounted(() => {
                 </div>
               </div>
 
-              <!-- Input Area -->
               <div class="input-area">
-                <!-- Error Display -->
                 <div v-if="error && error.length" class="alert alert-danger error-alert">
                   <div class="d-flex justify-content-between align-items-center">
                     <span>{{ error }}</span>
@@ -340,7 +313,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Right Column: News Vertical Carousel -->
+        <!-- right col: news section -->
         <div class="col-12 col-lg-4">
           <div class="news-sidebar">
             <news />
@@ -353,13 +326,11 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Main page layout */
 .chatbot-page {
   min-height: 100vh;
   background: #f8f9fa;
 }
 
-/* Hero section - full width */
 .hero-full-width {
   width: 100%;
   padding: 0;
@@ -385,14 +356,12 @@ onMounted(() => {
   }
 }
 
-/* Hero Section Styles */
 .compact-hero {
   position: relative;
   overflow: hidden;
   width: 100%;
 }
 
-/* Subtle Color Splashes */
 .color-splashes {
   top: 0;
   left: 0;
@@ -483,7 +452,7 @@ onMounted(() => {
   .splash-5 { width: 100px; height: 100px; }
 }
 
-/* Speech Bubbles Container */
+
 .speech-bubbles-container {
   position: relative;
   width: 400px;
@@ -497,7 +466,7 @@ onMounted(() => {
   }
 }
 
-/* Speech Bubbles Container */
+
 .speech-bubbles-container {
   position: relative;
   width: 400px;
@@ -511,7 +480,6 @@ onMounted(() => {
   }
 }
 
-/* Chat Bubbles - Main conversation */
 .chat-bubble {
   position: absolute;
   background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
@@ -551,7 +519,6 @@ onMounted(() => {
   animation-delay: 2.5s;
 }
 
-/* Bubble tails */
 .bubble-tail-bottom {
   position: absolute;
   bottom: -12px;
@@ -598,7 +565,6 @@ onMounted(() => {
   border-bottom: 10px solid #dcfce7;
 }
 
-/* Thought bubbles - small floating */
 .thought-bubble-small {
   position: absolute;
   width: 50px;
@@ -685,12 +651,10 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
 }
 
-/* Decorative educational elements */
 .brain-decorations {
   z-index: 0;
 }
 
-/* Speech bubbles */
 .speech-bubble {
   position: absolute;
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(52, 211, 153, 0.04) 100%);
@@ -708,7 +672,6 @@ onMounted(() => {
   line-height: 1;
 }
 
-/* Speech bubble tails */
 .bubble-tail {
   position: absolute;
   bottom: -8px;
@@ -737,7 +700,6 @@ onMounted(() => {
   left: 20px;
 }
 
-/* Bubble positions and animations */
 .bubble-1 {
   width: 60px;
   height: 60px;
@@ -789,7 +751,6 @@ onMounted(() => {
   }
 }
 
-/* Conversation lines animation */
 .conversation-line {
   stroke-dasharray: 5, 5;
   animation: dashFlow 20s linear infinite;
@@ -805,7 +766,7 @@ onMounted(() => {
   }
 }
 
-/* Floating emojis animation */
+/* floating emojis */
 @keyframes riseAndFloat {
   0% {
     transform: translateY(0) scale(0.6);
@@ -834,7 +795,6 @@ onMounted(() => {
   transform-origin: center;
 }
 
-/* Category pills shadows */
 .shadow-soft {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
   transition: all 0.25s ease-in-out;
@@ -850,7 +810,6 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* Mobile responsive for hero */
 @media (max-width: 991px) {
   .compact-hero {
     padding: 1rem 0 !important;
@@ -927,7 +886,7 @@ onMounted(() => {
   overflow-y: auto;
 }
 
-/* Vertical scrollbar for news sidebar */
+/* scrollbar for news sidebar */
 .news-sidebar::-webkit-scrollbar {
   width: 6px;
 }
@@ -946,7 +905,6 @@ onMounted(() => {
   background: rgba(16, 185, 129, 0.5);
 }
 
-/* Feature Cards */
 .feature-card {
   position: relative;
   overflow: hidden;
@@ -1030,7 +988,6 @@ onMounted(() => {
   color: white;
 }
 
-/* Chat Shell */
 .chat-shell {
   background: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(20px) saturate(180%);
@@ -1065,7 +1022,6 @@ onMounted(() => {
   }
 }
 
-/* Message Row */
 .message-row {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
@@ -1087,7 +1043,6 @@ onMounted(() => {
   justify-self: end; 
 }
 
-/* Avatars */
 .avatar {
   width: 40px;
   height: 40px;
@@ -1138,7 +1093,6 @@ onMounted(() => {
   color: #6b7280;
 }
 
-/* Chat Composer */
 .chat-composer {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
@@ -1182,7 +1136,6 @@ onMounted(() => {
   opacity: 0.6;
 }
 
-/* Input Area */
 .input-area {
   width: 100%;
 }
@@ -1267,7 +1220,6 @@ onMounted(() => {
 }
 
 
-/* Scrollbar styling */
 .chat-messages::-webkit-scrollbar {
   width: 6px;
 }

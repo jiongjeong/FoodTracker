@@ -1,7 +1,6 @@
 <template>
   <div class="login-wrapper">
     <div class="login-container">
-      <!-- Logo and Brand -->
       <div class="brand-section">
         <img src="/bigbackicon.jpg" alt="FoodTracker" class="brand-logo" />
         <h2 class="brand-title">Welcome Back!</h2>
@@ -68,7 +67,6 @@
         </button>
       </form>
 
-      <!-- Sign Up Link -->
       <div class="signup-section">
         <p>Don't have an account? <a @click="goToSignup" class="signup-link">Sign Up</a></p>
       </div>
@@ -100,21 +98,17 @@ export default {
       this.isLoading = true;
 
       try {
-        // Set Firebase Auth persistence based on "Remember me"
         const persistence = this.remember ? browserLocalPersistence : browserSessionPersistence;
         await setPersistence(auth, persistence);
 
         let user;
         if (!auth.currentUser) {
-          // User not signed in, proceed to sign in
           const userCredential = await signInWithEmailAndPassword(auth, this.email, this.password);
           user = userCredential.user;
         } else {
-          // User already signed in, use currentUser
           user = auth.currentUser;
         }
 
-        // Get user document from Firestore
         const userDocRef = doc(db, "users", user.uid);
         const userDoc = await getDoc(userDocRef);
 
@@ -122,7 +116,6 @@ export default {
           ? userDoc.data()
           : { uid: user.uid, email: user.email };
 
-        // Save user data to storage for UI convenience (auth persistence is handled by Firebase)
         const storage = this.remember ? localStorage : sessionStorage;
         storage.setItem("user", JSON.stringify(userToStore));
 

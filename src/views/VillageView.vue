@@ -66,7 +66,6 @@ onUnmounted(() => {
   if (bananaInterval) clearInterval(bananaInterval)
 })
 
-/* ---------- LAND CLAMPING (natural size) ---------- */
 const percentToPx = (percent, axis) => {
   const img = villageImg.value
   if (!img) return 0
@@ -107,7 +106,6 @@ const getRandomLandPosition = () => {
 const startWalking = () => {
   const walk = () => {
     allMonkeys.value.forEach(m => {
-      // Skip keyboard control for the player's monkey
       if (m.isYou && keyboardControl.value) {
         return
       }
@@ -329,7 +327,10 @@ const startPan = e => {
 
 const onPan = e => {
   if (!isPanning.value) return
-  e.preventDefault()
+  // touch-action: none on the pan container prevents default scrolling, so
+  // we don't need to call preventDefault() here. Keeping the handler passive
+  // improves scroll performance and avoids browser warnings about
+  // non-passive touch listeners.
   const clientX = e.touches ? e.touches[0].clientX : e.clientX
   const clientY = e.touches ? e.touches[0].clientY : e.clientY
 
@@ -404,7 +405,7 @@ const bananaStyle = b => ({
 const monkeySrc = (monkey) => {
   const isHovered = hoveredMonkey.value === monkey.uid
   const normal = `/monkey/${monkey.monkeyId}.png`
-  const banana = `/bananagif-unscreen.gif`  // ← SAME IMAGE FOR ALL
+  const banana = `/bananagif-unscreen.gif` 
   return isHovered ? banana : normal
 }
 
@@ -424,9 +425,9 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
       @mousemove="onPan"
       @mouseup="endPan"
       @mouseleave="endPan"
-      @touchstart="startPan"
-      @touchmove="onPan"
-      @touchend="endPan"
+      @touchstart.passive="startPan"
+      @touchmove.passive="onPan"
+      @touchend.passive="endPan"
     >
 
         <img
@@ -496,7 +497,7 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
 </template>
 
 <style scoped>
-/* Full-screen village section */
+
 .village-page {
   width: 100%;
   height: 100vh;
@@ -505,15 +506,15 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
   background: transparent;
   user-select: none;
   cursor: grab;
-  touch-action: none; /* Prevent default touch behaviors */
+  touch-action: none; 
 }
 
-/* Pan container */
 .pan-container {
   position: relative;
   width: 100%;
   height: 100%;
   min-height: 100vh;
+  touch-action: none;
 }
 
 .village-bg {
