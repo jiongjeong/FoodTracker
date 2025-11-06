@@ -176,7 +176,7 @@ const calculateScoreChange = (activityType, price, percentageUsed = 100) => {
   const normalizedPercentage = percentageUsed / 100;
 
   switch (activityType) {
-    case 'conFood': // onsumed/Saved
+    case 'conFood': // Consumed/Saved
       return (40 * normalizedPercentage) + (0.2 * price); // +40 points per 100%, +0.2*total_value for money
     case 'expFood': // Expired/Wasted
       return -((60 * normalizedPercentage) + (0.2 * price)); // -60 points per 100%, -0.2*total_value for money, wasting food should bear heaviest weightage

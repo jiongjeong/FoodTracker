@@ -327,7 +327,10 @@ const startPan = e => {
 
 const onPan = e => {
   if (!isPanning.value) return
-  e.preventDefault()
+  // touch-action: none on the pan container prevents default scrolling, so
+  // we don't need to call preventDefault() here. Keeping the handler passive
+  // improves scroll performance and avoids browser warnings about
+  // non-passive touch listeners.
   const clientX = e.touches ? e.touches[0].clientX : e.clientX
   const clientY = e.touches ? e.touches[0].clientY : e.clientY
 
@@ -422,9 +425,9 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
       @mousemove="onPan"
       @mouseup="endPan"
       @mouseleave="endPan"
-      @touchstart="startPan"
-      @touchmove="onPan"
-      @touchend="endPan"
+      @touchstart.passive="startPan"
+      @touchmove.passive="onPan"
+      @touchend.passive="endPan"
     >
 
         <img
@@ -511,6 +514,7 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
   width: 100%;
   height: 100%;
   min-height: 100vh;
+  touch-action: none;
 }
 
 .village-bg {
