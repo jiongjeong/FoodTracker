@@ -6,7 +6,7 @@ const props = defineProps({
   },
   mode: {
     type: String,
-    default: 'myShared', // 'myShared' or 'available'
+    default: 'myShared',
     validator: (value) => ['myShared', 'available'].includes(value)
   }
 })

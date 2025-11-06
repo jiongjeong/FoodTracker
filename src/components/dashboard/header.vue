@@ -1,29 +1,16 @@
 <template>
   <section class="compact-hero position-relative py-4 py-md-5 mb-4">
-    <div class="position-absolute top-0 start-0 w-100 h-100 dashboard-lines" style="z-index: 0; pointer-events: none; overflow: hidden;">
-      <svg class="position-absolute w-100 h-100" style="top: 0; left: 0;" viewBox="0 0 1440 800" preserveAspectRatio="none">
-        <path 
-          d="M-100,200 Q400,100 800,250 T1600,200" 
-          fill="none" 
-          stroke="url(#greenGradient)" 
-          stroke-width="3" 
-          opacity="0.4"
-        />
-        <path 
-          d="M-100,400 Q300,500 700,350 T1600,450" 
-          fill="none" 
-          stroke="url(#cyanGradient)" 
-          stroke-width="3" 
-          opacity="0.4"
-        />
-        <path 
-          d="M-100,600 Q500,550 900,650 T1600,600" 
-          fill="none" 
-          stroke="url(#lightGreenGradient)" 
-          stroke-width="2" 
-          opacity="0.3"
-        />
-        
+    <div class="position-absolute top-0 start-0 w-100 h-100 dashboard-lines"
+      style="z-index: 0; pointer-events: none; overflow: hidden;">
+      <svg class="position-absolute w-100 h-100" style="top: 0; left: 0;" viewBox="0 0 1440 800"
+        preserveAspectRatio="none">
+        <path d="M-100,200 Q400,100 800,250 T1600,200" fill="none" stroke="url(#greenGradient)" stroke-width="3"
+          opacity="0.4" />
+        <path d="M-100,400 Q300,500 700,350 T1600,450" fill="none" stroke="url(#cyanGradient)" stroke-width="3"
+          opacity="0.4" />
+        <path d="M-100,600 Q500,550 900,650 T1600,600" fill="none" stroke="url(#lightGreenGradient)" stroke-width="2"
+          opacity="0.3" />
+
         <defs>
           <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
@@ -39,21 +26,30 @@
           </linearGradient>
         </defs>
       </svg>
-      
-      <div class="position-absolute dashboard-dot" style="top: 15%; right: 20%; width: 8px; height: 8px; background: #10b981; border-radius: 50%; opacity: 0.5;"></div>
-      <div class="position-absolute dashboard-dot" style="top: 45%; right: 15%; width: 6px; height: 6px; background: #06b6d4; border-radius: 50%; opacity: 0.4;"></div>
-      <div class="position-absolute dashboard-dot" style="top: 70%; right: 25%; width: 10px; height: 10px; background: #34d399; border-radius: 50%; opacity: 0.3;"></div>
-      <div class="position-absolute dashboard-dot" style="top: 30%; right: 8%; width: 7px; height: 7px; background: #059669; border-radius: 50%; opacity: 0.5;"></div>
+
+      <div class="position-absolute dashboard-dot"
+        style="top: 15%; right: 20%; width: 8px; height: 8px; background: #10b981; border-radius: 50%; opacity: 0.5;">
+      </div>
+      <div class="position-absolute dashboard-dot"
+        style="top: 45%; right: 15%; width: 6px; height: 6px; background: #06b6d4; border-radius: 50%; opacity: 0.4;">
+      </div>
+      <div class="position-absolute dashboard-dot"
+        style="top: 70%; right: 25%; width: 10px; height: 10px; background: #34d399; border-radius: 50%; opacity: 0.3;">
+      </div>
+      <div class="position-absolute dashboard-dot"
+        style="top: 30%; right: 8%; width: 7px; height: 7px; background: #059669; border-radius: 50%; opacity: 0.5;">
+      </div>
     </div>
 
     <div class="container-fluid px-3 px-md-4">
       <div class="row align-items-center g-4 position-relative">
 
-       
 
-        <div class="col-12 col-lg-5 text-center text-lg-start position-relative my-auto py-0" style="z-index: 10; padding-top: 2rem;justify-items: center;">
 
-         
+        <div class="col-12 col-lg-5 text-center text-lg-start position-relative my-auto py-0"
+          style="z-index: 10; padding-top: 2rem;justify-items: center;">
+
+
 
           <h1 class="hero-title mb-2">Hello,
 
@@ -73,7 +69,7 @@
 
           </p>
 
-         
+
 
           <div class="floating-monkeys">
 
@@ -96,25 +92,19 @@
         <div class="col-12 col-lg-7 position-relative" style="z-index: 10; padding-top: 2rem;">
           <div class="row g-3">
             <div class="col-6 col-lg-6">
-              <StatCard
-                title="Food Score"
-                iconClass="bi bi-graph-up-arrow"
+              <StatCard title="Food Score" iconClass="bi bi-graph-up-arrow"
                 :gradient="`linear-gradient(135deg, rgba(0, 102, 60, 0.85) 0%, rgba(50, 200, 120, 0.75) 100%)`"
-                height="130px"
-              >
+                height="130px">
                 <template #default>
                   <h3 class="fw-bold mb-0 text-white">{{ userFoodScore }}</h3>
                   <small class="text-white">points</small>
 
                   <div v-if="analytics.streakDays > 0" class="mt-2">
-                    <span
-                      class="streak-fire"
-                      :class="{
-                        'fire-small': analytics.streakDays < 7,
-                        'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
-                        'fire-large': analytics.streakDays >= 14
-                      }"
-                    >🔥</span>
+                    <span class="streak-fire" :class="{
+                      'fire-small': analytics.streakDays < 7,
+                      'fire-medium': analytics.streakDays >= 7 && analytics.streakDays < 14,
+                      'fire-large': analytics.streakDays >= 14
+                    }">🔥</span>
                     <span class="streak-text text-white">
                       {{ analytics.streakDays }} day{{ analytics.streakDays !== 1 ? 's' : '' }}
                     </span>
@@ -132,23 +122,17 @@
             </div>
 
             <div class="col-6 col-lg-6">
-              <StatCard
-                title="Expiring Soon"
-                iconClass="bi bi-exclamation-triangle"
-                gradient="linear-gradient(135deg, rgba(0, 74, 173, 0.85) 0%, rgba(59, 130, 246, 0.75) 100%)"
-              >
+              <StatCard title="Expiring Soon" iconClass="bi bi-exclamation-triangle"
+                gradient="linear-gradient(135deg, rgba(0, 74, 173, 0.85) 0%, rgba(59, 130, 246, 0.75) 100%)">
                 <h3 class="fw-bold mb-0 text-white">{{ expiringSoon }}</h3>
                 <small class="text-white">items</small>
               </StatCard>
             </div>
 
             <div class="col-6 col-lg-6">
-              <StatCard
-                title="Potential Loss"
-                iconClass="bi bi-currency-dollar"
+              <StatCard title="Potential Loss" iconClass="bi bi-currency-dollar"
                 :gradient="`linear-gradient(135deg, rgba(153, 27, 27, 0.85) 0%, rgba(239, 68, 68, 0.75) 100%)`"
-                height="130px"
-              >
+                height="130px">
                 <template #default>
                   <h3 class="fw-bold mb-0 text-white">${{ potentialLoss.toFixed(2) }}</h3>
                   <small class="text-white">if expired</small>
@@ -163,11 +147,8 @@
             </div>
 
             <div class="col-6 col-lg-6">
-              <StatCard
-                title="Expired"
-                iconClass="bi bi-calendar-x"
-                gradient="linear-gradient(135deg, rgba(202, 84, 0, 0.85) 0%, rgba(249, 115, 22, 0.75) 100%)"
-              >
+              <StatCard title="Expired" iconClass="bi bi-calendar-x"
+                gradient="linear-gradient(135deg, rgba(202, 84, 0, 0.85) 0%, rgba(249, 115, 22, 0.75) 100%)">
                 <h3 class="fw-bold mb-0 text-white">{{ expired }}</h3>
                 <small class="text-white">items</small>
               </StatCard>
@@ -175,11 +156,8 @@
           </div>
 
           <div class="text-center mt-3">
-            <button 
-              @click="$emit('toggle-overview')" 
-              :aria-expanded="overviewCollapsed"
-              class="btn btn-collapse d-flex align-items-center justify-content-center gap-2 mx-auto"
-            >
+            <button @click="$emit('toggle-overview')" :aria-expanded="overviewCollapsed"
+              class="btn btn-collapse d-flex align-items-center justify-content-center gap-2 mx-auto">
               <i :class="overviewCollapsed ? 'bi bi-chevron-up' : 'bi bi-chevron-down'"></i>
               <span class="d-none d-sm-inline">{{ overviewCollapsed ? 'Hide' : 'Show' }} Details</span>
               <span class="d-inline d-sm-none">{{ overviewCollapsed ? 'Hide' : 'Show' }}</span>
@@ -188,14 +166,21 @@
         </div>
       </div>
     </div>
-    </section>
+  </section>
 </template>
 
 <script setup>
-// ... (Keep the script section as is)
 import StatCard from '@/components/dashboard/StatCard.vue'
 
-const props = defineProps({
+const {
+  userFoodScore,
+  expiringSoon,
+  potentialLoss,
+  expired,
+  analytics,
+  overviewCollapsed,
+  username
+} = defineProps({
   userFoodScore: {
     type: Number,
     default: 0
@@ -230,39 +215,38 @@ defineEmits(['toggle-overview'])
 </script>
 
 <style scoped>
-/* ... (Keep CSS before Floating Monkeys as is) ... */
-
-/* === COMPACT HERO === */
 .compact-hero {
   background: #faf8f5;
   color: #2d3436;
   overflow: hidden;
 }
 
-/* === FLOATING ANIMATIONS === */
 @keyframes riseAndFloat {
   0% {
     transform: translateY(0) scale(0.6);
     opacity: 0;
   }
+
   20% {
     opacity: 1;
     transform: translateY(-10px) scale(1);
   }
+
   50% {
     transform: translateY(-25px) scale(1.1);
   }
+
   80% {
     opacity: 0.8;
     transform: translateY(-40px) scale(1.05);
   }
+
   100% {
     transform: translateY(-60px) scale(1);
     opacity: 0;
   }
 }
 
-/* === GRAPH IMAGE ANIMATIONS === */
 .graph-container {
   position: relative;
 }
@@ -282,30 +266,37 @@ defineEmits(['toggle-overview'])
 }
 
 @keyframes subtlePulse {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.02);
   }
 }
 
 @keyframes floatGentle {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0) rotate(0deg);
   }
+
   25% {
     transform: translateY(-8px) rotate(0.5deg);
   }
+
   50% {
     transform: translateY(-12px) rotate(-0.5deg);
   }
+
   75% {
     transform: translateY(-8px) rotate(0.5deg);
   }
 }
 
-/* Floating emojis from graph */
 .floating-emoji {
   position: absolute;
   font-size: 1.6rem;
@@ -343,18 +334,22 @@ defineEmits(['toggle-overview'])
     opacity: 0;
     transform: translate(0, 0) scale(0.3);
   }
+
   10% {
     opacity: 1;
     transform: translate(0, 0) scale(1);
   }
+
   30% {
     opacity: 0.8;
     transform: translate(calc(var(--x, 0) * 10px), calc(var(--y, 0) * -15px)) scale(1.1);
   }
+
   60% {
     opacity: 0.5;
     transform: translate(calc(var(--x, 0) * 20px), calc(var(--y, 0) * -30px)) scale(0.9) rotate(10deg);
   }
+
   100% {
     opacity: 0;
     transform: translate(calc(var(--x, 0) * 30px), calc(var(--y, 0) * -50px)) scale(0.5) rotate(20deg);
@@ -362,7 +357,7 @@ defineEmits(['toggle-overview'])
 }
 
 
-/* === CONTENT === */
+/*  CONTENT  */
 .hero-content {
   position: relative;
   z-index: 2;
@@ -453,15 +448,20 @@ defineEmits(['toggle-overview'])
 }
 
 @keyframes fireFlicker {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1) rotate(-2deg);
   }
+
   25% {
     transform: scale(1.1) rotate(2deg);
   }
+
   50% {
     transform: scale(0.95) rotate(-1deg);
   }
+
   75% {
     transform: scale(1.05) rotate(1deg);
   }
@@ -491,23 +491,27 @@ defineEmits(['toggle-overview'])
   0% {
     stroke-dashoffset: 0;
   }
+
   100% {
     stroke-dashoffset: 100;
   }
 }
 
 @keyframes dotPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
     opacity: 0.5;
   }
+
   50% {
     transform: scale(1.5);
     opacity: 0.8;
   }
 }
 
-/* Floating Monkeys - 2 TOP, 3 BOTTOM */
+/* Floating Monkeys */
 .floating-monkeys {
   position: absolute;
   top: 0;
@@ -515,7 +519,7 @@ defineEmits(['toggle-overview'])
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: -1; /* Place behind the greeting text */
+  z-index: -1;
 }
 
 .floating-monkey {
@@ -527,86 +531,88 @@ defineEmits(['toggle-overview'])
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
 }
 
-/* === TOP MONKEYS (2) === */
-/* Monkey 1 - Top Left */
+
+/* Monkey 1 */
 .monkey-1 {
-  top: -55%; /* Above the greeting */
+  top: -55%;
   left: 15%;
   animation-delay: 0s;
 }
 
-/* Monkey 2 - Top Right */
+/* Monkey 2 */
 .monkey-2 {
-  top: -55%; /* Above the greeting */
+  top: -55%;
   left: 75%;
   animation-delay: 1.2s;
 }
 
-/* === BOTTOM MONKEYS (3) === */
-/* Monkey 3 - Bottom Left */
+/* Monkey 3 */
 .monkey-3 {
-  bottom: -65%; /* Below the greeting */
+  bottom: -65%;
   left: 10%;
   animation-delay: 2.4s;
 }
 
-/* Monkey 4 - Bottom Center */
+/* Monkey 4 */
 .monkey-4 {
-  bottom: -80%; /* Below the greeting */
+  bottom: -80%;
   left: 45%;
   animation-delay: 3.6s;
 }
 
-/* Monkey 5 - Bottom Right */
+/* Monkey 5 */
 .monkey-5 {
-  bottom: -65%; /* Below the greeting */
+  bottom: -65%;
   left: 80%;
   animation-delay: 4.8s;
 }
 
 @keyframes monkeyFloat {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0) translateX(0) rotate(-5deg);
     opacity: 0.7;
   }
+
   25% {
     transform: translateY(-15px) translateX(5px) rotate(0deg);
     opacity: 0.9;
   }
+
   50% {
     transform: translateY(-10px) translateX(-5px) rotate(5deg);
     opacity: 1;
   }
+
   75% {
     transform: translateY(-20px) translateX(3px) rotate(0deg);
     opacity: 0.9;
   }
 }
 
-/* Responsive adjustments */
 @media (max-width: 575px) {
   .floating-monkey {
     width: 30px;
     height: 30px;
   }
-  
-  /* Hide 2 monkeys on mobile for cleaner look */
+
   .monkey-4,
   .monkey-5 {
     display: none;
   }
-  
-  /* Adjust remaining monkeys */
+
+
   .monkey-1 {
     top: -8%;
     left: 10%;
   }
-  
+
   .monkey-2 {
     top: -10%;
     left: 70%;
   }
-  
+
   .monkey-3 {
     bottom: -20%;
     left: 35%;
@@ -618,28 +624,28 @@ defineEmits(['toggle-overview'])
     width: 40px;
     height: 40px;
   }
-  
-  /* Adjust positions for tablets */
+
+
   .monkey-1 {
     top: -8%;
     left: 7%;
   }
-  
+
   .monkey-2 {
     top: -12%;
     left: 88%;
   }
-  
+
   .monkey-3 {
     bottom: -50%;
     left: 0%;
   }
-  
+
   .monkey-4 {
     bottom: -50%;
     left: 42%;
   }
-  
+
   .monkey-5 {
     bottom: -50%;
     left: 95%;

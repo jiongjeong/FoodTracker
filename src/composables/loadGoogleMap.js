@@ -34,7 +34,7 @@ export function loadGoogleMaps() {
     }
 
     script.onerror = (error) => {
-      reject(new Error('Failed to load Google Maps script'))
+      reject(new Error('Failed to load Google Maps script' + error))
     }
 
     document.head.appendChild(script)

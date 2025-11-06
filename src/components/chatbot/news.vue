@@ -3,20 +3,10 @@
     <h2 class="section-title">Food & Sustainability News</h2>
 
     <div class="carousel-container" ref="carousel">
-      <div
-        class="news-card"
-        v-for="(article, index) in articles"
-        :key="index"
-        @click="openArticle(article.link)"
-      >
+      <div class="news-card" v-for="(article, index) in articles" :key="index" @click="openArticle(article.link)">
         <div class="news-img-container">
-          <img
-            v-if="article.thumbnail"
-            :src="article.thumbnail"
-            alt="thumbnail"
-            class="news-img"
-            @error="handleImageError"
-          />
+          <img v-if="article.thumbnail" :src="article.thumbnail" alt="thumbnail" class="news-img"
+            @error="handleImageError" />
           <div v-else class="news-img-placeholder">
             <span class="placeholder-icon">🍽️</span>
           </div>
@@ -38,7 +28,7 @@ const articles = ref([])
 const carousel = ref(null)
 let scrollInterval = null
 
-// RSS feeds (converted to JSON) - Food & Sustainability focused
+// RSS feeds
 const feeds = [
   {
     name: 'CNA Sustainability',
@@ -50,7 +40,6 @@ const feeds = [
   }
 ]
 
-// Keywords to filter for food-related content
 const foodKeywords = [
   'food', 'recipe', 'cooking', 'meal', 'ingredient', 'kitchen', 'chef',
   'eat', 'eating', 'diet', 'nutrition', 'waste', 'storage', 'fresh',
@@ -59,7 +48,7 @@ const foodKeywords = [
   'harvest', 'produce', 'expiration', 'preservation', 'leftover'
 ]
 
-// Check if article title contains food-related keywords
+
 const isFoodRelated = (title) => {
   const lowerTitle = title.toLowerCase()
   return foodKeywords.some(keyword => lowerTitle.includes(keyword))
@@ -72,27 +61,23 @@ const fetchNews = async () => {
         try {
           const response = await axios.get(feed.url)
           if (response.data && response.data.items) {
-            // Filter for food-related articles and get more items initially
             return response.data.items
               .filter(item => isFoodRelated(item.title))
               .slice(0, 5)
               .map((item) => {
-                // Extract thumbnail from multiple possible sources
                 let thumbnail = item.thumbnail || item.enclosure?.link || null
-                
-                // For Guardian and other sources, try to extract from content/description
+
                 if (!thumbnail && item.description) {
                   const imgMatch = item.description.match(/<img[^>]+src="([^">]+)"/)
                   if (imgMatch) {
                     thumbnail = imgMatch[1]
                   }
                 }
-                
-                // For Guardian, try media content
+
                 if (!thumbnail && item['media:content']) {
                   thumbnail = item['media:content'].url
                 }
-                
+
                 return {
                   title: item.title,
                   link: item.link,
@@ -108,13 +93,12 @@ const fetchNews = async () => {
         }
       })
     )
-    
-    // Combine successful results
+
     articles.value = results
       .filter(result => result.status === 'fulfilled')
       .flatMap(result => result.value)
-      .filter(article => article) // Remove any null/undefined
-    
+      .filter(article => article)
+
     if (articles.value.length === 0) {
       console.warn('No food-related articles found - showing general content')
     } else {
@@ -130,7 +114,6 @@ const openArticle = (url) => {
 }
 
 const handleImageError = (event) => {
-  // Hide broken image and show placeholder instead
   event.target.style.display = 'none'
   const placeholder = event.target.parentElement.querySelector('.news-img-placeholder')
   if (!placeholder) {
@@ -141,7 +124,6 @@ const handleImageError = (event) => {
   }
 }
 
-// Auto scroll effect - Vertical
 const startAutoScroll = () => {
   scrollInterval = setInterval(() => {
     if (carousel.value) {

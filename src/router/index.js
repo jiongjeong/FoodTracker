@@ -73,7 +73,6 @@ router.beforeEach(async (to, from, next) => {
 
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const currentUser = auth.currentUser
-
   if (requiresAuth) {
     if (currentUser) {
       next()

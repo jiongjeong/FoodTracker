@@ -31,7 +31,6 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'submit', 'select-food', 'location-selected', 'update:quantity'])
 
-// Local form state
 const localForm = ref({
   foodItemId: '',
   foodName: '',
@@ -44,9 +43,7 @@ const localForm = ref({
   location: null
 })
 
-// Watch for changes to formData and update localForm
 watch(() => props.formData, (newVal) => {
-  // Update each property individually to maintain reactivity
   Object.keys(newVal).forEach(key => {
     if (localForm.value[key] !== newVal[key]) {
       localForm.value[key] = newVal[key]
@@ -54,34 +51,26 @@ watch(() => props.formData, (newVal) => {
   })
 }, { deep: true, immediate: true })
 
-// Watch for quantity changes and emit to parent for validation
 watch(() => localForm.value.quantity, (newQty) => {
   emit('update:quantity', newQty)
 })
 
-// Handle close
 const handleClose = () => {
   emit('close')
 }
 
-// Handle submit
 const handleSubmit = () => {
   emit('submit', localForm.value)
 }
 
-// Handle food selection
 const handleFoodSelect = () => {
-  // Emit the selected ID and let parent update shareForm
-  // Then the watch will sync those changes back to localForm
   emit('select-food', localForm.value.foodItemId)
 }
 
-// Handle location selection
 const handleLocationSelect = (location) => {
   emit('location-selected', location)
 }
 
-// Check if quantity exceeds max
 const quantityExceeded = computed(() => {
   return localForm.value.quantity > props.maxShareQuantity
 })
@@ -107,45 +96,30 @@ const quantityExceeded = computed(() => {
 
           <!-- Body -->
           <div class="modal-body">
-            <!-- Food Selection - Create Mode -->
+            <!-- Food Selection -->
             <div v-if="!isEditMode" class="form-group">
               <label class="form-label">
                 <i class="bi bi-egg-fill me-1"></i>
                 Food Name
                 <span class="text-danger">*</span>
               </label>
-              <select
-                v-model="localForm.foodItemId"
-                class="form-select"
-                @change="handleFoodSelect"
-                required
-              >
+              <select v-model="localForm.foodItemId" class="form-select" @change="handleFoodSelect" required>
                 <option value="" disabled>Select a food item...</option>
-                <option
-                  v-for="item in foodItems"
-                  :key="item.id"
-                  :value="item.id"
-                  :disabled="item.remainingQty <= 0 || item.isExpired"
-                >
+                <option v-for="item in foodItems" :key="item.id" :value="item.id"
+                  :disabled="item.remainingQty <= 0 || item.isExpired">
                   {{ item.name }} - {{ item.remainingQty }} {{ item.unit }} left
                   <template v-if="item.isExpired"> (expired)</template>
                 </option>
               </select>
             </div>
 
-            <!-- Food Selection - Edit Mode (Read-only) -->
+            <!-- Edit Food Selection -->
             <div v-else class="form-group">
               <label class="form-label">
                 <i class="bi bi-egg-fill me-1"></i>
                 Food Name
               </label>
-              <input
-                v-model="localForm.foodName"
-                type="text"
-                class="form-control"
-                readonly
-                disabled
-              />
+              <input v-model="localForm.foodName" type="text" class="form-control" readonly disabled />
             </div>
 
             <!-- Category and Expiration Row -->
@@ -155,26 +129,14 @@ const quantityExceeded = computed(() => {
                   <i class="bi bi-bookmark-fill me-1"></i>
                   Category
                 </label>
-                <input
-                  v-model="localForm.category"
-                  type="text"
-                  class="form-control"
-                  readonly
-                  disabled
-                />
+                <input v-model="localForm.category" type="text" class="form-control" readonly disabled />
               </div>
               <div class="col-6">
                 <label class="form-label">
                   <i class="bi bi-calendar-event me-1"></i>
                   Expiration Date
                 </label>
-                <input
-                  v-model="localForm.expirationDate"
-                  type="date"
-                  class="form-control"
-                  readonly
-                  disabled
-                />
+                <input v-model="localForm.expirationDate" type="date" class="form-control" readonly disabled />
               </div>
             </div>
 
@@ -186,17 +148,9 @@ const quantityExceeded = computed(() => {
                   Quantity
                   <span class="text-danger">*</span>
                 </label>
-                <input
-                  v-model.number="localForm.quantity"
-                  type="number"
-                  class="form-control"
-                  :class="{ 'is-invalid': quantityExceeded }"
-                  min="1"
-                  step="1"
-                  :max="maxShareQuantity"
-                  placeholder="0"
-                  required
-                />
+                <input v-model.number="localForm.quantity" type="number" class="form-control"
+                  :class="{ 'is-invalid': quantityExceeded }" min="1" step="1" :max="maxShareQuantity" placeholder="0"
+                  required />
                 <small v-if="!isEditMode" class="text-muted d-block mt-1">
                   Available: <strong>{{ maxShareQuantity }} {{ localForm.unit }}</strong>
                 </small>
@@ -212,13 +166,7 @@ const quantityExceeded = computed(() => {
                   <i class="bi bi-rulers me-1"></i>
                   Unit
                 </label>
-                <input
-                  v-model="localForm.unit"
-                  type="text"
-                  class="form-control"
-                  readonly
-                  disabled
-                />
+                <input v-model="localForm.unit" type="text" class="form-control" readonly disabled />
               </div>
             </div>
 
@@ -228,12 +176,8 @@ const quantityExceeded = computed(() => {
                 <i class="bi bi-clock-fill me-1"></i>
                 Preferred Pickup Time
               </label>
-              <input
-                v-model="localForm.pickupTime"
-                type="text"
-                class="form-control"
-                placeholder="E.g., weekdays, weekends, every Friday 10am"
-              />
+              <input v-model="localForm.pickupTime" type="text" class="form-control"
+                placeholder="E.g., weekdays, weekends, every Friday 10am" />
             </div>
 
             <!-- Additional Notes -->
@@ -242,12 +186,8 @@ const quantityExceeded = computed(() => {
                 <i class="bi bi-chat-dots-fill me-1"></i>
                 Additional Notes
               </label>
-              <textarea
-                v-model="localForm.notes"
-                rows="3"
-                class="form-control"
-                placeholder="Any special notes..."
-              ></textarea>
+              <textarea v-model="localForm.notes" rows="3" class="form-control"
+                placeholder="Any special notes..."></textarea>
             </div>
 
             <!-- Location Picker -->
@@ -275,11 +215,8 @@ const quantityExceeded = computed(() => {
               <i class="bi bi-x-circle me-2"></i>
               Cancel
             </button>
-            <button
-              class="btn btn-share"
-              @click="handleSubmit"
-              :disabled="!isShareQuantityValid || !localForm.location"
-            >
+            <button class="btn btn-share" @click="handleSubmit"
+              :disabled="!isShareQuantityValid || !localForm.location">
               <i :class="isEditMode ? 'bi bi-check-circle me-2' : 'bi bi-share me-2'"></i>
               {{ isEditMode ? 'Update Listing' : 'Share Food' }}
             </button>
@@ -291,7 +228,6 @@ const quantityExceeded = computed(() => {
 </template>
 
 <style scoped>
-/* Modal Transitions */
 .modal-fade-enter-active,
 .modal-fade-leave-active {
   transition: opacity 0.3s ease;
@@ -334,7 +270,6 @@ const quantityExceeded = computed(() => {
   padding: 1rem;
 }
 
-/* Modal Card - Glassmorphism */
 .modal-card {
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(20px);
@@ -350,7 +285,6 @@ const quantityExceeded = computed(() => {
   position: relative;
 }
 
-/* Decorative gradient overlay */
 .modal-card::before {
   content: '';
   position: absolute;
@@ -364,15 +298,17 @@ const quantityExceeded = computed(() => {
 }
 
 @keyframes shimmer {
-  0%, 100% {
+
+  0%,
+  100% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
 }
 
-/* Modal Header */
 .modal-header {
   padding: 1.75rem 2rem 1.25rem;
   display: flex;
@@ -424,7 +360,6 @@ const quantityExceeded = computed(() => {
   transform: scale(1.05);
 }
 
-/* Modal Body */
 .modal-body {
   padding: 2rem;
   max-height: 65vh;
@@ -449,7 +384,6 @@ const quantityExceeded = computed(() => {
   background: linear-gradient(180deg, #059669, #047857);
 }
 
-/* Form Groups */
 .form-group {
   margin-bottom: 1.5rem;
 }
@@ -473,7 +407,6 @@ const quantityExceeded = computed(() => {
   color: #ef4444;
 }
 
-/* Form Controls */
 .form-control,
 .form-select {
   height: 48px;
@@ -644,7 +577,6 @@ textarea.form-control {
   font-size: 0.875rem;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .modal-card {
     border-radius: 16px;

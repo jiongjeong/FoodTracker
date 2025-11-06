@@ -91,7 +91,7 @@ const handleClearLocation = () => {
 
     <div class="container-fluid px-3 px-md-4 position-relative" style="z-index: 10;">
       <div class="row align-items-center g-5">
-        <!-- Left: Title & Description -->
+        <!-- Title & Description -->
         <div class="col-lg-6">
           <div class="hero-content">
             <h1 class="display-5 fw-bold mb-3" style="line-height: 1.3; white-space: nowrap;">
@@ -133,7 +133,7 @@ const handleClearLocation = () => {
           </div>
         </div>
 
-        <!-- Right: Location Picker Card -->
+        <!-- Location Picker Card -->
         <div class="col-lg-6">
           <div class="location-picker-card card border-0 shadow-lg rounded-4 position-relative p-1"
                style="min-height: 300px; transition: all 0.3s ease;">
@@ -157,7 +157,6 @@ const handleClearLocation = () => {
 
               <!-- Location Picker Body -->
               <div class="mt-2">
-                <!-- No location selected -->
                 <template v-if="!preferredLocation">
                   <div class="text-center py-4">
                     <p class="text-muted mb-3">Set your preferred location to see distances</p>
@@ -202,12 +201,10 @@ const handleClearLocation = () => {
 </template>
 
 <style scoped>
-/* Hero Section */
 .hero-section {
   background: linear-gradient(135deg, #fefefe 0%, #f9f7f4 40%, #f5f2ed 100%);
 }
 
-/* Community Connection Animations */
 .community-connections {
   pointer-events: none;
 }
@@ -245,7 +242,6 @@ const handleClearLocation = () => {
   50% { transform: translate(15%, 25%) scale(0.95); }
 }
 
-/* Connection Network Animation */
 .connection-network {
   pointer-events: none;
   opacity: 0.7;

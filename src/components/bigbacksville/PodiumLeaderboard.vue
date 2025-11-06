@@ -13,7 +13,7 @@ onMounted(() => {
       const data = d.data()
       const name = data.name || 'Anon'
       const nameParts = name.trim().split(' ')
-      const initials = nameParts.length >= 2 
+      const initials = nameParts.length >= 2
         ? (nameParts[0][0] + nameParts[1][0]).toUpperCase()
         : name[0]?.toUpperCase() || 'U'
       return {
@@ -32,21 +32,21 @@ onMounted(() => {
 const podiumOrder = computed(() => {
   if (topPlayers.value.length < 2) return topPlayers.value
   return [
-    topPlayers.value[1], // 2nd
-    topPlayers.value[0], // 1st
-    topPlayers.value[2]  // 3rd
+    topPlayers.value[1],
+    topPlayers.value[0],
+    topPlayers.value[2]
   ].filter(Boolean)
 })
 </script>
 
 <template>
 <div class="podium-leaderboard card shadow-lg border-0 mx-auto p-4">
-    <!-- Title - Now ABOVE crown -->
+    <!-- Title -->
     <h2 class="podium-title text-success fw-bold text-center fs-4 mb-8 position-relative">
       <i class="bi bi-trophy-fill me-2"></i>BigBacksVille Leaderboard
     </h2>
 
-    <!-- Podium Row - Vertically Centered -->
+    <!-- Podium Row -->
     <div class="podium-wrapper d-flex justify-content-center align-items-end flex-nowrap gap-4 h-100">
       <!-- 2nd Place -->
       <div v-if="podiumOrder[0]" class="podium-place text-center animate-on-load pulse">
@@ -66,7 +66,6 @@ const podiumOrder = computed(() => {
       <!-- 1st Place -->
       <div v-if="podiumOrder[1]" class="podium-place text-center position-relative animate-on-load pulse" style="animation-delay: 0.2s;">
         <div class="podium-container d-flex flex-column align-items-center">
-          <!-- Crown is INSIDE podium-container, BELOW title -->
           <div class="podium-crown text-warning position-absolute">
             <i class="bi bi-award-fill"></i>
           </div>
@@ -116,7 +115,7 @@ const podiumOrder = computed(() => {
   font-weight: 700;
   margin-bottom: 3rem !important;
   z-index: 10;
-  
+
 }
 
 .podium-wrapper {
@@ -176,7 +175,7 @@ const podiumOrder = computed(() => {
 
 /* Crown */
 .podium-crown {
-  top: -45px; /* adjust so it’s above the user card */
+  top: -45px;
   left: 50%;
   transform: translateX(-50%);
   font-size: 3rem;

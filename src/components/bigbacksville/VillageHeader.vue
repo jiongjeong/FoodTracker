@@ -3,21 +3,19 @@
     <div class="container">
       <div class="row justify-content-center align-items-center text-center text-md-start g-4">
         <div class="col-12 col-md-7 order-2 order-md-2 d-flex justify-content-center align-items-center">
-          <PodiumLeaderboard/>
+          <PodiumLeaderboard />
         </div>
 
-        <!-- Side Section: Title + Monkey Selector -->
+        <!-- Side Section-->
         <div class="col-12 col-md-5 order-1 order-md-1 d-flex flex-column align-items-center align-items-md-start">
           <!-- Title Section -->
           <div class="title-section w-100 mb-4">
-            <!-- Trophy Centered -->
             <div class="d-flex justify-content-center mb-3">
               <div class="icon-wrapper">
                 <i class="bi bi-trophy-fill"></i>
               </div>
             </div>
 
-            <!-- Text Left-Aligned (on md+) -->
             <div class="text-center text-center-md">
               <h1 class="page-title mb-2">BigBacksVille</h1>
               <p class="page-subtitle">
@@ -46,14 +44,14 @@ import PodiumLeaderboard from '@/components/bigbacksville/PodiumLeaderboard.vue'
 .village-header {
   min-height: 100vh;
   background: linear-gradient(rgba(255, 255, 255, 0.85), rgba(248, 250, 252, 0.4)),
-              url('/public/monkeyvillage.png');
+    url('/public/monkeyvillage.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   border-bottom: 3px solid #fbbf24;
 }
 
-/* Trophy icon styling */
+/* Trophy icon */
 .icon-wrapper {
   width: 70px;
   height: 70px;

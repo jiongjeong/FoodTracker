@@ -13,13 +13,10 @@ export const getDaysUntilExpiration = (expirationDate) => {
 
   // Handle different date formats
   if (typeof expirationDate.toDate === 'function') {
-    // Firebase Timestamp
     expDate = expirationDate.toDate()
   } else if (expirationDate instanceof Date) {
-    // Already a Date object
     expDate = expirationDate
   } else {
-    // String or other format
     expDate = new Date(expirationDate)
   }
 
@@ -27,23 +24,23 @@ export const getDaysUntilExpiration = (expirationDate) => {
   const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const expMidnight = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate())
 
-  // Calculate difference in days (using floor for consistent behavior)
+  // Calculate difference in days
   return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
 }
 
 /**
  * Format a date string or Date object to YYYY-MM-DD format
- * @param {Date|string} date - The date to format
- * @returns {string} Formatted date string
+ * @param {Date|string} date -
+ * @returns {string}
  */
 export const formatDateToYYYYMMDD = (date) => {
   if (!date) return ''
-  
+
   const d = date instanceof Date ? date : new Date(date)
   const year = d.getFullYear()
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
-  
+
   return `${year}-${month}-${day}`
 }
 
@@ -58,7 +55,7 @@ export const isExpired = (food) => {
 }
 
 /**
- * Check if a food item is expiring soon (within threshold days)
+ * Check if a food item is expiring soon
  * @param {object} food - Food item with expirationDate property
  * @param {number} thresholdDays - Number of days to consider "soon" (default: 7)
  * @returns {boolean} True if expiring soon

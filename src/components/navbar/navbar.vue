@@ -2,38 +2,23 @@
   <nav class="navbar navbar-expand-md navbar-light bg-white border-bottom fixed-top shadow-sm">
     <div class="container-fluid">
       <!-- Brand -->
-      <RouterLink
-        to="/dashboard"
-        class="navbar-brand fw-bold title text-decoration-none d-flex align-items-center"
-        exact-active-class="active"
-        @click="closeNavbar"
-      >
+      <RouterLink to="/dashboard" class="navbar-brand fw-bold title text-decoration-none d-flex align-items-center"
+        exact-active-class="active" @click="closeNavbar">
         <img src="/bigbackicon.jpg" alt="Logo" class="logo-img me-2 rounded-circle" />
         BigBacks
       </RouterLink>
 
-      <!-- Mobile controls (hamburger + profile icon) - only visible on small screens -->
+      <!-- Mobile controls (hamburger + profile icon)-->
       <div class="d-flex d-md-none align-items-center gap-2">
         <!-- Profile icon button for mobile -->
-        <button
-          v-if="userName"
-          class="btn btn-link p-0 profile-icon-btn"
-          type="button"
-          @click.stop="toggleDropdown($event)"
-          aria-label="Profile menu"
-        >
+        <button v-if="userName" class="btn btn-link p-0 profile-icon-btn" type="button"
+          @click.stop="toggleDropdown($event)" aria-label="Profile menu">
           <span class="initials-avatar-mobile">{{ userInitials }}</span>
         </button>
 
         <!-- Hamburger button -->
-        <button
-          class="navbar-toggler border-0 p-2"
-          type="button"
-          @click="toggleNavbar"
-          aria-controls="navbarNav"
-          :aria-expanded="navbarOpen.toString()"
-          aria-label="Toggle navigation"
-        >
+        <button class="navbar-toggler border-0 p-2" type="button" @click="toggleNavbar" aria-controls="navbarNav"
+          :aria-expanded="navbarOpen.toString()" aria-label="Toggle navigation">
           <span class="hamburger-icon" :class="{ open: navbarOpen }">
             <span></span>
             <span></span>
@@ -47,52 +32,27 @@
         <div class="d-flex align-items-center w-100">
           <ul class="navbar-nav d-flex flex-column flex-md-row justify-content-center align-items-center flex-grow-1">
             <li class="nav-item">
-              <RouterLink
-                to="/dashboard"
-                class="nav-link"
-                exact-active-class="active"
-                @click="closeNavbar"
-              >
+              <RouterLink to="/dashboard" class="nav-link" exact-active-class="active" @click="closeNavbar">
                 <i class="bi bi-house-door me-2"></i>Dashboard
               </RouterLink>
             </li>
             <li class="nav-item">
-              <RouterLink
-                to="/recipes"
-                class="nav-link"
-                exact-active-class="active"
-                @click="closeNavbar"
-              >
+              <RouterLink to="/recipes" class="nav-link" exact-active-class="active" @click="closeNavbar">
                 <i class="bi bi-egg-fried me-2"></i>Recipes
               </RouterLink>
             </li>
             <li class="nav-item">
-              <RouterLink
-                to="/chatbot"
-                class="nav-link"
-                exact-active-class="active"
-                @click="closeNavbar"
-              >
+              <RouterLink to="/chatbot" class="nav-link" exact-active-class="active" @click="closeNavbar">
                 <i class="bi bi-robot me-2"></i>Learn More
               </RouterLink>
             </li>
             <li class="nav-item">
-              <RouterLink
-                to="/community"
-                class="nav-link"
-                exact-active-class="active"
-                @click="closeNavbar"
-              >
+              <RouterLink to="/community" class="nav-link" exact-active-class="active" @click="closeNavbar">
                 <i class="bi bi-people me-2"></i>Community
               </RouterLink>
             </li>
             <li class="nav-item">
-              <RouterLink
-                to="/village"
-                class="nav-link"
-                exact-active-class="active"
-                @click="closeNavbar"
-              >
+              <RouterLink to="/village" class="nav-link" exact-active-class="active" @click="closeNavbar">
                 <i class="bi bi-trophy me-2"></i>BigBacksVille
               </RouterLink>
             </li>
@@ -101,15 +61,8 @@
           <!-- Desktop user section (hidden on mobile) -->
           <ul class="navbar-nav ms-auto flex-shrink-0 d-none d-md-flex">
             <li class="nav-item dropdown" v-if="userName" ref="dropdownRef">
-              <a
-                class="nav-link dropdown-toggle"
-                href="#"
-                role="button"
-                @click.prevent="toggleDropdown($event)"
-                :class="{ show: dropdownOpen }"
-                aria-haspopup="true"
-                :aria-expanded="dropdownOpen.toString()"
-              >
+              <a class="nav-link dropdown-toggle" href="#" role="button" @click.prevent="toggleDropdown($event)"
+                :class="{ show: dropdownOpen }" aria-haspopup="true" :aria-expanded="dropdownOpen.toString()">
                 <span class="initials-avatar">{{ userInitials }}</span>{{ userName }}
               </a>
               <ul class="dropdown-menu dropdown-menu-end" :class="{ show: dropdownOpen }">
@@ -135,12 +88,8 @@
       </div>
 
       <!-- Mobile profile dropdown (positioned below profile icon) -->
-      <div
-        v-if="userName"
-        class="mobile-profile-dropdown d-md-none"
-        :class="{ show: dropdownOpen }"
-        ref="mobileDropdownRef"
-      >
+      <div v-if="userName" class="mobile-profile-dropdown d-md-none" :class="{ show: dropdownOpen }"
+        ref="mobileDropdownRef">
         <RouterLink to="/profile" class="mobile-dropdown-item" @click="closeNavbar">
           <i class="bi bi-person me-2"></i>My Profile
         </RouterLink>
@@ -172,33 +121,29 @@ const dropdownRef = ref(null)
 const mobileDropdownRef = ref(null)
 
 function handleOutsideClick(e) {
-  // if dropdown is not open, nothing to do
   if (!dropdownOpen.value) return
-  // if click is inside the desktop or mobile dropdown, ignore
   const desktopEl = dropdownRef.value
   const mobileEl = mobileDropdownRef.value
   if ((desktopEl && desktopEl.contains(e.target)) ||
-      (mobileEl && mobileEl.contains(e.target))) {
+    (mobileEl && mobileEl.contains(e.target))) {
     return
   }
   dropdownOpen.value = false
 }
 
-// Auth and user state
 const auth = getAuth()
 const user = ref(auth.currentUser)
 const userName = ref('')
 
 let unsubscribeAuth = null
 
-// Register auth listener once and clean up on unmount
 function authListener() {
   unsubscribeAuth = auth.onAuthStateChanged(async (u) => {
     user.value = u
     userName.value = ''
     if (u) {
       try {
-        const userDocRef = doc(db, 'user', u.uid) // Corrected collection name to 'users'
+        const userDocRef = doc(db, 'user', u.uid)
         const userDocSnap = await getDoc(userDocRef)
         if (userDocSnap.exists()) {
           userName.value = userDocSnap.data().name
@@ -216,7 +161,7 @@ onUnmounted(() => {
   document.removeEventListener('click', handleOutsideClick)
 })
 
-// Close navbar and dropdown on route change
+
 watch($route, () => {
   closeNavbar()
 })
@@ -233,7 +178,6 @@ function closeNavbar() {
   dropdownOpen.value = false
 }
 function toggleDropdown(evt) {
-  // prevent the document click handler from immediately closing the dropdown
   if (evt && typeof evt.stopPropagation === 'function') evt.stopPropagation()
   dropdownOpen.value = !dropdownOpen.value
 }
@@ -262,19 +206,16 @@ const userInitials = computed(() => {
 </script>
 
 <style scoped>
-/* Navbar height variable for body padding */
 :root {
   --navbar-height: 56px;
 }
 
-/* Logo sizing */
 .logo-img {
   height: 36px;
   width: 36px;
   object-fit: cover;
 }
 
-/* Navbar brand responsive font */
 .navbar-brand {
   font-size: clamp(1.1rem, 2.5vw, 1.35rem);
 }
@@ -283,7 +224,6 @@ const userInitials = computed(() => {
   color: #059669;
 }
 
-/* Custom hamburger icon with animation */
 .hamburger-icon {
   display: inline-block;
   width: 24px;
@@ -332,7 +272,6 @@ const userInitials = computed(() => {
   transform: rotate(-135deg);
 }
 
-/* Mobile profile icon button */
 .profile-icon-btn {
   text-decoration: none;
   transition: transform 0.2s ease;
@@ -363,7 +302,6 @@ const userInitials = computed(() => {
   background: #047857;
 }
 
-/* Mobile menu overlay with smooth slide animation */
 @media (max-width: 767.98px) {
   .navbar-collapse {
     position: absolute;
@@ -387,7 +325,6 @@ const userInitials = computed(() => {
     padding: 1rem 0;
   }
 
-  /* Nav items spacing and hover in mobile */
   .navbar-nav .nav-item {
     width: 100%;
     padding: 0.25rem 0;
@@ -413,7 +350,6 @@ const userInitials = computed(() => {
   }
 }
 
-/* Mobile profile dropdown - positioned below the profile icon */
 .mobile-profile-dropdown {
   position: absolute;
   top: 100%;
@@ -469,7 +405,6 @@ const userInitials = computed(() => {
   background: rgba(220, 53, 69, 0.08);
 }
 
-/* Nav link responsive font and spacing */
 .nav-link {
   font-size: clamp(0.9rem, 1.8vw, 1.12rem);
   white-space: nowrap;
@@ -491,7 +426,6 @@ const userInitials = computed(() => {
   }
 }
 
-/* Active link styling (enhance Bootstrap) */
 .nav-link.active {
   background: linear-gradient(135deg, #e0f5ef 0%, #d1f0e6 100%);
   border-radius: 0.5rem;
@@ -499,7 +433,6 @@ const userInitials = computed(() => {
   font-weight: 600;
 }
 
-/* Desktop nav link hover */
 @media (min-width: 768px) {
   .nav-link:hover:not(.active) {
     background: rgba(5, 150, 105, 0.05);
@@ -507,7 +440,6 @@ const userInitials = computed(() => {
   }
 }
 
-/* User avatar (desktop) */
 .initials-avatar {
   display: inline-flex;
   align-items: center;
@@ -545,6 +477,7 @@ const userInitials = computed(() => {
     opacity: 0;
     transform: translateY(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

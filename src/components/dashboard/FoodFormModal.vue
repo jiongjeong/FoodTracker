@@ -28,27 +28,22 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'save', 'update:formData'])
 
-// Local form state
 const localForm = ref({ ...props.formData })
 
-// Watch for external form data changes
 watch(() => props.formData, (newVal) => {
   localForm.value = { ...newVal }
 }, { deep: true })
 
-// Computed properties
 const modalTitle = computed(() => props.mode === 'add' ? 'Add Food Item' : 'Edit Food Item')
 const saveButtonText = computed(() => props.mode === 'add' ? 'Add' : 'Save')
 
-// Compute available units based on the local form's category
 const availableUnits = computed(() => {
   const category = localForm.value.category || 'All Categories'
   return props.categoryUnits[category] || []
 })
 
-// Expiration suggestion state (Gemini only)
 const lastSuggestion = ref('')
-const { generateResponse, isLoading: geminiLoading, error: geminiError } = useGeminiAI()
+const { generateResponse, isLoading: geminiLoading } = useGeminiAI()
 
 const formatDate = (date) => {
   const y = date.getFullYear()
@@ -57,16 +52,13 @@ const formatDate = (date) => {
   return `${y}-${m}-${d}`
 }
 
-// Helper to sanitize user input for prompt injection prevention
 function sanitizeForPrompt(str) {
   if (typeof str !== 'string') return '';
-  // Remove newlines, carriage returns, and limit length
   return str.replace(/[\r\n]+/g, ' ').replace(/[^\x20-\x7E]+/g, '').slice(0, 100);
 }
 
 const suggestWithGemini = async () => {
   try {
-    // clear previous suggestion immediately and show spinner
     lastSuggestion.value = ''
     const name = sanitizeForPrompt(localForm.value.name || '')
     const category = sanitizeForPrompt(localForm.value.category || '')
@@ -85,11 +77,10 @@ const suggestWithGemini = async () => {
       lastSuggestion.value = 'AI returned an unclear suggestion.'
     }
   } catch (err) {
-    lastSuggestion.value = 'AI suggestion failed.'
+    lastSuggestion.value = 'AI suggestion failed.' + err
   }
 }
 
-// Title case utility
 const titleCase = (str) => {
   if (!str || typeof str !== 'string') return ''
   return str
@@ -100,7 +91,6 @@ const titleCase = (str) => {
     .join(' ')
 }
 
-// Handle name input with title case
 const onNameInput = (event) => {
   const el = event.target
   const start = el.selectionStart
@@ -118,7 +108,7 @@ const onNameInput = (event) => {
         el.selectionStart = start
         el.selectionEnd = end
       } catch {
-        // ignore - cursor restoration failed
+        console.log("Error")
       }
     }, 0)
   } else {
@@ -126,22 +116,18 @@ const onNameInput = (event) => {
   }
 }
 
-// Apply title case on blur
 const applyTitleCase = () => {
   localForm.value.name = titleCase(localForm.value.name || '')
 }
 
-// Handle close
 const handleClose = () => {
   emit('close')
 }
 
-// Handle save
 const handleSave = () => {
   emit('save', localForm.value)
 }
 
-// Category placeholder text
 const categoryPlaceholder = computed(() => {
   if (props.mode === 'edit' && localForm.value.category) {
     return localForm.value.category
@@ -149,7 +135,6 @@ const categoryPlaceholder = computed(() => {
   return 'Select a category'
 })
 
-// Unit placeholder text
 const unitPlaceholder = computed(() => {
   if (props.mode === 'edit' && localForm.value.unit) {
     return localForm.value.unit
@@ -157,7 +142,6 @@ const unitPlaceholder = computed(() => {
   return 'Select a unit'
 })
 
-// Clear suggestion when modal opens to avoid stale text remaining between opens
 watch(() => props.show, (val) => {
   if (val) {
     lastSuggestion.value = ''
@@ -319,7 +303,6 @@ watch(() => props.show, (val) => {
 </template>
 
 <style scoped>
-/* Modal Transitions */
 .modal-fade-enter-active,
 .modal-fade-leave-active {
   transition: opacity 0.3s ease;
@@ -348,7 +331,6 @@ watch(() => props.show, (val) => {
   transform: translateY(20px) scale(0.98);
 }
 
-/* Backdrop */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -362,7 +344,6 @@ watch(() => props.show, (val) => {
   padding: 1rem;
 }
 
-/* Modal Card - Glassmorphism */
 .modal-card {
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(20px);
@@ -378,7 +359,6 @@ watch(() => props.show, (val) => {
   position: relative;
 }
 
-/* Decorative gradient overlay */
 .modal-card::before {
   content: '';
   position: absolute;
@@ -400,9 +380,7 @@ watch(() => props.show, (val) => {
   }
 }
 
-/* Modal Header */
 .modal-header {
-  /* reduced vertical padding to make the modal shorter */
   padding: 1rem 1.5rem 0.75rem;
   display: flex;
   align-items: center;
@@ -453,9 +431,7 @@ watch(() => props.show, (val) => {
   transform: scale(1.05);
 }
 
-/* Modal Body */
 .modal-body {
-  /* tighter body padding and allow more vertical space for content */
   padding: 1rem 1.25rem;
   max-height: 75vh;
   overflow-y: auto;
@@ -552,7 +528,6 @@ watch(() => props.show, (val) => {
 
 /* Modal Footer */
 .modal-footer {
-  /* reduce footer vertical padding */
   padding: 0.75rem 1.25rem 0.9rem;
   display: flex;
   justify-content: flex-end;
@@ -632,7 +607,6 @@ watch(() => props.show, (val) => {
     0 1px 4px rgba(16, 185, 129, 0.15);
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .modal-card {
     border-radius: 16px;
@@ -661,13 +635,11 @@ watch(() => props.show, (val) => {
   }
 }
 
-/* Small helper text for the expiry field */
 .expiry-helper {
   font-size: 0.7rem;
   margin-bottom: 0.25rem !important;
 }
 
-/* Expiry date input and button styling */
 .expiry-input-container .expiry-input {
   padding-right: 3.5rem;
 }
@@ -683,7 +655,6 @@ watch(() => props.show, (val) => {
   font-size: 0.9rem;
 }
 
-/* Smaller AI suggestion text */
 .last-suggestion {
   font-size: 0.72rem;
   line-height: 1.1;

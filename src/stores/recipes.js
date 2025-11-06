@@ -6,21 +6,18 @@ import { doc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore'
 
 export const useRecipesStore = defineStore('recipes', () => {
   const bookmarkedRecipes = ref([])
-  
-  // Future: Add database sync capability
-  
+
+
   const loadBookmarks = async () => {
     try {
       const userStore = useUserStore()
       const userId = userStore.getUserId()
       if (userStore.isAuthenticated && userId) {
-        // Load from Firestore: get all documents from user/{userId}/recipes subcollection
         const recipesCollection = collection(db, 'user', userId, 'recipes')
         const snapshot = await getDocs(recipesCollection)
         const recipeIds = snapshot.docs.map(doc => doc.id)
         bookmarkedRecipes.value = recipeIds
       } else {
-        // Fallback to localStorage for guests
         const stored = localStorage.getItem('bookmarked_recipes')
         if (stored) {
           bookmarkedRecipes.value = JSON.parse(stored)
@@ -34,7 +31,6 @@ export const useRecipesStore = defineStore('recipes', () => {
     }
   }
 
-  // Optionally, keep localStorage sync for guests
   watch(bookmarkedRecipes, () => {
     const userStore = useUserStore()
     if (!userStore.isAuthenticated) {
@@ -43,10 +39,9 @@ export const useRecipesStore = defineStore('recipes', () => {
   }, { deep: true })
 
   const addBookmark = async (recipe) => {
-    const recipeId = recipe.idMeal || recipe.id // support both idMeal and id
+    const recipeId = recipe.idMeal || recipe.id
     if (!bookmarkedRecipes.value.includes(recipeId)) {
       bookmarkedRecipes.value.push(recipeId)
-      // Firestore sync: create document in user/{userId}/recipes/{recipeId} subcollection
       const userStore = useUserStore()
       const userId = userStore.getUserId()
       if (userStore.isAuthenticated && userId) {
@@ -65,7 +60,6 @@ export const useRecipesStore = defineStore('recipes', () => {
     const index = bookmarkedRecipes.value.indexOf(id)
     if (index > -1) {
       bookmarkedRecipes.value.splice(index, 1)
-      // Firestore sync: delete document from user/{userId}/recipes/{recipeId} subcollection
       const userStore = useUserStore()
       const userId = userStore.getUserId()
       if (userStore.isAuthenticated && userId) {
@@ -89,7 +83,6 @@ export const useRecipesStore = defineStore('recipes', () => {
     }
   }
 
-  // Getters
   const isRecipeBookmarked = (recipeId) => {
     if (!recipeId) return false;
     let id = recipeId;
@@ -101,7 +94,6 @@ export const useRecipesStore = defineStore('recipes', () => {
 
   const getBookmarkCount = () => bookmarkedRecipes.value.length
 
-  // Initialize bookmarks - make it explicit that this is async
   const initialized = ref(false)
   const initializeStore = async () => {
     if (!initialized.value) {
@@ -110,7 +102,6 @@ export const useRecipesStore = defineStore('recipes', () => {
     }
   }
 
-  // Auto-initialize, but components can await this if needed
   initializeStore()
 
   return {
