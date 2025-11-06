@@ -25,7 +25,7 @@ npm run dev
 
 ## Demo user accounts
 
-Use these demo accounts to sign in during testing. These are public demo credentials — do not use them for real accounts.
+Use these demo accounts to sign in during testing. 
 
 - bob@gmail.com
 - test1@gmail.com
