@@ -462,7 +462,6 @@ const userInitials = computed(() => {
   background: #047857;
 }
 
-/* Smooth dropdown animation */
 .dropdown-menu {
   border: none;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);

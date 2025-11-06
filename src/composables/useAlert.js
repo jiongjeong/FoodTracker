@@ -41,7 +41,6 @@ export function useAlert() {
     alertState.value.show = false
   }
 
-  // Shorthand methods
   const success = (message, title = 'Success') => {
     return showAlert({ type: 'success', title, message })
   }

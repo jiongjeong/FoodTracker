@@ -4,13 +4,11 @@ import { ref } from 'vue'
 const isLoading = ref(false)
 const error = ref(null)
 
-// Initialize Gemini AI - The client gets the API key from the environment variable
 const ai = new GoogleGenAI({
     apiKey: import.meta.env.VITE_GEMINI_API_KEY
 })
 
 export function useGeminiAI() {
-  // Shared function to handle AI requests and common error/loading patterns
   const makeAIRequest = async (prompt, errorMessage = 'Failed to get AI response. Please try again.') => {
     isLoading.value = true
     error.value = null
