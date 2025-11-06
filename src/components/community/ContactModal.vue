@@ -280,7 +280,6 @@ const handleClose = () => {
   border-top: 1px solid #e2e8f0;
 }
 
-/* Responsive Design for Contact Modal */
 @media (max-width: 768px) {
   .contact-modal-body {
     padding: 1rem;

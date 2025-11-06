@@ -5,7 +5,7 @@
       class="recipe-image-container position-relative overflow-hidden flex-shrink-0"
       @click.stop="$emit('view', recipe)">
       <img :src="recipe.image" :alt="recipe.name" class="recipe-img" />
-      
+
       <!-- Bookmark Button -->
       <button
         @click.stop="$emit('toggle-bookmark', recipe)"
@@ -25,7 +25,7 @@
       <h6 class="recipe-title fw-bold mb-2 text-dark" style="font-size: 1.06rem;">
         {{ recipe.name }}
       </h6>
-      
+
       <div class="d-flex align-items-center gap-2 text-muted mb-2 small">
         <span v-if="recipe.area" class="d-flex align-items-center gap-1">
           <i class="bi bi-geo-alt-fill"></i>
@@ -44,7 +44,7 @@
         </span>
       </div>
 
-      <!-- Suggested By (pushed to bottom) -->
+      <!-- Suggested By -->
       <div v-if="showSuggestedBy && recipe.suggestedBy?.length" class="mt-auto pt-2">
         <p class="mb-1 text-muted fw-semibold" style="font-size: 0.75rem;">Expiring soon:</p>
         <div class="d-flex flex-wrap gap-1">

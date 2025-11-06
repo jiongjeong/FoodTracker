@@ -51,7 +51,6 @@ import {
 import LeaderboardInsightCard from './LeaderboardInsightCard.vue'
 import AnalyticsKPIRow from './AnalyticsKPIRow.vue'
 
-// Register Chart.js components
 ChartJS.register(
   Title,
   Tooltip,
@@ -73,7 +72,6 @@ const props = defineProps({
   }
 })
 
-// Chart configuration
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 const wasteVsSavingsOpts = {

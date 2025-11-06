@@ -1,13 +1,14 @@
 <template>
   <div>
-  <!-- Section Header with Search -->
-  <div v-if="showTitle || showFilter" class="section-header d-flex justify-content-between align-items-center gap-3 mb-4 flex-wrap">
+    <!-- Section Header with Search -->
+    <div v-if="showTitle || showFilter"
+      class="section-header d-flex justify-content-between align-items-center gap-3 mb-4 flex-wrap">
       <div class="d-flex align-items-center gap-2">
         <h4 class="fw-bold mb-0 h5 text-dark">
-          {{ title }} 
-          <span class="badge ms-2" style="background-color: rgba(25, 135, 84, 0.2); color: #198754;">{{ totalRecipes }}</span>
+          {{ title }}
+          <span class="badge ms-2" style="background-color: rgba(25, 135, 84, 0.2); color: #198754;">{{ totalRecipes
+          }}</span>
         </h4>
-        <!-- Show filtered count if filtering is active -->
         <small v-if="showFilter && searchFilter && totalRecipes < recipes.length" class="text-muted ms-2">
           (showing {{ totalRecipes }} of {{ recipes.length }})
         </small>
@@ -19,20 +20,10 @@
           <span class="input-group-text bg-white">
             <i class="bi bi-search text-success"></i>
           </span>
-          <input
-            :value="searchFilter"
-            @input="updateFilter($event.target.value)"
-            type="text"
-            class="form-control"
-            placeholder="Filter results"
-          />
-          <button
-            v-if="searchFilter"
-            @click="updateFilter('')"
-            class="btn btn-outline-secondary"
-            type="button"
-            title="Clear search"
-          >
+          <input :value="searchFilter" @input="updateFilter($event.target.value)" type="text" class="form-control"
+            placeholder="Filter results" />
+          <button v-if="searchFilter" @click="updateFilter('')" class="btn btn-outline-secondary" type="button"
+            title="Clear search">
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
@@ -41,28 +32,15 @@
 
     <!-- Recipe Grid -->
     <div class="recipe-grid">
-      <div
-        v-for="recipe in paginatedRecipes"
-        :key="recipe.id"
-        class="recipe-grid-item"
-      >
-        <RecipeCard
-          :recipe="recipe"
-          :is-bookmarked="isBookmarkedFn(recipe.id)"
-          :user-ingredient-count="countIngredientsFn(recipe)"
-          :show-suggested-by="showSuggestedBy"
-          :show-time-estimate="showTimeEstimate"
-          @view="$emit('view-recipe', $event)"
-          @toggle-bookmark="$emit('toggle-bookmark', $event)"
-        />
+      <div v-for="recipe in paginatedRecipes" :key="recipe.id" class="recipe-grid-item">
+        <RecipeCard :recipe="recipe" :is-bookmarked="isBookmarkedFn(recipe.id)"
+          :user-ingredient-count="countIngredientsFn(recipe)" :show-suggested-by="showSuggestedBy"
+          :show-time-estimate="showTimeEstimate" @view="$emit('view-recipe', $event)"
+          @toggle-bookmark="$emit('toggle-bookmark', $event)" />
       </div>
     </div>
 
-    <!-- Pagination -->
-    <RecipePagination
-      v-model:current-page="currentPage"
-      :total-pages="totalPages"
-    />
+    <RecipePagination v-model:current-page="currentPage" :total-pages="totalPages" />
   </div>
 </template>
 
@@ -121,9 +99,9 @@ const currentPage = ref(1)
 
 const filteredRecipes = computed(() => {
   if (!props.showFilter || !props.searchFilter) return props.recipes
-  
+
   const search = props.searchFilter.toLowerCase().trim()
-  return props.recipes.filter(r => 
+  return props.recipes.filter(r =>
     r.name?.toLowerCase().includes(search) ||
     r.category?.toLowerCase().includes(search) ||
     r.area?.toLowerCase().includes(search) ||
@@ -133,7 +111,7 @@ const filteredRecipes = computed(() => {
 
 const totalRecipes = computed(() => filteredRecipes.value.length)
 
-const totalPages = computed(() => 
+const totalPages = computed(() =>
   Math.ceil(filteredRecipes.value.length / props.itemsPerPage)
 )
 
@@ -143,7 +121,6 @@ const paginatedRecipes = computed(() => {
   return filteredRecipes.value.slice(start, end)
 })
 
-// Reset to page 1 when filter changes
 watch(() => props.searchFilter, () => {
   currentPage.value = 1
 })
@@ -163,6 +140,7 @@ const updateFilter = (value) => {
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

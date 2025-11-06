@@ -20,7 +20,6 @@ export function loadGoogleMaps() {
     script.defer = true
 
     script.onload = () => {
-      // POLL UNTIL geometry IS READY
       const maxAttempts = 50
       let attempts = 0
       const interval = setInterval(() => {
@@ -36,7 +35,7 @@ export function loadGoogleMaps() {
     }
 
     script.onerror = (error) => {
-      reject(new Error('Failed to load Google Maps script'))
+      reject(new Error('Failed to load Google Maps script' + error))
     }
 
     document.head.appendChild(script)

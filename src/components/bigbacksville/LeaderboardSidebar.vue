@@ -21,10 +21,10 @@
       </div>
 
       <div class="leaderboard-list d-flex flex-column gap-2">
-        <div 
-          v-for="(u, i) in topUsers" 
-          :key="u.uid" 
-          class="rank-item d-flex align-items-center gap-3 p-3 rounded-3 position-relative" 
+        <div
+          v-for="(u, i) in topUsers"
+          :key="u.uid"
+          class="rank-item d-flex align-items-center gap-3 p-3 rounded-3 position-relative"
           :class="{ 'is-you': u.isYou }"
         >
           <span class="rank-number fw-bold">#{{ i + 1 }}</span>
@@ -80,17 +80,16 @@ onUnmounted(() => unsubscribe?.())
   pointer-events: none;
 }
 
-/* Default: Collapsed - Only button shows */
 .sidebar-wrapper.collapsed {
-  transform: translateY(-50%) translateX(280px); /* full width + button */
+  transform: translateY(-50%) translateX(280px);
 }
 
-/* Expanded */
+
 .sidebar-wrapper:not(.collapsed) {
   transform: translateY(-50%) translateX(0);
 }
 
-/* === TOGGLE BUTTON - Always visible === */
+
 .toggle-btn {
   position: absolute;
   left: -40px;
@@ -121,7 +120,7 @@ onUnmounted(() => unsubscribe?.())
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.12);
 }
 
-/* === SIDEBAR CONTENT === */
+/* Sidebar */
 .sidebar {
   width: 280px;
   max-height: 70vh;
@@ -151,7 +150,7 @@ onUnmounted(() => unsubscribe?.())
   background: #9ca3af;
 }
 
-/* === HEADER === */
+/*  HEADER  */
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -197,7 +196,7 @@ onUnmounted(() => unsubscribe?.())
   font-size: 0.8125rem;
 }
 
-/* === RANK ITEM === */
+/*  RANK ITEM  */
 .rank-item {
   background: #f9fafb;
   border: 2px solid #f3f4f6;
@@ -272,7 +271,7 @@ onUnmounted(() => unsubscribe?.())
   flex-shrink: 0;
 }
 
-/* === RESPONSIVE === */
+
 @media (max-width: 991.98px) {
   .sidebar {
     width: 240px;

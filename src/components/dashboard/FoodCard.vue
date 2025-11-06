@@ -76,9 +76,6 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['edit', 'use', 'delete', 'go-to-recipes'])
-
-// pendingDonationQty is now passed as a prop from the parent component
 
 const getDaysLeft = (food) => {
   const now = new Date()

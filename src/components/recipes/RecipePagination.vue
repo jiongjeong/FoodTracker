@@ -58,37 +58,31 @@ defineEmits(['update:currentPage'])
 
 const visiblePages = computed(() => {
   const pages = []
-  const delta = 1 // Pages to show on each side of current page
+  const delta = 1
 
   if (props.totalPages <= 7) {
-    // Show all pages if total is 7 or less
+
     for (let i = 1; i <= props.totalPages; i++) {
       pages.push(i)
     }
   } else {
-    // Always show first page
     pages.push(1)
 
-    // Calculate range around current page
     let start = Math.max(2, props.currentPage - delta)
     let end = Math.min(props.totalPages - 1, props.currentPage + delta)
 
-    // Add ellipsis after first page if needed
     if (start > 2) {
       pages.push('...')
     }
 
-    // Add pages around current
     for (let i = start; i <= end; i++) {
       pages.push(i)
     }
 
-    // Add ellipsis before last page if needed
     if (end < props.totalPages - 1) {
       pages.push('...')
     }
 
-    // Always show last page
     pages.push(props.totalPages)
   }
 

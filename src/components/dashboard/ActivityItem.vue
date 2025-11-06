@@ -1,7 +1,7 @@
 <template>
   <div class="activity-item">
     <div class="d-flex align-items-start gap-3 position-relative">
-      <!-- Points Badge - Top Right -->
+      <!-- Points Badge -->
       <div
         v-if="activity.pointsEarned !== undefined && activity.pointsEarned !== 0"
         class="position-absolute top-0 end-0"

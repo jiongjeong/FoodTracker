@@ -10,7 +10,6 @@ let autocomplete = null
 
 const emit = defineEmits(['place-selected'])
 
-// Expose reset method to parent components
 defineExpose({
   reset: () => {
     if (inputRef.value) {
@@ -169,7 +168,6 @@ onUnmounted(() => {
   color: #9ca3af;
 }
 
-/* Loading state */
 .loading-state {
   display: flex;
   align-items: center;
@@ -196,7 +194,6 @@ onUnmounted(() => {
   to { transform: rotate(360deg); }
 }
 
-/* Error state */
 .error-state {
   padding: 1rem;
   margin-top: 0.5rem;
@@ -223,7 +220,6 @@ onUnmounted(() => {
   background: #b91c1c;
 }
 
-/* Google's autocomplete dropdown styling */
 :global(.pac-container) {
   z-index: 10000 !important;
   margin-top: 4px;
@@ -277,7 +273,6 @@ onUnmounted(() => {
   color: #059669;
 }
 
-/* Selected place display */
 .selected-place {
   margin-top: 1rem;
   padding: 1rem;

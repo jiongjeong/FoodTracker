@@ -7,7 +7,6 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['share-food'])
 
 const config = {
   'no-items': {

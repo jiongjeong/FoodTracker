@@ -23,7 +23,7 @@ const loadMonkeys = async () => {
       name: d.data().name || d.id,
       requiredPoints: d.data().requiredPoints ?? 0
     }))
-    .sort((a,b) => a.requiredPoints - b.requiredPoints)
+    .sort((a, b) => a.requiredPoints - b.requiredPoints)
 
   const userSnap = await getDoc(userRef)
   const data = userSnap.data() || {}
@@ -57,7 +57,7 @@ const updateChunkCount = () => {
   else if (w >= 992) chunkCount.value = 2
   else chunkCount.value = 1
 
-  
+
 
 }
 
@@ -73,7 +73,7 @@ const monkeyChunks = computed(() => {
 const selectMonkey = async (monkey) => {
   if (!isUnlocked(monkey)) return
   const userRef = doc(db, 'user', currentUser.value.uid)
-  await updateDoc(userRef, { 'monkey.selected': monkey.id })  
+  await updateDoc(userRef, { 'monkey.selected': monkey.id })
   userMonkey.value.selected = monkey.id
 }
 
@@ -83,7 +83,7 @@ const isSelected = (monkey) => userMonkey.value.selected === monkey.id
 const handleImageError = (e) => { e.target.src = '/monkey/fallback.png' }
 
 const prevSlide = () => { if (currentSlide.value > 0) currentSlide.value-- }
-const nextSlide = () => { if (currentSlide.value < monkeyChunks.value.length-1) currentSlide.value++ }
+const nextSlide = () => { if (currentSlide.value < monkeyChunks.value.length - 1) currentSlide.value++ }
 
 const handleResize = () => {
   updateChunkCount()
@@ -107,32 +107,19 @@ onMounted(() => {
   <div class="monkey-selector-row mx-auto" v-if="allMonkeys.length">
     <h5 class="text-center fw-bold text-dark mb-3">Monkeys for Grabs</h5>
     <div class="d-flex align-items-center justify-content-center position-relative mb-3">
-      <!-- Left button -->  
-      <button 
-        class="carousel-btn left-btn"
-        @click="prevSlide" 
-        :disabled="currentSlide === 0"
-      >
+      <!-- Left button -->
+      <button class="carousel-btn left-btn" @click="prevSlide" :disabled="currentSlide === 0">
         <i class="bi bi-chevron-left"></i>
       </button>
 
       <!-- Avatars for current slide -->
       <div class="d-flex flex-wrap justify-content-center gap-5 mx-3">
-        <div
-          v-for="monkey in monkeyChunks[currentSlide] || []"
-          :key="monkey.id"
-          class="monkey-item text-center"
-          :class="{ locked: !isUnlocked(monkey), selected: isSelected(monkey) }"
-          @click="selectMonkey(monkey)"
-          :title="isUnlocked(monkey) ? monkey.name : `Locked - Need ${monkey.requiredPoints} pts`"
-        >
+        <div v-for="monkey in monkeyChunks[currentSlide] || []" :key="monkey.id" class="monkey-item text-center"
+          :class="{ locked: !isUnlocked(monkey), selected: isSelected(monkey) }" @click="selectMonkey(monkey)"
+          :title="isUnlocked(monkey) ? monkey.name : `Locked - Need ${monkey.requiredPoints} pts`">
           <div class="monkey-avatar-wrapper position-relative mx-auto">
-            <img
-              :src="`/monkey/${monkey.id}.png`"
-              @error="handleImageError"
-              :alt="monkey.name"
-              class="monkey-avatar-img rounded-circle border border-light"
-            />
+            <img :src="`/monkey/${monkey.id}.png`" @error="handleImageError" :alt="monkey.name"
+              class="monkey-avatar-img rounded-circle border border-light" />
             <div v-if="!isUnlocked(monkey)" class="lock-overlay d-flex justify-content-center align-items-center">
               <i class="bi bi-lock-fill text-light"></i>
             </div>
@@ -148,19 +135,15 @@ onMounted(() => {
       </div>
 
       <!-- Right button -->
-      <button 
-        class="carousel-btn right-btn"
-        @click="nextSlide" 
-        :disabled="currentSlide >= monkeyChunks.length - 1"
-      >
+      <button class="carousel-btn right-btn" @click="nextSlide" :disabled="currentSlide >= monkeyChunks.length - 1">
         <i class="bi bi-chevron-right"></i>
       </button>
     </div>
-    <p>
-      <p class="text-muted text-center mb-0">
-        You have <strong class="text-success">{{ userScore }}</strong> food points
-      </p>
+
+    <p class="text-muted text-center mb-0">
+      You have <strong class="text-success">{{ userScore }}</strong> food points
     </p>
+
   </div>
 </template>
 
@@ -177,6 +160,7 @@ onMounted(() => {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
 .monkey-selector-row::-webkit-scrollbar {
   display: none;
 }
@@ -189,7 +173,7 @@ onMounted(() => {
 }
 
 .monkey-avatar-wrapper {
-  width: 56px; 
+  width: 56px;
   height: 56px;
   overflow: hidden;
   border: 2px solid #fff;
@@ -326,15 +310,17 @@ onMounted(() => {
 
 #monkeyCarousel .carousel-control-prev-icon,
 #monkeyCarousel .carousel-control-next-icon {
-  background-color: rgba(0,0,0,0.7);
+  background-color: rgba(0, 0, 0, 0.7);
   border-radius: 50%;
   width: 40px;
   height: 40px;
 }
+
 #monkeyCarousel .carousel-control-prev,
 #monkeyCarousel .carousel-control-next {
   filter: none;
 }
+
 #monkeyCarousel .visually-hidden {
   color: #000 !important;
 }
@@ -348,14 +334,14 @@ onMounted(() => {
   height: 48px;
   border-radius: 50%;
   border: none;
-  background: rgba(33, 37, 41, 0.9); /* dark, similar to sidebar */
+  background: rgba(33, 37, 41, 0.9);
   color: #fff;
   font-size: 24px;
   display: flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   transition: all 0.2s ease;
 }
 
@@ -371,10 +357,12 @@ onMounted(() => {
 }
 
 .left-arrow {
-  left: -24px; /* slightly outside the avatars */
+  left: -24px;
+
 }
 
 .right-arrow {
-  right: -24px; /* slightly outside the avatars */
+  right: -24px;
+
 }
 </style>
