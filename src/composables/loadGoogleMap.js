@@ -20,13 +20,11 @@ export function loadGoogleMaps() {
     script.defer = true
 
     script.onload = () => {
-      // POLL UNTIL geometry IS READY
       const maxAttempts = 50
       let attempts = 0
       const interval = setInterval(() => {
         if (window.google?.maps?.geometry) {
           clearInterval(interval)
-          console.log('Google Maps API fully loaded (geometry ready)')
           resolve(window.google)
         } else if (attempts++ > maxAttempts) {
           clearInterval(interval)

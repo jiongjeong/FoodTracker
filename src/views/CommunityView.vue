@@ -30,7 +30,6 @@ const searchQuery= ref('')
 const showDonatedItems= ref(false)
 
 
-// Show my shared items
 const displayedMySharedItems = computed(() => {
   const sorted = [...mySharedItems.value].sort((a, b) => {
     if (!a.donated && b.donated) return -1
@@ -38,10 +37,9 @@ const displayedMySharedItems = computed(() => {
     return 0
   })
 
-  // Filter based on toggle
   let filtered = showDonatedItems.value ? sorted : sorted.filter(item => !item.donated)
 
-  // Apply search filter
+  // search filter
   if (searchQuery.value && searchQuery.value.trim()) {
     const search = searchQuery.value.toLowerCase().trim()
     filtered = filtered.filter(item =>
@@ -54,11 +52,9 @@ const displayedMySharedItems = computed(() => {
   return filtered
 })
 
-// Filtered available items with search
 const filteredAvailableItems = computed(() => {
   let filtered = itemsWithDistance.value
 
-  // Apply search filter
   if (searchQuery.value && searchQuery.value.trim()) {
     const search = searchQuery.value.toLowerCase().trim()
     filtered = filtered.filter(item =>
@@ -77,7 +73,6 @@ const handleContact = (item) => {
   showContactModal.value = true
 }
 
-// Share Form ref
 const shareForm = ref({
   foodName: '',
   category: '',
@@ -90,7 +85,6 @@ const shareForm = ref({
   foodItemId: ''
 })
 
-// Edit form ref
 const editForm = ref({
   id: '',
   foodItemId: '',
@@ -149,7 +143,7 @@ const getDaysLeft = (food) => {
 
 const foodItems = ref([])
 
-// Load Food Items based on user
+// load user food items
 async function loadFoodItems() {
   if (!currentUser.value) return;
   const foodItemsRef = collection(db, "user", currentUser.value.uid, "foodItems");
@@ -161,7 +155,6 @@ async function loadFoodItems() {
     foodNameMap.value[item.id] = item.name
   })
 
-  // Only show items with quantity > 0 in the dropdown
   foodItems.value = allItems.filter(item => item.quantity > 0);
 }
 
@@ -183,14 +176,14 @@ function onSelectFoodItem() {
     } else {
       shareForm.value.expirationDate = ''
     }
-    // Don't auto-fill quantity - let user enter the amount they want to share
+    // no auto-fill qty
     shareForm.value.quantity = ''
     shareForm.value.unit = selected.unit || ''
 
   }
 }
 
-// Load user listings
+// user listings
 async function loadMyListings() {
   if (!currentUser.value) return;
   const q = query(
@@ -214,15 +207,14 @@ async function loadMyListings() {
   })
 }
 
-// Load all Listings
 async function loadAvailableListings() {
   const sharedItemsRef = collection(db, "communityListings")
   const sharedItemsSnapshot = await getDocs(sharedItemsRef)
 
-  // Get all unique owner IDs
+  // unique owner IDs
   const ownerIds = [...new Set(sharedItemsSnapshot.docs.map(doc => doc.data().ownerId))]
 
-  // Fetch all owner information
+  // all owner information
   const ownersMap = {}
   for (const ownerId of ownerIds) {
     try {
@@ -329,9 +321,9 @@ async function loadAvailableListings() {
 }
 
 
-// Share Food
+
 async function submitShare(formData) {
-  // Use formData from modal if provided, otherwise fall back to shareForm
+
   const data = formData || shareForm.value
 
   if (!currentUser.value) {
@@ -362,7 +354,7 @@ async function submitShare(formData) {
       return
     }
 
-    // Prevent sharing expired items
+
     if (data.expirationDate && getDaysLeft(data.expirationDate) === 0) {
       await error('This item is expired and cannot be shared.')
       return
@@ -396,10 +388,10 @@ async function submitShare(formData) {
     const currentQty = Number(currentItem?.quantity || 0)
     const totalPrice = Number(currentItem?.price || 0)
 
-    // Store the original quantity (before donation) for percentage calculation later
+
     const originalQty = currentQty
 
-    // Calculate price per unit from total price
+
     const pricePerUnit = currentQty > 0 ? Math.round((totalPrice / currentQty) * 100) / 100 : 0
     const newQty = Math.max(0, currentQty - qtyToShare)
     const remainingPrice = Math.round(pricePerUnit * newQty * 100) / 100
@@ -416,7 +408,7 @@ async function submitShare(formData) {
       return
     }
 
-    // Update both quantity AND price
+
     await updateDoc(foodItemRef, {
       quantity: newQty,
       price: remainingPrice
@@ -431,7 +423,7 @@ async function submitShare(formData) {
       foodId: payload.foodId,
       quantity: payload.quantity,
       unit: payload.unit,
-      originalQuantity: originalQty, // Store original quantity for percentage calculation
+      originalQuantity: originalQty
     })
 
     await success("Food shared successfully!")
@@ -452,7 +444,6 @@ async function markAsDonated(item) {
   if (!confirmed) return
 
   try {
-    // Update listing as donated
     await updateDoc(doc(db, 'communityListings', item.id), {
       donated: true,
       donatedAt: serverTimestamp()
@@ -467,10 +458,8 @@ async function markAsDonated(item) {
       const remainingQty = Number(foodItemSnap.data().quantity || 0)
       isFullyDonated = remainingQty <= 0
 
-      // Calculate original quantity (current + donated)
       originalQty = remainingQty + Number(item.quantity)
     } else {
-      // If food item doesn't exist, the donated quantity was the original
       originalQty = Number(item.quantity)
       isFullyDonated = true
     }
@@ -493,12 +482,12 @@ async function markAsDonated(item) {
     }
 
     const donationQty = Number(item.quantity) || 1
-    const donationTotalPrice = Number(item.price) || 0  // This is total price from listing
+    const donationTotalPrice = Number(item.price) || 0  // this is total price from listing
 
-    // Calculate percentage of food donated
+    // percentage of food donated
     const percentageDonated = originalQty > 0 ? (donationQty / originalQty) * 100 : 100
 
-    // Get current score and streak from Firebase
+    // get userscore / streak
     const userDocRef = doc(db, 'user', currentUser.value.uid)
     const userSnap = await getDoc(userDocRef)
     const currentScore = userSnap.exists() ? (userSnap.data().foodScore || 0) : 0
@@ -506,7 +495,7 @@ async function markAsDonated(item) {
 
     const streakMultiplier = streakDays > 0 ? (1 + streakDays / 7) : 1
 
-    // Calculate score using percentage: +40 points per 100%, +0.2*price, +50 bonus per 100%
+    // calculate score using percentage: +40 points per 100%, +0.2*price, +50 bonus per 100%
     const normalizedPercentage = percentageDonated / 100
     const baseScoreChange = (40 * normalizedPercentage) + (0.2 * donationTotalPrice) + (50 * normalizedPercentage)
     const adjustedChange = Math.round(baseScoreChange * streakMultiplier)
@@ -517,23 +506,19 @@ async function markAsDonated(item) {
       foodScore: newScore
     })
 
-    // Log donation activity with points earned
     const activityPayload = {
       activityType: 'donFood',
       category: item.category,
       createdAt: new Date().toISOString(),
       foodName: item.foodName,
-      price: donationTotalPrice,  // Store total price
+      price: donationTotalPrice,
       quantity: donationQty,
       unit: item.unit,
       pointsEarned: adjustedChange
     }
 
-    // If fully donated, add note to mark it
     if (isFullyDonated) {
       activityPayload.note = 'fully donated'
-
-      // Delete the food item from inventory
       await deleteDoc(foodItemRef)
     }
 
@@ -581,46 +566,38 @@ const getRemainingQuantity = (foodNameOrId) => {
   return remaining
 }
 
-// Computed property for max shareable quantity
+// max qty
 const maxShareQuantity = computed(() => {
   if (!shareForm.value.foodItemId) return 0
   return getRemainingQuantity(shareForm.value.foodItemId)
 })
 
-// Check if share quantity is valid
 const isShareQuantityValid = computed(() => {
   const qty = Number(shareForm.value.quantity) || 0
   const max = maxShareQuantity.value
   return qty > 0 && qty <= max
 })
 
-// Computed property for max editable quantity (for edit mode)
 const maxEditQuantity = computed(() => {
   if (!editForm.value.foodItemId) return 0
 
-  // Get the current food item quantity from inventory
   const foodItem = foodItems.value.find(f => f.id === editForm.value.foodItemId)
   if (!foodItem) return 0
 
   const currentFoodQty = Number(foodItem.quantity || 0)
 
-  // Get the original listing quantity (what was already shared)
-  // We need to find this from mySharedItems
   const originalListing = mySharedItems.value.find(item => item.id === editForm.value.id)
   const originalSharedQty = originalListing ? Number(originalListing.quantity || 0) : 0
 
-  // Max = current inventory + what was already shared
   return currentFoodQty + originalSharedQty
 })
 
-// Check if edit quantity is valid
 const isEditQuantityValid = computed(() => {
   const qty = Number(editForm.value.quantity) || 0
   const max = maxEditQuantity.value
   return qty > 0 && qty <= max
 })
 
-// Computed food items with status for modal
 const foodItemsWithStatus = computed(() => {
   return foodItems.value
     .map(item => ({
@@ -628,7 +605,7 @@ const foodItemsWithStatus = computed(() => {
       remainingQty: getRemainingQuantity(item.id),
       isExpired: isExpiredItem(item)
     }))
-    .filter(item => item.remainingQty > 0 && !item.isExpired) // Exclude items with no remaining quantity or expired items
+    .filter(item => item.remainingQty > 0 && !item.isExpired)
 })
 
 const isExpiredItem = (item) => {
@@ -710,19 +687,16 @@ function savePreferredLocation() {
 }
 
 function calculateDistances() {
-  // If no items, clear the list
   if (sharedItems.value.length === 0) {
     itemsWithDistance.value = []
     return
   }
 
-  // If no preferred location, show all items without distance
   if (!preferredLocation.value) {
     itemsWithDistance.value = sharedItems.value.map(i => ({ ...i, distance: null }))
     return
   }
 
-  // If no geometry loaded yet, show items without distance
   if (!geometry.value) {
     itemsWithDistance.value = sharedItems.value.map(i => ({ ...i, distance: null }))
     return
@@ -783,8 +757,6 @@ watch(
 watch(preferredLocation, (newVal) => {
 })
 
-
-// Edit donated item function
 async function editDonated(item) {
 
   editForm.value = {
@@ -807,7 +779,6 @@ async function editDonated(item) {
   showEditModal.value = true
 }
 
-// Submit edit function - with proper error handling and rollback
 async function submitEdit() {
   if (!currentUser.value) {
     await error('Please log in first')
@@ -820,8 +791,6 @@ async function submitEdit() {
 
   try {
     const expDate = new Date(editForm.value.expirationDate)
-
-    // Get the original listing to compare quantities
     const listingRef = doc(db, 'communityListings', editForm.value.id)
     const listingSnap = await getDoc(listingRef)
 
@@ -853,7 +822,6 @@ async function submitEdit() {
       }
     }
 
-    // Prepare update data
     const updateData = {
       category: editForm.value.category,
       quantity: newQty,
@@ -868,10 +836,8 @@ async function submitEdit() {
       }
     }
 
-    // Update the community listing
     await updateDoc(listingRef, updateData)
 
-    // Update the food item quantity if quantity changed
     if (qtyDifference !== 0) {
       try {
         const foodItemRef = doc(db, 'user', currentUser.value.uid, 'foodItems', editForm.value.foodItemId)
@@ -880,11 +846,8 @@ async function submitEdit() {
         if (foodItemSnap.exists()) {
           const currentFoodQty = Number(foodItemSnap.data().quantity || 0)
           const currentFoodPrice = Number(foodItemSnap.data().price || 0)
-
-          // Calculate per-unit price from current food item
           const pricePerUnit = currentFoodQty > 0 ? Math.round((currentFoodPrice / currentFoodQty) * 100) / 100 : 0
 
-          // Calculate new quantity and price
           const updatedFoodQty = currentFoodQty - qtyDifference
           const updatedFoodPrice = Math.round(pricePerUnit * updatedFoodQty * 100) / 100
 
@@ -903,7 +866,6 @@ async function submitEdit() {
       }
     }
 
-    // Update the pending donation activity quantity and price
     try {
       const activitiesQuery = query(
         collection(db, 'user', currentUser.value.uid, 'activities'),
@@ -914,7 +876,6 @@ async function submitEdit() {
       const activitiesSnap = await getDocs(activitiesQuery)
 
       if (!activitiesSnap.empty) {
-        // Find the activity with matching original quantity
         const matchingActivity = activitiesSnap.docs.find(doc =>
           Number(doc.data().quantity) === originalQty
         )
@@ -923,7 +884,6 @@ async function submitEdit() {
         const oldActivityPrice = Number(activityDoc.data().price) || 0
         const oldActivityQty = Number(activityDoc.data().quantity) || 1
 
-        // Calculate price per unit from the activity (which stores the original proportional price)
         const pricePerUnit = oldActivityQty > 0 ? Math.round((oldActivityPrice / oldActivityQty) * 100) / 100 : 0
         const updatedPrice = Math.round(pricePerUnit * newQty * 100) / 100
 
@@ -948,9 +908,9 @@ async function submitEdit() {
   }
 }
 
-// Cancel donated function
+// cancel donated function
 async function canDonated(item) {
-  // Check if already donated/claimed
+  // check if already donated/claimed
   if (item.donated) {
     await error("This item has already been donated and cannot be cancelled.")
     return
@@ -981,11 +941,10 @@ async function canDonated(item) {
       return
     }
 
-    // Double check if it was marked as donated after the UI was loaded
     const listingData = listingSnap.data()
     if (listingData.donated) {
       await error("This item has already been donated and cannot be cancelled.")
-      await loadMyListings() // Refresh the list
+      await loadMyListings() 
       return
     }
 
@@ -1005,7 +964,6 @@ async function canDonated(item) {
     const currentFoodPrice = Number(foodItemSnap.data().price || 0)
     const newQty = originalFoodQty + returnQty
 
-    // Find the specific pending donation activity for THIS listing
     const activitiesQuery = query(
       collection(db, 'user', currentUser.value.uid, 'activities'),
       where('activityType', '==', 'pendingDonFood'),
@@ -1013,13 +971,10 @@ async function canDonated(item) {
     )
     const activitiesSnap = await getDocs(activitiesQuery)
 
-    // Find the activity that matches this listing's quantity
-    // Only return the price for THIS specific donation being cancelled
     let priceToReturn = 0
     let activityToDelete = null
 
     if (!activitiesSnap.empty) {
-      // Try to find an activity with matching quantity
       const matchingActivity = activitiesSnap.docs.find(doc =>
         Number(doc.data().quantity) === returnQty
       )
@@ -1028,7 +983,6 @@ async function canDonated(item) {
         priceToReturn = Number(matchingActivity.data().price) || 0
         activityToDelete = matchingActivity
       } else {
-        // If no exact match, calculate proportionally from the first activity
         const firstActivity = activitiesSnap.docs[0]
         const activityQty = Number(firstActivity.data().quantity) || 1
         const activityPrice = Number(firstActivity.data().price) || 0
@@ -1037,22 +991,11 @@ async function canDonated(item) {
         activityToDelete = firstActivity
       }
     } else {
-      // Fallback: calculate proportionally from current food price
       const pricePerUnit = originalFoodQty > 0 ? Math.round((currentFoodPrice / originalFoodQty) * 100) / 100 : 0
       priceToReturn = Math.round(pricePerUnit * returnQty * 100) / 100
     }
 
     const newPrice = Math.round((currentFoodPrice + priceToReturn) * 100) / 100
-
-    console.log('💰 Price calculation:', {
-      currentFoodPrice,
-      priceToReturn,
-      newPrice,
-      originalQty: originalFoodQty,
-      returnQty,
-      newQty,
-      activityFound: !!activityToDelete
-    })
 
     await deleteDoc(listingRef)
 
@@ -1067,8 +1010,6 @@ async function canDonated(item) {
       console.warn('Failed to return quantity to food item during cancel:', foodItemError)
       throw new Error('Failed to update food item quantity. Listing restored.')
     }
-
-    // Remove only the specific pending donation activity
     try {
       if (activityToDelete) {
         await deleteDoc(activityToDelete.ref)
@@ -1098,9 +1039,8 @@ const getGoogleMapsUrl = (location) => {
 }
 </script>
 
-
 <template>
-  <div style="background: linear-gradient(135deg, #fefefe 0%, #f9f7f4 40%, #f5f2ed 100%);">
+  <div style="background: linear-gradient(135deg, #fefefe 0%, #f9f7f4 40%, #f5f2ed 100%)">
     <!-- Hero Section -->
     <CommunityHero
       :my-shared-items-count="mySharedItems.length"
@@ -1128,11 +1068,15 @@ const getGoogleMapsUrl = (location) => {
         <div class="d-flex justify-content-between align-items-center mb-4">
           <h4 class="fw-bold mb-0">My Shared Items</h4>
           <div class="d-flex gap-2">
-            <button v-if="mySharedItems.some(item => item.donated)"
-                    class="btn btn-outline-secondary"
-                    @click="showDonatedItems = !showDonatedItems">
+            <button
+              v-if="mySharedItems.some((item) => item.donated)"
+              class="btn btn-outline-secondary"
+              @click="showDonatedItems = !showDonatedItems"
+            >
               <i :class="showDonatedItems ? 'bi bi-eye-slash' : 'bi bi-eye'" class="me-2"></i>
-              {{ showDonatedItems ? 'Hide' : 'Show' }} Donated ({{mySharedItems.filter(i => i.donated).length}})
+              {{ showDonatedItems ? 'Hide' : 'Show' }} Donated ({{
+                mySharedItems.filter((i) => i.donated).length
+              }})
             </button>
             <button class="btn btn-success" @click="handleShareFood">
               <i class="bi bi-plus-circle-fill me-2"></i>
@@ -1142,14 +1086,22 @@ const getGoogleMapsUrl = (location) => {
         </div>
 
         <!-- Empty State -->
-        <EmptyState v-if="mySharedItems.length === 0" type="no-items" @share-food="handleShareFood" />
+        <EmptyState
+          v-if="mySharedItems.length === 0"
+          type="no-items"
+          @share-food="handleShareFood"
+        />
 
         <!-- No Active Items -->
         <EmptyState v-else-if="displayedMySharedItems.length === 0" type="no-active" />
 
         <!-- Items Grid -->
         <div v-else class="row g-3">
-          <div v-for="item in displayedMySharedItems" :key="item.id" class="col-12 col-md-6 col-lg-4">
+          <div
+            v-for="item in displayedMySharedItems"
+            :key="item.id"
+            class="col-12 col-md-6 col-lg-4"
+          >
             <FoodItemCard
               :item="item"
               mode="myShared"
@@ -1165,7 +1117,7 @@ const getGoogleMapsUrl = (location) => {
       <div v-if="activeTab === 'available'" class="tab-content-section">
         <div class="d-flex justify-content-between align-items-center mb-4">
           <h4 class="fw-bold mb-0">Available Near You</h4>
-          <span class="badge bg-primary" style="padding: 8px 16px; font-size: 0.9rem;">
+          <span class="badge bg-primary" style="padding: 8px 16px; font-size: 0.9rem">
             <i class="bi bi-basket3-fill me-2"></i>
             {{ filteredAvailableItems.length }} Items
           </span>
@@ -1176,12 +1128,12 @@ const getGoogleMapsUrl = (location) => {
 
         <!-- Items Grid -->
         <div v-else class="row g-3">
-          <div v-for="item in filteredAvailableItems" :key="item.id" class="col-12 col-md-6 col-lg-4">
-            <FoodItemCard
-              :item="item"
-              mode="available"
-              @contact="handleContact"
-            />
+          <div
+            v-for="item in filteredAvailableItems"
+            :key="item.id"
+            class="col-12 col-md-6 col-lg-4"
+          >
+            <FoodItemCard :item="item" mode="available" @contact="handleContact" />
           </div>
         </div>
       </div>
@@ -1204,7 +1156,12 @@ const getGoogleMapsUrl = (location) => {
       :isEditMode="false"
       @close="showShareModal = false"
       @submit="submitShare"
-      @select-food="(foodId) => { shareForm.foodItemId = foodId; onSelectFoodItem(); }"
+      @select-food="
+        (foodId) => {
+          shareForm.foodItemId = foodId
+          onSelectFoodItem()
+        }
+      "
       @location-selected="shareForm.location = $event"
       @update:quantity="shareForm.quantity = $event"
     />
@@ -1227,7 +1184,6 @@ const getGoogleMapsUrl = (location) => {
 </template>
 
 <style scoped>
-/* Simplified - most styles moved to components */
 .tab-content-section {
   min-height: 300px;
 }

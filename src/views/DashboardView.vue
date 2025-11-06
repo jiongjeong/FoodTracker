@@ -169,17 +169,14 @@ async function loadActivities() {
   }
 }
 
-// Helper function to calculate score change for an activity
-// percentageUsed: the percentage (0-100) of the food item being used
 const calculateScoreChange = (activityType, price, percentageUsed = 100) => {
   price = Number(price) || 0;
   percentageUsed = Number(percentageUsed) || 0;
 
-  // Normalize percentage to 0-1 range
   const normalizedPercentage = percentageUsed / 100;
 
   switch (activityType) {
-    case 'conFood': // Consumed/Saved
+    case 'conFood': // onsumed/Saved
       return (40 * normalizedPercentage) + (0.2 * price); // +40 points per 100%, +0.2*total_value for money
     case 'expFood': // Expired/Wasted
       return -((60 * normalizedPercentage) + (0.2 * price)); // -60 points per 100%, -0.2*total_value for money, wasting food should bear heaviest weightage
@@ -190,24 +187,20 @@ const calculateScoreChange = (activityType, price, percentageUsed = 100) => {
   }
 };
 
-// Helper function to update food score in Firebase
 const updateFoodScore = async (activityType, price, uid, percentageUsed = 100) => {
   if (!uid) return { newScore: null, pointsEarned: 0 };
 
   try {
     const userDocRef = doc(db, 'user', uid);
 
-    // Get current score and streak from Firebase
     const currentDoc = await getDoc(userDocRef);
     const currentScore = currentDoc.exists() ? (currentDoc.data().foodScore || 0) : 0;
     const streakDays = currentDoc.exists() ? (currentDoc.data().streak || 0) : 0;
 
     const streakMultiplier = streakDays > 0 ? (1 + streakDays / 7) : 1;
 
-    // Calculate base score change
     const baseScoreChange = calculateScoreChange(activityType, price, percentageUsed);
 
-    // Apply streak multiplier and round to whole number
     const adjustedChange = Math.round(baseScoreChange * streakMultiplier);
 
     const newScore = Math.max(0, currentScore + adjustedChange);
@@ -223,13 +216,10 @@ const updateFoodScore = async (activityType, price, uid, percentageUsed = 100) =
   }
 };
 
-// Auth state changed
 auth.onAuthStateChanged((u) => {
   user.value = u
 })
 
-// Watch userId changes
-// Watch userId changes and load user's food score
 watch(userId, async (val) => {
   if (val) {
     await loadFoodItems()
@@ -240,7 +230,6 @@ watch(userId, async (val) => {
 
     await loadActivities()
 
-    // Load user's food score from Firebase
     try {
       const userDocRef = doc(db, 'user', val);
       const userDoc = await getDoc(userDocRef);
@@ -262,14 +251,12 @@ watch(userId, async (val) => {
   }
 }, { immediate: true })
 
-// Watch for expired foods and donations
-// Watch for expired foods
+
 watchEffect(async () => {
   if (!activitiesLoaded.value) return
   const uid = userId.value
   if (!uid) return
 
-  // Handle expired foods
   const expiredFoods = foodItems.value.filter((food) => getDaysLeft(food) < 0)
   for (const food of expiredFoods) {
     const alreadyLogged = activities.value.some(
@@ -289,7 +276,6 @@ watchEffect(async () => {
         await updateDoc(userDocRef, { streak: 0 })
         userStreak.value = 0
 
-        // Calculate points BEFORE creating activity - use 100% since entire item expired
         const { newScore, pointsEarned } = await updateFoodScore('expFood', food.price, uid, 100);
         if (newScore !== null) {
           userFoodScore.value = newScore;
@@ -304,7 +290,7 @@ watchEffect(async () => {
           quantity: String(food.quantity || ''),
           unit: String(food.unit || ''),
           note: 'expired',
-          pointsEarned: pointsEarned // ← ADD THIS LINE
+          pointsEarned: pointsEarned
         }
         const docRef = await addDoc(actRef, payload)
         activities.value.unshift({
@@ -315,12 +301,10 @@ watchEffect(async () => {
     }
   }
 
-  // Check for activity gap (no activity in last 24 hours)
   if (activities.value.length > 0) {
     const now = new Date()
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
-    // Get most recent activity
     const sortedActivities = [...activities.value].sort((a, b) => {
       const dateA = new Date(a.createdAt)
       const dateB = new Date(b.createdAt)
@@ -339,7 +323,6 @@ watchEffect(async () => {
   }
 })
 
-// Utility functions
 const toInputDateString = (d) => {
   const yyyy = d.getFullYear()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
@@ -368,7 +351,6 @@ const getDaysLeft = (food) => {
   return Math.floor((expMidnight - nowMidnight) / (1000 * 60 * 60 * 24))
 }
 
-// Computed properties
 const filteredFoodItems = computed(() => {
   const uniqueItems = foodItems.value.filter(
     (item, index, self) => index === self.findIndex((i) => i.id === item.id),
@@ -532,26 +514,20 @@ const analytics = computed(() => {
   const reductionPercentage =
     totalItemsHandled > 0 ? Math.round((totalSavedItems / totalItemsHandled) * 100) : 0
 
-  // Calculate inventory value excluding pending donations
-  // For each food item, calculate its current value based on remaining quantity
   const inventoryValue = inventoryActivities.reduce((sum, item) => {
     const originalPrice = Number(item.price) || 0
     const currentQty = Number(item.quantity) || 0
 
-    // Find all pending donations for this specific food item
     const itemPendingDonations = pendingDonations.filter(
       (activity) => activity.foodId === item.id
     )
 
-    // Calculate total quantity that's pending donation
     const pendingQty = itemPendingDonations.reduce((total, activity) => {
       return total + (Number(activity.quantity) || 0)
     }, 0)
 
-    // Total quantity (current + pending) to calculate price per unit
     const totalQty = currentQty + pendingQty
 
-    // Calculate the value of only the remaining quantity
     let itemValue = originalPrice
     if (totalQty > 0) {
       const pricePerUnit = originalPrice / totalQty
@@ -578,8 +554,6 @@ const analytics = computed(() => {
 })
 
 
-
-
 const toggleSortDirection = () => {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
 }
@@ -593,7 +567,6 @@ const getSortButtonTitle = computed(() => {
   return `Sort ${direction}`
 })
 
-// Modal functions
 const openUse = (food) => {
   // Prevent using expired food
   if (getDaysLeft(food) < 0) {
@@ -636,19 +609,16 @@ const saveUse = async () => {
     const usedValue = Math.round(pricePerUnit * usedQty * 100) / 100
     const remainingValue = Math.round(pricePerUnit * newQty * 100) / 100
 
-    // Calculate percentage of food used
     const percentageUsed = (usedQty / food.quantity) * 100
 
     const refDoc = doc(db, 'user', uid, 'foodItems', useForm.id)
     const actRef = collection(db, 'user', uid, 'activities')
 
-    // Calculate points BEFORE creating activity using percentage
     const { newScore, pointsEarned } = await updateFoodScore('conFood', usedValue, uid, percentageUsed);
     if (newScore !== null) {
       userFoodScore.value = newScore;
     }
 
-    // ADD pointsEarned to the activity payload
     const activityPayload = {
       activityType: 'conFood',
       createdAt: new Date().toISOString(),
@@ -657,7 +627,7 @@ const saveUse = async () => {
       price: String(pricePerUnit),
       quantity: String(usedQty),
       unit: food.unit || '',
-      pointsEarned: pointsEarned // ← ADD THIS LINE
+      pointsEarned: pointsEarned
     }
     const docRef = await addDoc(actRef, activityPayload)
     activities.value.unshift({
@@ -669,7 +639,6 @@ const saveUse = async () => {
       await deleteDoc(refDoc)
       foodItems.value.splice(foodIndex, 1)
 
-      // No additional points for fully consumed marker (already counted above)
       const fullConsumedPayload = {
         activityType: 'conFood',
         createdAt: new Date().toISOString(),
@@ -679,7 +648,7 @@ const saveUse = async () => {
         quantity: String(usedQty),
         unit: food.unit || '',
         note: 'fully consumed',
-        pointsEarned: 0 // No additional points
+        pointsEarned: 0 
       }
       const docRef2 = await addDoc(actRef, fullConsumedPayload)
       activities.value.unshift({
@@ -730,8 +699,6 @@ const saveAdd = async (formData) => {
     console.warn('No userId available; cannot add food item')
     return
   }
-
-  // Use formData from modal if provided, otherwise fall back to addForm
   const data = formData || addForm
   const nameValue = data.name || ''
 
@@ -832,7 +799,6 @@ const closeEdit = () => {
 }
 
 const saveEdit = async (formData) => {
-  // Use formData from modal if provided, otherwise fall back to editForm
   const data = formData || editForm
   if (!data.id) return
   const refDoc = doc(db, 'user', userId.value, 'foodItems', data.id)
@@ -918,7 +884,6 @@ const confirmDelete = async () => {
 
 <template>
   <div class="container-fluid p-0" style="background:#faf8f5;;">
-    <!-- Dashboard Header with Stats Cards -->
     <DashboardHeader
       :userFoodScore="userFoodScore"
       :expiringSoon="expiringSoon"
@@ -930,7 +895,6 @@ const confirmDelete = async () => {
       @toggle-overview="overviewCollapsed = !overviewCollapsed"
     />
 
-    <!-- Charts Section - Seamless with header -->
     <transition name="charts-slide">
       <div v-show="overviewCollapsed" class="charts-wrapper">
         <div class="container-fluid px-4 py-4">
@@ -952,7 +916,6 @@ const confirmDelete = async () => {
       </div>
     </transition>
 
-    <!-- Food Inventory - with spacing from above -->
     <div class="container-fluid p-4">
       <div class="row g-4">
       <div class="col-lg-8">
@@ -1075,7 +1038,6 @@ const confirmDelete = async () => {
           How much of <strong>{{ useForm.name }}</strong> did you use?
         </p>
 
-        <!-- Show available quantity alert -->
         <div class="alert alert-info py-2 mb-2" style="font-size: 0.875rem;">
           <i class="bi bi-info-circle me-2"></i>
           Available: <strong>{{ useForm.maxQuantity }} {{ useForm.unit }}</strong>
@@ -1087,7 +1049,7 @@ const confirmDelete = async () => {
             <input v-model.number="useForm.quantity" type="number" min="1" :max="useForm.maxQuantity"
               class="form-control" :class="{ 'is-invalid': useForm.quantity > useForm.maxQuantity }"
               style="height: 45px" />
-            <!-- Error message if exceeds max -->
+
             <div v-if="useForm.quantity > useForm.maxQuantity" class="invalid-feedback d-block">
               Cannot exceed {{ useForm.maxQuantity }} {{ useForm.unit }}
             </div>
@@ -1100,7 +1062,6 @@ const confirmDelete = async () => {
 
         <div class="d-flex justify-content-end gap-2 mt-3">
           <button class="btn btn-secondary" @click="closeUse">Cancel</button>
-          <!-- Disable button when invalid -->
           <button class="btn btn-primary" @click="saveUse"
             :disabled="useForm.quantity <= 0 || useForm.quantity > useForm.maxQuantity">
             Use
@@ -1141,18 +1102,15 @@ const confirmDelete = async () => {
     </div>
   </div>
 
-  <!-- Toast -->
   <div v-if="showToast" class="custom-toast">{{ toastMessage }}</div>
 </template>
 
 <style scoped>
-/* Charts wrapper - seamless with header */
 .charts-wrapper {
   background: #faf8f5;
-  margin-top: -2rem; /* Pull up to remove gap */
+  margin-top: -2rem; 
 }
 
-/* Smooth slide animation */
 .charts-slide-enter-active {
   transition: all 0.4s ease-out;
 }
@@ -1239,8 +1197,6 @@ const confirmDelete = async () => {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
 }
 
-/* Floating Add button */
-
 .fab-add {
   position: fixed;
   right: 24px;
@@ -1295,10 +1251,8 @@ const confirmDelete = async () => {
   transform: translateX(0);
 }
 
-/* Delete modal — white interior with pulsing red glow */
 .delete-modal {
   background: #ffffff;
-  /* keep interior white for better readability */
   color: #111;
   border: 1px solid rgba(229, 57, 53, 0.08);
   position: relative;
@@ -1342,7 +1296,6 @@ const confirmDelete = async () => {
   }
 }
 
-/* Make activity card scrollable and match inventory height */
 .activity-scroll {
   min-height: 0;
   max-height: 400px;
@@ -1353,8 +1306,6 @@ const confirmDelete = async () => {
 .min-h-0 {
   min-height: 0;
 }
-
-/* Streak fire background animation */
 .streak-fire-bg {
   position: absolute;
   top: 0;

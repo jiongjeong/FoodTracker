@@ -1,7 +1,6 @@
 <template>
   <div class="signup-wrapper">
     <div class="signup-container">
-      <!-- Logo and Brand -->
       <div class="brand-section">
         <img src="/bigbackicon.jpg" alt="FoodTracker" class="brand-logo" />
         <h2 class="brand-title">Create Account</h2>
@@ -72,7 +71,6 @@
         </button>
       </form>
 
-      <!-- Login Link -->
       <div class="login-section">
         <p>Already have an account? <a @click="goToLogin" class="login-link">Sign In</a></p>
       </div>

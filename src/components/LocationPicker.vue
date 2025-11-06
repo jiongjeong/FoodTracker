@@ -54,13 +54,11 @@ async function initializeAutocomplete() {
         placeId: place.place_id
       }
 
-      console.log('✅ Place selected:', selectedPlace.value)
       error.value = null
       emit('place-selected', selectedPlace.value)
     })
 
     isLoading.value = false
-    console.log('✅ LocationPicker ready')
 
   } catch (err) {
     console.error('❌ Failed to initialize LocationPicker:', err)
@@ -70,8 +68,6 @@ async function initializeAutocomplete() {
 }
 
 onMounted(() => {
-  console.log('🔧 LocationPicker component mounted')
-  console.log('Input ref on mount:', inputRef.value)
   initializeAutocomplete()
 })
 

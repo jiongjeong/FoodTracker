@@ -16,26 +16,23 @@ import LoadingSpinner from '../components/recipes/LoadingSpinner.vue'
 import ErrorAlert from '../components/recipes/ErrorAlert.vue'
 
 
-// Configuration constants
 const API_BASE_URL = 'https://www.themealdb.com/api/json/v1/1'
 const MAX_INGREDIENTS = 40
 const REQUEST_TIMEOUT = 10000
 const MAX_SUGGESTED_RECIPES = 10
 const EXPIRING_SOON_DAYS = 7
 const MIN_WORD_LENGTH_FOR_MATCHING = 3
-// For multi-ingredient lookups
 const MAX_LOOKUP_IDS = 30
 
-// Reactive state
 const activeTab = ref('suggested')
 const searchQuery = ref('')
-const searchFilter = ref('') // Filter for single-term search
-const searchFilterAll = ref('') // Independent filter for Match All section
-const searchFilterAny = ref('') // Independent filter for Any section
+const searchFilter = ref('') 
+const searchFilterAll = ref('') 
+const searchFilterAny = ref('') 
 const route = useRoute()
 const isLoading = ref(false)
 const searchResults = ref([])
-// Multi-ingredient search results: Any (OR) and All (AND)
+
 const searchResultsAny = ref([]) // union of ingredient searches (chicken OR rice)
 const searchResultsAll = ref([]) // intersection of ingredient searches (chicken AND rice)
 const searchAnyTotal = ref(0)
@@ -43,7 +40,6 @@ const searchAllTotal = ref(0)
 const isLoadingAny = ref(false)
 const isLoadingAll = ref(false)
 
-// Simple in-memory cache for lookup.php results by idMeal
 const lookupCache = new Map()
 const suggestedRecipes = ref([])
 const selectedRecipe = ref(null)
@@ -51,37 +47,30 @@ const showRecipeModal = ref(false)
 const errorMessage = ref('')
 const user = ref(auth.currentUser)
 
-// Pinia store
 const recipesStore = useRecipesStore()
 const bookmarkedRecipes = computed(() => recipesStore.bookmarkedRecipes)
 const isRecipeBookmarked = recipesStore.isRecipeBookmarked
 const toggleBookmark = recipesStore.toggleBookmark
 
-// Computed properties
 const userId = computed(() => user.value?.uid || null)
 const bookmarkedRecipeObjects = ref([])
 
-// Helper function to calculate days left until expiration
 const getDaysLeft = (food) => {
   const now = new Date()
   let expDate
 
   if (food.expirationDate) {
     if (typeof food.expirationDate.toDate === 'function') {
-      // Firestore Timestamp
       expDate = food.expirationDate.toDate()
     } else if (food.expirationDate.seconds) {
-      // Firestore Timestamp object with seconds property
       expDate = new Date(food.expirationDate.seconds * 1000)
     } else {
-      // String or Date object
       expDate = new Date(food.expirationDate)
     }
   } else {
-    return Infinity // no expiration date
+    return Infinity 
   }
 
-  // Validate the date
   if (isNaN(expDate.getTime())) {
     return Infinity
   }
@@ -93,7 +82,6 @@ const getDaysLeft = (food) => {
   return daysLeft
 }
 
-// Fetch full recipe objects for bookmarked IDs
 const fetchBookmarkedRecipes = async () => {
   const ids = bookmarkedRecipes.value
     .map(r => (typeof r === 'object' ? r.idMeal || r.id : r))
@@ -126,21 +114,18 @@ const fetchBookmarkedRecipes = async () => {
   bookmarkedRecipeObjects.value = recipes
 }
 
-// Watch for tab change to 'bookmarked' and fetch recipes
 watch(activeTab, async (tab) => {
   if (tab === 'bookmarked') {
     await fetchBookmarkedRecipes()
   }
 })
 
-// Also refetch when bookmarks change and tab is 'bookmarked'
 watch(bookmarkedRecipes, async () => {
   if (activeTab.value === 'bookmarked') {
     await fetchBookmarkedRecipes()
   }
 })
 
-// Error handling helper
 const handleApiError = (error) => {
   if (error.code === 'ECONNABORTED') {
     return 'Request timed out. Please check your connection and try again.'
@@ -153,7 +138,6 @@ const handleApiError = (error) => {
   }
 }
 
-// Search recipes from TheMealDB API
 const searchRecipes = async (query) => {
   if (!query.trim()) {
     searchResults.value = []
@@ -170,12 +154,10 @@ const searchRecipes = async (query) => {
     // Check if user is searching for multiple ingredients (comma-separated)
     const ingredients = query.split(',').map(i => i.trim()).filter(i => i.length > 0)
 
-    // Reset multi-result refs
     searchResultsAny.value = []
     searchResultsAll.value = []
 
     if (ingredients.length > 1) {
-      // For each ingredient, get the list of meal ids (try filter.php then fallback to search.php)
       const perIngredientIds = await Promise.all(ingredients.map(async (ingredient) => {
         try {
           // Run both requests in parallel
@@ -197,7 +179,6 @@ const searchRecipes = async (query) => {
             meals = searchResult.value.data.meals
           }
 
-          // Return set of ids for this ingredient
           return new Set(meals.map(m => m.idMeal))
         } catch (err) {
           console.error(`Error searching for ${ingredient}:`, err)
@@ -205,24 +186,19 @@ const searchRecipes = async (query) => {
         }
       }))
 
-      // Compute union (any) and intersection (all)
       const unionIds = new Set()
       perIngredientIds.forEach(s => s.forEach(id => unionIds.add(id)))
 
-      // Intersection: start with first set, then keep only those present in all
       let intersectionIds = new Set(perIngredientIds[0] || [])
       for (let i = 1; i < perIngredientIds.length; i++) {
         intersectionIds = new Set([...intersectionIds].filter(id => perIngredientIds[i].has(id)))
       }
 
-      // Helper to fetch full recipe details for a set of ids
-      // This uses lookupCache to avoid duplicate network calls and annotates each recipe
-      // with `matchedIngredients` (which of the searched ingredients were found in the recipe)
       const fetchFullDetailsForIds = async (idIterable, allIdsTotal = 0) => {
         const ids = Array.from(idIterable)
         const promises = ids.map(async (id) => {
           try {
-            // Use cache when available
+            // use cache when available
             let fullMeal = lookupCache.get(id)
             if (!fullMeal) {
               const response = await axios.get(`${API_BASE_URL}/lookup.php`, {
@@ -234,7 +210,6 @@ const searchRecipes = async (query) => {
             }
 
             if (fullMeal) {
-              // compute matchedIngredients by comparing searchIngredients to meal name and ingredients
               const mealIngredients = getIngredientsList(fullMeal).map(ing => ing.toLowerCase())
               const recipeName = fullMeal.strMeal.toLowerCase()
               const matched = searchIngredients.value.filter(si => {
@@ -263,8 +238,6 @@ const searchRecipes = async (query) => {
         })
         return (await Promise.all(promises)).filter(r => r !== null)
       }
-
-        // Prepare totals and cap IDs fetched to avoid too many lookup requests
         searchAnyTotal.value = unionIds.size
         searchAllTotal.value = intersectionIds.size
 
@@ -274,7 +247,7 @@ const searchRecipes = async (query) => {
         const unionToFetch = new Set(unionIdsArray.slice(0, MAX_LOOKUP_IDS))
         const intersectionToFetch = new Set(intersectionIdsArray.slice(0, MAX_LOOKUP_IDS))
 
-        // Fetch union (any) results
+        // union (any) results
         if (unionToFetch.size > 0) {
           isLoadingAny.value = true
           searchResultsAny.value = await fetchFullDetailsForIds(unionToFetch, unionIds.size)
@@ -283,7 +256,7 @@ const searchRecipes = async (query) => {
           searchResultsAny.value = []
         }
 
-        // Fetch intersection (all) results
+        // intersection (all) results
         if (intersectionToFetch.size > 0) {
           isLoadingAll.value = true
           searchResultsAll.value = await fetchFullDetailsForIds(intersectionToFetch, intersectionIds.size)
@@ -292,10 +265,9 @@ const searchRecipes = async (query) => {
           searchResultsAll.value = []
         }
 
-      // Keep searchResults empty for multi-search to avoid confusion in template
       searchResults.value = []
     } else {
-      // Single ingredient or free-text search - use original logic
+      // single search
       const response = await axios.get(`${API_BASE_URL}/search.php`, {
         params: { s: query },
         timeout: REQUEST_TIMEOUT
@@ -332,7 +304,6 @@ const searchRecipes = async (query) => {
   }
 }
 
-// Get suggested recipes based on expiring ingredients
 const getSuggestedRecipes = async () => {
   if (!userId.value) return
 
@@ -357,13 +328,10 @@ const getSuggestedRecipes = async () => {
     // Extract ingredient keywords - use the full name for better matching
     const ingredients = [...new Set(expiringFoods.map(food => food.name.toLowerCase().trim()))]
 
-    // Cache for failed filter.php requests to avoid redundant search.php calls
     const filterFailedCache = new Set()
 
-    // Try searching by ingredient filter first, then fallback to general search
     const recipePromises = ingredients.map(async (ingredient) => {
       try {
-        // First try: ingredient filter
         let response = await axios.get(`${API_BASE_URL}/filter.php`, {
           params: { i: ingredient },
           timeout: REQUEST_TIMEOUT
@@ -394,7 +362,6 @@ const getSuggestedRecipes = async () => {
       index === self.findIndex(m => m.idMeal === meal.idMeal)
     ).slice(0, MAX_SUGGESTED_RECIPES)
 
-    // Pre-compute normalized food tokens for faster matching
     const normalizedFoods = expiringFoods.map(food => {
       const foodName = food.name.toLowerCase()
       const foodWords = foodName.split(/\s+/).filter(w => w.length >= MIN_WORD_LENGTH_FOR_MATCHING)
@@ -416,18 +383,14 @@ const getSuggestedRecipes = async () => {
           const mealIngredients = getIngredientsList(fullMeal).map(ing => ing.toLowerCase())
           const recipeName = fullMeal.strMeal.toLowerCase()
 
-          // Match expiring foods to recipe ingredients OR recipe name
           const suggestingFoods = normalizedFoods.filter(food => {
-            // Check recipe name first
             if (recipeName.includes(food.normalized)) return true
             if ([...food.words].some(word => recipeName.includes(word))) return true
 
-            // Check if any recipe ingredient contains the food name or any significant word
             return mealIngredients.some(ing => {
-              // Direct match
+
               if (ing.includes(food.normalized) || food.normalized.includes(ing)) return true
 
-              // Check individual words from pre-computed set
               return [...food.words].some(word => {
                 return ing.includes(word) || word.includes(ing)
               })
@@ -464,7 +427,6 @@ const getSuggestedRecipes = async () => {
   }
 }
 
-// Extract ingredients list from TheMealDB response
 const getIngredientsList = (meal) => {
   const ingredients = []
   for (let i = 1; i <= MAX_INGREDIENTS; i++) {
@@ -477,7 +439,6 @@ const getIngredientsList = (meal) => {
   return ingredients
 }
 
-// User pantry foods (simplified keywords) - loaded from Firestore
 const userFoods = ref([])
 const userFoodKeywords = computed(() => {
   const set = new Set()
@@ -506,13 +467,12 @@ const loadUserFoods = async () => {
   }
 }
 
-// Computed helpers for multi-ingredient detection
 const searchIngredients = computed(() =>
   searchQuery.value.split(',').map(i => i.trim()).filter(i => i.length > 0)
 )
 const isMultiSearch = computed(() => searchIngredients.value.length > 1)
 
-// Count how many ingredients from a recipe the user has in their pantry
+// count how many ingredients user has in inventory
 const countUserIngredients = (recipe) => {
   if (!recipe?.ingredients || !userFoodKeywords.value) return 0
   let count = 0
@@ -528,7 +488,6 @@ const countUserIngredients = (recipe) => {
   return count
 }
 
-// Format instructions with step numbering (handles recipes that already have numbers)
 const formatInstructions = (instructions) => {
   if (!instructions) return []
 
@@ -536,21 +495,19 @@ const formatInstructions = (instructions) => {
   const hasLeadingNumbers = /^\s*0?\d+[\.\):]/.test(instructions)
 
   if (hasLeadingNumbers) {
-    // Split by line breaks first, then clean up step numbers
     const steps = instructions
       .split(/[\r\n]+/)
       .map(s => s.trim())
       .filter(s => s.length > 0)
       .map(step => {
-        // Remove leading numbers like "01.", "1.", "02)", "STEP 1:", etc.
+        // remove leading numbers like "01.", "1.", "02)", "STEP 1:", etc.
         return step.replace(/^\s*0?(\d+)[\.\):]?\s*/i, '')
       })
-      .filter(s => s.length > 10) // Keep only substantial steps
+      .filter(s => s.length > 10) 
 
     return steps
   }
 
-  // Check for STEP format
   const hasStepFormat = /\bSTEP\s+\d+/i.test(instructions)
 
   if (hasStepFormat) {
@@ -564,7 +521,6 @@ const formatInstructions = (instructions) => {
     )
   }
 
-  // No numbers - split by line breaks or sentences
   const steps = instructions
     .split(/[\r\n]+/)
     .flatMap(line => {
@@ -579,7 +535,6 @@ const formatInstructions = (instructions) => {
   return steps
 }
 
-// Handle search
 const handleSearch = async () => {
   activeTab.value = 'search'
   searchFilterAll.value = ''
@@ -587,18 +542,15 @@ const handleSearch = async () => {
   await searchRecipes(searchQuery.value)
 }
 
-// View recipe details
 const viewRecipe = (recipe) => {
   selectedRecipe.value = recipe
   showRecipeModal.value = true
 }
 
-// Computed formatted instructions for modal
 const formattedInstructions = computed(() =>
   selectedRecipe.value ? formatInstructions(selectedRecipe.value.instructions) : []
 )
 
-// Handle tab change
 const handleTabChange = (tab) => {
   activeTab.value = tab
   if (tab === 'search') {
@@ -606,7 +558,6 @@ const handleTabChange = (tab) => {
   }
 }
 
-// Watch for route query changes to auto-search
 watch(
   () => route.query.search,
   async (newSearch) => {
@@ -632,7 +583,6 @@ onAuthStateChanged(auth, async (u) => {
 <template>
 <div class="bg-light min-vh-100">
   <div class="recipes-page">
-    <!-- Hero Section - Full Width -->
     <div class="hero-full-width">
       <HeroSection
         v-model:search-query="searchQuery"
@@ -643,20 +593,15 @@ onAuthStateChanged(auth, async (u) => {
     </div>
 
   <div class="container-fluid px-3 px-md-4 py-3">
-    <!-- Error Message -->
     <ErrorAlert :message="errorMessage" @close="errorMessage = ''" />
 
-    <!-- Loading State -->
     <Transition name="fade">
       <LoadingSpinner v-if="isLoading" />
     </Transition>
 
-    <!-- Content based on active tab -->
     <Transition name="fade" mode="out-in">
       <div v-if="!isLoading" key="content">
-        <!-- Search Results Tab -->
         <div v-if="activeTab === 'search'">
-          <!-- Single-term or free-text search -->
           <div v-if="!isMultiSearch">
             <EmptyState
               v-if="searchResults.length === 0 && !searchQuery.trim()"
@@ -684,9 +629,8 @@ onAuthStateChanged(auth, async (u) => {
             />
           </div>
 
-          <!-- Multi-ingredient search: show BOTH intersection (AND) and union (ANY) -->
+          <!-- multi search -->
           <div v-else>
-            <!-- Combined title for multi-search -->
             <div class="mb-4">
               <h4 class="mb-1">
                 Recipes for <strong>{{ searchIngredients.join(' + ') }}</strong>
@@ -694,7 +638,6 @@ onAuthStateChanged(auth, async (u) => {
               <small class="text-muted">Showing recipes that match all ingredients, or any of them below.</small>
             </div>
 
-            <!-- Match All Section -->
             <div class="mb-5">
               <div v-if="isLoadingAll" class="text-center py-5">
                 <div class="spinner-border text-primary" role="status">

@@ -66,7 +66,6 @@ onUnmounted(() => {
   if (bananaInterval) clearInterval(bananaInterval)
 })
 
-/* ---------- LAND CLAMPING (natural size) ---------- */
 const percentToPx = (percent, axis) => {
   const img = villageImg.value
   if (!img) return 0
@@ -107,7 +106,6 @@ const getRandomLandPosition = () => {
 const startWalking = () => {
   const walk = () => {
     allMonkeys.value.forEach(m => {
-      // Skip keyboard control for the player's monkey
       if (m.isYou && keyboardControl.value) {
         return
       }
@@ -404,7 +402,7 @@ const bananaStyle = b => ({
 const monkeySrc = (monkey) => {
   const isHovered = hoveredMonkey.value === monkey.uid
   const normal = `/monkey/${monkey.monkeyId}.png`
-  const banana = `/bananagif-unscreen.gif`  // ← SAME IMAGE FOR ALL
+  const banana = `/bananagif-unscreen.gif` 
   return isHovered ? banana : normal
 }
 
@@ -496,7 +494,7 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
 </template>
 
 <style scoped>
-/* Full-screen village section */
+
 .village-page {
   width: 100%;
   height: 100vh;
@@ -505,10 +503,9 @@ const onHoverLeave = () => { hoveredMonkey.value = null }
   background: transparent;
   user-select: none;
   cursor: grab;
-  touch-action: none; /* Prevent default touch behaviors */
+  touch-action: none; 
 }
 
-/* Pan container */
 .pan-container {
   position: relative;
   width: 100%;

@@ -57,7 +57,6 @@ const router = createRouter({
   ]
 })
 
-// Wait for auth to be ready before checking routes
 let authReady = false
 const authReadyPromise = new Promise((resolve) => {
   const unsubscribe = auth.onAuthStateChanged(() => {
@@ -68,14 +67,13 @@ const authReadyPromise = new Promise((resolve) => {
 })
 
 router.beforeEach(async (to, from, next) => {
-  // Wait for Firebase Auth to initialize on first navigation
   if (!authReady) {
     await authReadyPromise
   }
 
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const currentUser = auth.currentUser
-  // If route requires auth, ensure user is authenticated
+
   if (requiresAuth) {
     if (currentUser) {
       next()
@@ -85,16 +83,13 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  // Public routes: if user is already logged in, redirect them away from auth/landing pages
   if (currentUser) {
-    // If visiting root landing page while authenticated, send to dashboard
     if (['landing', 'login', 'signup'].includes(to.name)) {
       next('/dashboard')
       return
     }
   }
 
-  // Default allow
   next()
 })
 
