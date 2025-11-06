@@ -1,4 +1,4 @@
-# BigBacks — FoodTracker
+# BigBacks
 
 Track Food. Save Money. Reduce Waste.
 Your smart companion for managing groceries, preventing food waste, and building sustainable habits.
