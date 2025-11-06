@@ -1,44 +1,63 @@
-# FoodTracker
+# BigBacks — FoodTracker
 
-This template should help get you started developing with Vue 3 in Vite.
+Track Food. Save Money. Reduce Waste.
+Your smart companion for managing groceries, preventing food waste, and building sustainable habits.
 
-## Recommended IDE Setup
+## Live demo, walkthrough, and repo
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- Video walkthrough: https://youtu.be/9R0Yri7ZiQA
+- Web (hosted): https://bigbacks-foodtracker.web.app/
+- Source (GitHub): https://github.com/jiongjeong/FoodTracker.git
 
-## Recommended Browser Setup
+## Quick start
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd) 
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+### Requirements
 
-## Customize configuration
+- Node.js
+- npm
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+### Install & run (development)
 
-## Project Setup
-
-```sh
+```powershell
 npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
 npm run dev
 ```
 
-### Compile and Minify for Production
+### Build (production)
 
-```sh
+```powershell
 npm run build
 ```
+### Deployment (firebase)
 
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
+```powershell
+firebase deploy
 ```
+
+## Demo user accounts
+
+Use these demo accounts to sign in during testing. These are public demo credentials — do not use them for real accounts.
+
+- bob@gmail.com
+- test1@gmail.com
+- test2@gmail.com
+- test3@gmail.com
+- test4@gmail.com
+- demo@gmail.com
+
+Password for all demo accounts: `Test123`
+
+
+Thanks for checking out BigBacks — enjoy the monkeys! 🐒🍌
+
+## Note about AI assistance
+
+This project use of AI/LLM tools to assist with certain project tasks. All AI-provided suggestions were reviewed, edited, and integrated by the group. 
+
+- Exploring UI/UX ideas and layout concepts for inspiration.
+- Generating website themes
+- Producing small boilerplate code snippets to speed prototyping (component skeletons, utility examples).
+- During debugging - quick information lookups and debugging hints to help diagnose issues.
+
+GitHub Copilot was also used as an assistive tool during development and pull request workflows to suggest code and review cues — suggested changes were reviewed and approved by the group before merging.
+
