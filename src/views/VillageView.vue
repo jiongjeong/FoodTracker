@@ -327,10 +327,6 @@ const startPan = e => {
 
 const onPan = e => {
   if (!isPanning.value) return
-  // touch-action: none on the pan container prevents default scrolling, so
-  // we don't need to call preventDefault() here. Keeping the handler passive
-  // improves scroll performance and avoids browser warnings about
-  // non-passive touch listeners.
   const clientX = e.touches ? e.touches[0].clientX : e.clientX
   const clientY = e.touches ? e.touches[0].clientY : e.clientY
 
